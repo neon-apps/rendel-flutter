@@ -1,0 +1,38 @@
+<!--
+  What the copilot needs on Android, declared here so the host app does not
+  have to. The manifest merger adds both to the app's own manifest at build
+  time.
+
+  INTERNET: Flutter's app template grants it only to debug and profile
+  builds, so a release build of an app that never needed the network before
+  would ship a copilot that cannot reach its API.
+  RECORD_AUDIO: the composer's built-in microphone. The runtime prompt is
+  still the system's; this only makes asking possible.
+
+  The queries are not permissions. Since Android 11 an app sees only the
+  apps it names, and opening a card's link in an in-app browser needs to see
+  one that serves https and Custom Tabs. The composer's Camera needs to see
+  the camera app: image_picker grants it the file to write the photograph
+  into by looking it up, and a camera it cannot see is handed nothing.
+
+  No CAMERA permission, on purpose. The camera app takes the picture under
+  its own; declaring it here would make the Play Store hide every host app
+  from devices without a camera. An app that declares it itself still gets
+  the runtime prompt, which image_picker asks for.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <intent>
+            <action android:name="android.support.customtabs.action.CustomTabsService" />
+        </intent>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
+</manifest>

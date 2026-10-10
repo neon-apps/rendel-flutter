@@ -1,0 +1,4 @@
+
+# Review-panel scratch tests. Lenses write these while they measure; none of
+# them is anyone's to maintain, and one slipped into a commit once.
+test/zz_*_test.dart

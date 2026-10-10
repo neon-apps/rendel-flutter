@@ -1,0 +1,52 @@
+name: rendel
+description: >-
+  Embed an AI copilot that answers with native UI components and safely
+  executes registered app actions. "Your entire app, one sentence away."
+version: 0.44.1
+homepage: https://rendel.ai
+repository: https://github.com/neon-apps/rendel-flutter
+
+# maplibre_gl's own floor: it does not resolve below Dart 3.7 and Flutter 3.29.
+environment:
+  sdk: ^3.7.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  crypto: ^3.0.3
+  http: ^1.2.0
+  # The composer's two controls, ready without the host writing them.
+  # `RendelConfig.onPickAttachment` and `onDictate` still replace them.
+  image_picker: ^1.0.0
+  speech_to_text: ^7.0.0
+  # Opens a link a card's button carries, in an in-app browser.
+  # `RendelConfig.onOpenUrl` still replaces it.
+  url_launcher: ^6.3.0
+  # Keeps the device id and the config cache between launches.
+  shared_preferences: ^2.3.0
+  # The `map` block's ground: MapLibre over OpenFreeMap, no key. 0.27.1 and
+  # not 0.27.0, whose Android build fails under Flutter 3.44's Kotlin setup.
+  maplibre_gl: ^0.27.1
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+  # To see what the SDK asks the picker for, without a picker.
+  image_picker_platform_interface: ^2.10.0
+  # And what it asks the browser for, without a browser.
+  url_launcher_platform_interface: ^2.3.0
+
+# A plugin rather than a plain package, for two files the host would
+# otherwise have to write: the Android manifest that declares the copilot's
+# permissions, and the iOS check that hides the microphone when Info.plist
+# lacks its usage strings instead of letting iOS close the app.
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: ai.rendel.sdk
+        pluginClass: RendelPlugin
+      ios:
+        pluginClass: RendelPlugin
