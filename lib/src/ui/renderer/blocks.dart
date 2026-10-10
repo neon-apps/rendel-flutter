@@ -617,7 +617,11 @@ Widget buildInfoCard(BuildContext context, WireBlock block, RendelDispatcher dis
           icon: _iconFor(_str(block.props['icon'])),
           lead: lead,
           title: _str(block.props['title']) ?? block.fallbackText,
-          meta: _str(block.props['meta']),
+          // The same line twice ("Red scooter · 7HG 21" as both, Grove
+          // report P2-3) is drawn once.
+          meta: _str(block.props['meta']) == _str(block.props['body'])
+              ? null
+              : _str(block.props['meta']),
           body: _str(block.props['body']),
         ),
         if (actions.isNotEmpty) ...[
@@ -1026,37 +1030,44 @@ class _Stars extends StatelessWidget {
 
     return Semantics(
       label: label,
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            children: [
-              Text(
-                '★★★★★',
-                style: style.copyWith(
-                  color: star.withValues(alpha: 0.25),
-                ),
-              ),
-              ClipRect(
-                child: Align(
-                  alignment: AlignmentDirectional.centerStart,
-                  widthFactor: clamped / 5,
-                  child: Text(
-                    '★★★★★',
-                    style: style.copyWith(color: star),
+      // A readout of fixed glyphs cannot wrap, so on a card a few points too
+      // narrow for it ("★★★★ 3.9 (109)" on a 2-up row, Grove report P1-1) it
+      // shrinks to fit instead of overflowing.
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: AlignmentDirectional.centerStart,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Stack(
+              children: [
+                Text(
+                  '★★★★★',
+                  style: style.copyWith(
+                    color: star.withValues(alpha: 0.25),
                   ),
                 ),
-              ),
-            ],
-          ),
-          SizedBox(width: theme.space.xs),
-          Text(
-            count == null
-                ? clamped.toStringAsFixed(1)
-                : '${clamped.toStringAsFixed(1)} ($count)',
-            style: theme.part('reviews', theme.text.caption),
-          ),
-        ],
+                ClipRect(
+                  child: Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    widthFactor: clamped / 5,
+                    child: Text(
+                      '★★★★★',
+                      style: style.copyWith(color: star),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(width: theme.space.xs),
+            Text(
+              count == null
+                  ? clamped.toStringAsFixed(1)
+                  : '${clamped.toStringAsFixed(1)} ($count)',
+              style: theme.part('reviews', theme.text.caption),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1339,8 +1350,15 @@ Widget _confirmCard(
 ) {
   final theme = RendelThemeScope.of(context);
   final resolved = _str(block.props[RendelLocalKeys.resolved]);
-  final destructive = (_str(block.props['risk']) ?? 'write') == 'destructive';
+  // A destructive action the app says can be taken back (an order that can
+  // still be cancelled) is asked like any other: danger means "cannot be
+  // taken back" (`design/SYSTEM.md` §6a), and saying so of it was untrue.
+  final destructive = (_str(block.props['risk']) ?? 'write') == 'destructive' &&
+      block.props['irreversible'] != false;
   final display = _maps(block.props['params_display']);
+  // The server's verb for the button, with the amount when it charges one
+  // ("Place order · A$8.41"); the build's own word otherwise.
+  final confirmLabel = _str(block.props['confirm_label']) ?? RendelStringsScope.of(context).confirm;
 
   return _Plate(
     // A destructive card raises its own edge to full ink. The accent stays on
@@ -1379,11 +1397,19 @@ Widget _confirmCard(
           SizedBox(height: theme.space.md),
           _KvPanel(children: [
             for (final row in display)
-              _KeyValueRow(
-                label: _str(row['label']) ?? '',
-                value: _str(row['value']) ?? '',
-                part: 'details',
-              ),
+              // A support message or an address is read whole, from the left,
+              // not squeezed into the value column.
+              (_str(row['value']) ?? '').length > 40
+                  ? _StackedRow(
+                      label: _str(row['label']) ?? '',
+                      value: _str(row['value']) ?? '',
+                      part: 'details',
+                    )
+                  : _KeyValueRow(
+                      label: _str(row['label']) ?? '',
+                      value: _str(row['value']) ?? '',
+                      part: 'details',
+                    ),
           ]),
         ],
         SizedBox(height: theme.space.lg),
@@ -1428,35 +1454,84 @@ Widget _confirmCard(
                   ),
                 )
 
-              : Row(
-                  children: [
-                    Expanded(
-                      child: RendelActionButton(
-                        label: RendelStringsScope.of(context).confirm,
-                        expand: true,
-                        onTap: _tap(dispatch, block.props['confirm']),
-                        part: 'confirm',
-                      ),
-                    ),
-                    SizedBox(width: theme.space.sm),
-                    Expanded(
-                      child: RendelActionButton(
-                        // Never "Cancel": on a card asking whether to cancel an
-                        // order, the decline button and the action being
-                        // confirmed would be the same word.
-                        label: RendelStringsScope.of(context).goBack,
-                        quiet: true,
-                        expand: true,
-                        onTap: _tap(dispatch, block.props['cancel']),
-                        part: 'cancel',
-                      ),
-                    ),
-                  ],
+              : _confirmButtons(
+                  context,
+                  confirm: RendelActionButton(
+                    label: confirmLabel,
+                    expand: true,
+                    danger: destructive,
+                    onTap: _tap(dispatch, block.props['confirm']),
+                    part: 'confirm',
+                  ),
+                  cancel: RendelActionButton(
+                    // Never "Cancel": on a card asking whether to cancel an
+                    // order, the decline button and the action being
+                    // confirmed would be the same word.
+                    label: RendelStringsScope.of(context).goBack,
+                    quiet: true,
+                    expand: true,
+                    onTap: _tap(dispatch, block.props['cancel']),
+                    part: 'cancel',
+                  ),
+                  // "Place order · A$8.41" does not fit half a card on a phone.
+                  stacked: confirmLabel.length > 14,
                 ),
         ),
       ],
     ),
   );
+}
+
+/// The two answers side by side, or one above the other when the confirm
+/// button names its action at length.
+Widget _confirmButtons(
+  BuildContext context, {
+  required Widget confirm,
+  required Widget cancel,
+  required bool stacked,
+}) {
+  final theme = RendelThemeScope.of(context);
+  if (stacked) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [confirm, SizedBox(height: theme.space.sm), cancel],
+    );
+  }
+  return Row(
+    children: [
+      Expanded(child: confirm),
+      SizedBox(width: theme.space.sm),
+      Expanded(child: cancel),
+    ],
+  );
+}
+
+/// A detail too long for the value column: its label, then the value at the
+/// panel's full width, from the left.
+class _StackedRow extends StatelessWidget {
+  const _StackedRow({required this.label, required this.value, this.part});
+
+  final String label;
+  final String value;
+  final String? part;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return MergeSemantics(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: theme.space.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: _asPart(theme, part, theme.text.caption)),
+            SizedBox(height: theme.space.hair * 2),
+            Text(value, style: _asPart(theme, part, theme.text.captionSoftTabular)),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// The settled state of something the user answered: a confirm card they
@@ -2752,7 +2827,7 @@ String _describeChart(
       low = math.min(low, v);
     }
   }
-  final suffix = unit == null ? '' : ' $unit';
+  String said(double v) => _withUnit(_num(v), unit);
   final points = series.first.data.length;
   if (kind == 'donut') {
     final total = series.first.data.fold<double>(0, (sum, v) => sum + math.max(0, v));
@@ -2766,7 +2841,7 @@ String _describeChart(
     _ => kind,
   };
   return '$name chart, $points points, '
-      'high ${_num(high)}$suffix, low ${_num(low)}$suffix';
+      'high ${said(high)}, low ${said(low)}';
 }
 
 /// Series are told apart by weight of ink, not by hue. A chart is a readout,
@@ -2831,7 +2906,7 @@ class _Plot extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _num(maxValue) + (unit == null ? '' : ' $unit'),
+          _withUnit(_num(maxValue), unit),
           style: theme.text.captionTabular,
           // The two axis labels below this are capped; this was the only
           // caption in the catalog that could wrap to three lines and push
@@ -2995,7 +3070,7 @@ class _Bars extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                said(latest) + (unit == null ? '' : ' $unit'),
+                _withUnit(said(latest), unit),
                 style: theme.text.displayTabular,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -7517,12 +7592,18 @@ class RendelActionButton extends StatelessWidget {
     this.part,
     this.detail,
     this.icon,
+    this.danger = false,
   });
 
   final String label;
   final VoidCallback? onTap;
   final bool quiet;
   final bool expand;
+
+  /// The `danger` control (`design/SYSTEM.md` §6a): filled in danger with
+  /// white words, for the confirmation of something that cannot be taken
+  /// back. A card part's own fill still wins.
+  final bool danger;
 
   /// A smaller line under [label]: what the action itself names, such as the
   /// number a call dials or the start of an event added to the calendar.
@@ -7558,12 +7639,15 @@ class RendelActionButton extends StatelessWidget {
     //  * quiet is white with the hairline and ink words;
     //  * a card part's own fill is drawn flat, as the customer chose it.
     final BoxDecoration decoration;
+    final dangerous = danger && !quiet && !disabled && fill == null;
     if (fill != null) {
       decoration = BoxDecoration(
         color: fill,
         border: Border.all(color: fill),
         borderRadius: radius,
       );
+    } else if (dangerous) {
+      decoration = BoxDecoration(color: theme.danger, borderRadius: radius);
     } else if (quiet) {
       decoration = disabled
           ? BoxDecoration(
@@ -7612,10 +7696,12 @@ class RendelActionButton extends StatelessWidget {
           : disabled
               ? theme.text.labelStrong
                   .copyWith(color: theme.colors.onSurfaceFaint)
-              : outlined
-                  ? theme.text.labelStrong
-                      .copyWith(color: theme.accentText)
-                  : theme.text.labelStrong,
+              : dangerous
+                  ? theme.text.labelStrong.copyWith(color: const Color(0xFFFFFFFF))
+                  : outlined
+                      ? theme.text.labelStrong
+                          .copyWith(color: theme.accentText)
+                      : theme.text.labelStrong,
     );
     return RendelPressable(
       semanticLabel: detail == null ? label : '$label, $detail',
@@ -8597,8 +8683,22 @@ String _num(double value) {
   return value.toStringAsFixed(1);
 }
 
-/// A currency as a chart's unit: a sign like € or ₺, or a code like EUR.
-final RegExp _currencyUnit = RegExp(r'^(\p{Sc}|[A-Z]{3})$', unicode: true);
+/// A currency as a chart's unit: a sign like € or ₺, one with letters like
+/// A$ or US$, or a code like EUR.
+final RegExp _currencyUnit = RegExp(r'^([A-Z]{0,3}\p{Sc}|[A-Z]{3})$', unicode: true);
+
+/// A sign written before the amount wherever it is used: $, £, ¥, ₹, ₩, and
+/// the dollars that carry letters (A$, US$, HK$). Not €, ₺ or kr, which most
+/// of their own languages write after it.
+final RegExp _currencySign = RegExp(r'^[A-Z]{0,3}[$£¥₹₩]$', unicode: true);
+
+/// [said] with its unit: a sign before it ("A$119.04", as the prose writes
+/// it, Grove report P2-6), anything else after it ("12 kg", "40 EUR").
+String _withUnit(String said, String? unit) {
+  if (unit == null) return said;
+  final trimmed = unit.trim();
+  return _currencySign.hasMatch(trimmed) ? '$trimmed$said' : '$said $unit';
+}
 
 /// How a chart writes its values, as the web SDK does: all with as many
 /// decimals as the most precise of them has, at most two, so 53.4 beside
@@ -9886,16 +9986,24 @@ Widget buildScreens(BuildContext context, WireBlock block, RendelDispatcher disp
         _ScreenCard(
           title: _str(items[i]['title']) ?? '',
           icon: _iconFor(_str(items[i]['icon'])),
-          path: switch (UIAction.tryParse(items[i]['action'])) {
-            NavigateAction(:final route) => dispatch.routeTitle?.call(route),
-            _ => null,
-          },
+          path: _sameWords(
+            _str(items[i]['title']),
+            switch (UIAction.tryParse(items[i]['action'])) {
+              NavigateAction(:final route) => dispatch.routeTitle?.call(route),
+              _ => null,
+            },
+          ),
           onTap: _tap(dispatch, items[i]['action']),
         ),
       ],
     ],
   );
 }
+
+/// [path] unless it says what [title] already does: "Cart" over "Cart"
+/// (Grove report) is one word read twice.
+String? _sameWords(String? title, String? path) =>
+    path != null && title?.trim().toLowerCase() == path.trim().toLowerCase() ? null : path;
 
 /// One screen of the app: the primary fill's tile with the item's icon, the
 /// item's title over the route's own, and the way out at the end.
@@ -12605,16 +12713,21 @@ class _ProgressRing extends StatelessWidget {
               child: Center(
                 child: Padding(
                   padding: EdgeInsets.all(stroke + 6),
-                  child: Text(
-                    // Without a value label of its own, a ring's middle says
-                    // its share: "12.5 / 20" does not fit inside one of three
-                    // rings on a phone. The figures are still read out.
-                    valueLabel ?? percent,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    // The brief's 650, at the nearest weight Flutter names.
-                    style: theme.text.labelTabular.copyWith(fontSize: 15, fontWeight: FontWeight.w600),
+                  // Shrunk to fit, never cut: "3,710..." in place of the
+                  // points a member has is a number they cannot read (Grove
+                  // report P2-7).
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      // Without a value label of its own, a ring's middle says
+                      // its share: "12.5 / 20" does not fit inside one of three
+                      // rings on a phone. The figures are still read out.
+                      valueLabel ?? percent,
+                      maxLines: 1,
+                      textAlign: TextAlign.center,
+                      // The brief's 650, at the nearest weight Flutter names.
+                      style: theme.text.labelTabular.copyWith(fontSize: 15, fontWeight: FontWeight.w600),
+                    ),
                   ),
                 ),
               ),
@@ -12751,7 +12864,7 @@ class _HBars extends StatelessWidget {
           SizedBox(width: theme.space.sm),
           _TrailingSlot(
             child: Text(
-              said(value) + (unit == null ? '' : ' $unit'),
+              _withUnit(said(value), unit),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.text.captionTabular,

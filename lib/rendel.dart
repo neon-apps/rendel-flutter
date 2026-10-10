@@ -15,6 +15,7 @@ export 'src/core/strings.dart' show RendelStrings, RendelStringsScope;
 // a host decides where the last good payload is kept between launches.
 export 'src/core/remote_config.dart'
     show RendelConfigStore, RendelMemoryConfigStore, RendelRemoteConfig;
+export 'src/core/batteries.dart' show RendelDictationDenied;
 export 'src/core/copilot.dart' show Rendel;
 export 'src/core/pairing.dart' show RendelPairResult, RendelPairFailure;
 export 'src/core/events.dart' show RendelEvent;

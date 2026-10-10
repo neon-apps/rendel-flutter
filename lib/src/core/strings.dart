@@ -41,6 +41,8 @@ class RendelStrings {
     this.working = 'Working…',
     this.nothingHeard = 'Nothing was heard. Check the microphone and try again.',
     this.dictationFailed = 'Speech recognition is not available right now.',
+    this.dictationDenied = 'Allow the microphone and speech recognition for this app in Settings to talk to the assistant.',
+    this.openSettings = 'Open Settings',
     this.composerHint = 'Ask anything',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
@@ -198,6 +200,15 @@ class RendelStrings {
   /// recogniser that failed. The two shared one English sentence, which sent
   /// people to check a microphone that was fine.
   final String dictationFailed;
+
+  /// Shown when the microphone or speech recognition was refused. Not
+  /// [dictationFailed]: nothing is broken, the person has a switch to turn,
+  /// and saying where it is beats saying it is unavailable (Grove report P1-9).
+  final String dictationDenied;
+
+  /// The button beside [dictationDenied] that opens this app's page in the
+  /// system settings, where that switch is.
+  final String openSettings;
 
   final String composerHint;
 
@@ -534,6 +545,8 @@ class RendelStrings {
     String? working,
     String? nothingHeard,
     String? dictationFailed,
+    String? dictationDenied,
+    String? openSettings,
     String? composerHint,
     String? sendMessage,
     String? newConversation,
@@ -661,6 +674,8 @@ class RendelStrings {
       working: working ?? this.working,
       nothingHeard: nothingHeard ?? this.nothingHeard,
       dictationFailed: dictationFailed ?? this.dictationFailed,
+      dictationDenied: dictationDenied ?? this.dictationDenied,
+      openSettings: openSettings ?? this.openSettings,
       composerHint: composerHint ?? this.composerHint,
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
@@ -795,6 +810,8 @@ const Map<String, RendelStrings> _byLocale = {
   'tr': RendelStrings(
     nothingHeard: 'Hiçbir şey duyulmadı. Mikrofonu kontrol edip tekrar deneyin.',
     dictationFailed: 'Konuşma tanıma şu anda kullanılamıyor.',
+    dictationDenied: "Asistanla konuşmak için Ayarlar'da bu uygulamaya mikrofon ve konuşma tanıma izni verin.",
+    openSettings: 'Ayarları aç',
     working: 'Çalışıyor…',
     emptyTitle: 'Bu uygulamayla ilgili ne isterseniz sorun.',
     emptyBody: 'Kendi cümlelerinizle sorun. Bir cümle yeterli.',
@@ -926,6 +943,8 @@ const Map<String, RendelStrings> _byLocale = {
   'de': RendelStrings(
     nothingHeard: 'Es wurde nichts gehört. Prüfen Sie das Mikrofon.',
     dictationFailed: 'Die Spracherkennung ist gerade nicht verfügbar.',
+    dictationDenied: 'Erlauben Sie in den Einstellungen Mikrofon und Spracherkennung für diese App, um mit dem Assistenten zu sprechen.',
+    openSettings: 'Einstellungen öffnen',
     working: 'Arbeitet…',
     emptyTitle: 'Fragen Sie alles über diese App.',
     emptyBody: 'Fragen Sie in Ihren eigenen Worten. Ein Satz genügt.',
@@ -1059,6 +1078,8 @@ const Map<String, RendelStrings> _byLocale = {
   'fr': RendelStrings(
     nothingHeard: "Rien n'a été entendu. Vérifiez le microphone.",
     dictationFailed: 'La reconnaissance vocale est indisponible pour le moment.',
+    dictationDenied: "Autorisez le micro et la reconnaissance vocale pour cette app dans Réglages pour parler à l'assistant.",
+    openSettings: 'Ouvrir Réglages',
     working: 'En cours…',
     emptyTitle: 'Posez toutes vos questions sur cette application.',
     emptyBody: 'Posez votre question avec vos mots. Une phrase suffit.',
@@ -1191,6 +1212,8 @@ const Map<String, RendelStrings> _byLocale = {
   'es': RendelStrings(
     nothingHeard: 'No se oyó nada. Comprueba el micrófono.',
     dictationFailed: 'El reconocimiento de voz no está disponible ahora.',
+    dictationDenied: 'Permite el micrófono y el reconocimiento de voz para esta app en Ajustes para hablar con el asistente.',
+    openSettings: 'Abrir Ajustes',
     working: 'Trabajando…',
     emptyTitle: 'Pregunta lo que quieras sobre esta aplicación.',
     emptyBody: 'Pregunta con tus propias palabras. Basta una frase.',
@@ -1322,6 +1345,8 @@ const Map<String, RendelStrings> _byLocale = {
   'ar': RendelStrings(
     nothingHeard: 'لم يُسمع شيء. تحقّق من الميكروفون.',
     dictationFailed: 'التعرّف على الكلام غير متاح حاليًا.',
+    dictationDenied: 'اسمح للتطبيق باستخدام الميكروفون والتعرّف على الكلام من الإعدادات للتحدث مع المساعد.',
+    openSettings: 'فتح الإعدادات',
     working: 'جارٍ العمل…',
     emptyTitle: 'اسأل أي شيء عن هذا التطبيق.',
     emptyBody: 'اسأل بكلماتك الخاصة. جملة واحدة تكفي.',

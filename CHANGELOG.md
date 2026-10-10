@@ -5,6 +5,37 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.46.2
+
+**Added**
+
+- `RendelAction.undoable`: a destructive action the user can still take
+  back (an order that can be cancelled while it is packed). Its card does not
+  say "This cannot be undone" and its confirm button is not a danger control.
+  Sent in the manifest only when set, so existing manifests keep their hash.
+- `RendelDictationDenied`: thrown by the built-in recogniser when the
+  microphone or speech recognition is refused; a host's own `onDictate` may
+  throw it too. The thread then says where to allow it, with Open Settings
+  on iOS. New strings: `dictationDenied`, `openSettings`.
+
+**Changed**
+
+- The confirm button reads the card's `confirm_label` from the server
+  ("Place order · A$8.41") and stacks above Go back when it is long. An
+  irreversible destructive card's confirm is filled in danger, as on the web.
+  A long detail value reads whole under its label.
+- Voice mode opens when the recogniser starts listening, not behind the
+  system's permission prompt.
+- Charts write a dollar, pound, yen, rupee or won sign before the amount
+  (A$119.04); A$ and US$ count as money for the cents rule.
+
+**Fixed**
+
+- A product card's stars and review count no longer overflow a narrow card.
+- A progress ring's value shrinks to fit instead of ending in "...".
+- An info card whose meta and body are the same line draws it once; a
+  screen card leaves out the route's title when the item already says it.
+
 ## 0.46.1
 
 **Changed**

@@ -87,6 +87,49 @@ void main() {
     }
   });
 
+  // Grove report P0-2: a paying card said "Confirm" over raw ids, and every
+  // destructive one claimed it could not be undone.
+  group('the card in the user\'s terms', () {
+    testWidgets('the button says what happens, with the amount', (tester) async {
+      await pump(
+        tester,
+        card(risk: 'destructive')..['confirm_label'] = 'Place order · A\$8.41',
+        scale: 2.0,
+      );
+      expect(tester.takeException(), isNull);
+      expect(find.text('Place order · A\$8.41'), findsOneWidget);
+      expect(find.text('Confirm'), findsNothing);
+      expect(find.text('Go back'), findsOneWidget);
+    });
+
+    testWidgets('a destructive card says it cannot be undone by default',
+        (tester) async {
+      await pump(tester, card(risk: 'destructive'));
+      expect(find.text('This cannot be undone'), findsOneWidget);
+    });
+
+    testWidgets('an action the app can take back does not claim otherwise',
+        (tester) async {
+      await pump(tester, card(risk: 'destructive')..['irreversible'] = false);
+      expect(find.text('This cannot be undone'), findsNothing);
+    });
+
+    testWidgets('a long value is read whole, at any scale', (tester) async {
+      final props = card()
+        ..['params_display'] = [
+          {
+            'label': 'Message',
+            'value':
+                'My order arrived with the yoghurt split open and the bag soaked through, please refund it',
+          },
+        ];
+      for (final scale in [1.0, 2.0]) {
+        await pump(tester, props, scale: scale);
+        expect(tester.takeException(), isNull);
+      }
+    });
+  });
+
   group('expiry', () {
     testWidgets('a passed deadline replaces the buttons', (tester) async {
       await pump(

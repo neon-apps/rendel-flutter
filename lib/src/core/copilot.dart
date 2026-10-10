@@ -486,6 +486,7 @@ class Rendel {
           // The built-in reports how loud the speaker is; voice mode's glow
           // swells with it.
           dictationLevel: _config.onDictate == null ? speech.level : null,
+          dictationStarted: _config.onDictate == null ? speech.started : null,
           onNavigate: (action) => presentation.navigate(action),
         ),
       ),

@@ -3,10 +3,12 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart' show ValueListenable;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, ValueListenable, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
+import '../core/batteries.dart' show RendelDictationDenied, openAppSettings;
 import '../core/config.dart'
     show RendelAttachIcon, RendelAttachment, RendelAttachSource, RendelSendIcon, RendelVoiceIcon;
 import '../engine/conversation_controller.dart';
@@ -56,6 +58,7 @@ class ThreadScreen extends StatefulWidget {
     this.onDictate,
     this.onStopDictating,
     this.dictationLevel,
+    this.dictationStarted,
     this.onNavigate,
   });
 
@@ -120,6 +123,12 @@ class ThreadScreen extends StatefulWidget {
   /// How loud the speaker is, 0 to 1, for voice mode's glow. The SDK's own
   /// recogniser reports it; a host's does not, and the glow only breathes.
   final ValueListenable<double>? dictationLevel;
+
+  /// True once the recogniser is actually listening. The SDK's own reports
+  /// it, and voice mode waits for it: the first press opens the system's
+  /// permission prompt, and "Listening" behind it was untrue. Null — a host's
+  /// recogniser — opens voice mode on the press, as before.
+  final ValueListenable<bool>? dictationStarted;
 
   /// Opens one of the app's screens the way the presentation wants it: the
   /// panel shrinking into the bubble while the app navigates under it. Null
@@ -305,13 +314,19 @@ class _ThreadScreenState extends State<ThreadScreen> {
     final dictate = widget.onDictate;
     if (dictate == null || widget.controller.busy) return;
 
+    final started = widget.dictationStarted;
+    void opened() {
+      if (started!.value && mounted && !_voiceCancelled) setState(() => _voice = true);
+    }
+
     setState(() {
       _dictating = true;
       _attachError = null;
-      _voice = true;
+      _voice = started == null;
       _heard = '';
       _voiceCancelled = false;
     });
+    started?.addListener(opened);
     try {
       final text = await dictate((partial) {
         if (!mounted || _voiceCancelled) return;
@@ -341,6 +356,13 @@ class _ThreadScreenState extends State<ThreadScreen> {
       _send(words);
       _spoken = false;
       setState(() => _voice = false);
+    } on RendelDictationDenied {
+      if (!mounted) return;
+      // Refused, not broken: say where the switch is (Grove report P1-9).
+      setState(() {
+        _voice = false;
+        _attachError = widget.strings.dictationDenied;
+      });
     } catch (err) {
       if (!mounted) return;
       /* The recogniser failed, which is not silence.
@@ -355,9 +377,15 @@ class _ThreadScreenState extends State<ThreadScreen> {
         _attachError = widget.strings.dictationFailed;
       });
     } finally {
+      started?.removeListener(opened);
       if (mounted) setState(() => _dictating = false);
     }
   }
+
+  /// A refused microphone, on a platform whose settings can be opened to it.
+  bool get _offerSettings =>
+      identical(_attachError, widget.strings.dictationDenied) &&
+      defaultTargetPlatform == TargetPlatform.iOS;
 
   /// A tap away from voice mode while it listens: nothing is sent.
   void _cancelVoice() {
@@ -519,10 +547,14 @@ class _ThreadScreenState extends State<ThreadScreen> {
                             // not work", and a second error surface would be a
                             // second thing to learn.
                             message: _attachError ?? _turnError(controller),
-                            retryLabel: widget.strings.retry,
-                            onRetry: _attachError == null && controller.canRetry
-                                ? controller.retry
-                                : null,
+                            retryLabel: _offerSettings
+                                ? widget.strings.openSettings
+                                : widget.strings.retry,
+                            onRetry: _offerSettings
+                                ? () => unawaited(openAppSettings())
+                                : _attachError == null && controller.canRetry
+                                    ? controller.retry
+                                    : null,
                           ),
                           _Composer(
                             input: _input,

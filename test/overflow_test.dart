@@ -186,6 +186,24 @@ final fixtures = <String, ({String type, Map<String, dynamic> props})>{
       ]
     }
   ),
+  // Grove report P1-1: "★★★★ 3.9 (109)" overflowed a horizontal card by 4pt.
+  'product_cards/rated-max': (
+    type: 'product_cards',
+    props: {
+      'items': [
+        for (var i = 0; i < 4; i++)
+          {
+            'title': 'INNER GOODNESS Soy Light Milk 1L',
+            'subtitle': 'Soy Light · 1 L',
+            'price': 'A\$1.59',
+            'rating': 3.9,
+            'rating_count': 100000000,
+            'image_url': broken,
+            'action': act,
+          }
+      ]
+    }
+  ),
   'product_cards/max': (
     type: 'product_cards',
     props: {

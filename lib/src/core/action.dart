@@ -63,6 +63,7 @@ class RendelAction {
     this.confirmTemplates,
     this.timeout = const Duration(seconds: 15),
     this.sandboxResult,
+    this.undoable = false,
   })  : assert(
           handler != null || onInvoke != null,
           'RendelAction needs a handler or an onInvoke.',
@@ -119,6 +120,12 @@ class RendelAction {
   /// Matched on the locale the SDK sends: exact tag first, then the language,
   /// then [confirmTemplate]. Sixteen at most.
   final Map<String, String>? confirmTemplates;
+
+  /// A [RendelRisk.destructive] action whose effect the user can still take
+  /// back afterwards, such as an order that can be cancelled while it is
+  /// being packed. Its confirmation card then does not say "This cannot be
+  /// undone", and its confirm button is not drawn as a danger control.
+  final bool undoable;
 
   /// How long the platform waits for this action before giving up on it.
   final Duration timeout;

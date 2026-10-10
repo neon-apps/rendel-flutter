@@ -652,6 +652,9 @@ Map<String, dynamic> buildManifest(
             if (a.confirmTemplates != null && a.confirmTemplates!.isNotEmpty)
               'confirmTemplates': a.confirmTemplates,
             'timeoutMs': a.timeoutMs,
+            // Only when set, for the same reason: every manifest from before
+            // this flag keeps the hash it had.
+            if (a.undoable) 'undoable': true,
           },
         },
     ],

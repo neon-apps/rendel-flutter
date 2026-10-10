@@ -5,6 +5,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
@@ -296,6 +297,75 @@ void main() {
     expect(find.text('53.40 €'), findsOneWidget);
     expect(find.text('Today, the highest'), findsOneWidget);
     expect(find.textContaining('in Today'), findsNothing);
+  });
+
+  testWidgets('a ring shows its whole value, shrunk rather than cut (Grove report P2-7)', (tester) async {
+    final block = WireBlock.tryParse({
+      'id': 'b_progress',
+      'type': 'progress',
+      'fallback_text': 'Points.',
+      'props': {
+        'style': 'ring',
+        'items': [
+          {'label': 'Points', 'value': 3710, 'max': 5000, 'value_label': '3,710 pts'},
+          {'label': 'Orders', 'value': 9, 'max': 10},
+          {'label': 'Saved', 'value': 42.5, 'max': 100, 'value_label': 'A\$42.50'},
+        ],
+      },
+    })!;
+    tester.view.physicalSize = const Size(320 * 3, 800 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(MaterialApp(
+      home: RendelThemeScope(
+        theme: RendelTheme.paper(),
+        child: Scaffold(
+          body: Builder(
+            builder: (context) => ComponentRegistry.build(
+              context,
+              block,
+              RendelDispatcher(onAction: (_) async => true, canHandle: (_) => true, onSubmitForm: (_, __) async => RendelSubmitOutcome.sent),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 600));
+    final value = tester.renderObject<RenderParagraph>(find.text('3,710 pts'));
+    expect(value.didExceedMaxLines, isFalse);
+  });
+
+  testWidgets('a chart writes a dollar sign before the amount (Grove report P2-6)', (tester) async {
+    final block = WireBlock.tryParse({
+      'id': 'b_chart',
+      'type': 'chart',
+      'fallback_text': 'Spend by month.',
+      'props': {
+        'kind': 'bar',
+        'unit': 'A\$',
+        'labels': ['Sep', 'Oct'],
+        'series': [
+          {'data': [67.5, 119.04]},
+        ],
+      },
+    })!;
+    await tester.pumpWidget(MaterialApp(
+      home: RendelThemeScope(
+        theme: RendelTheme.paper(),
+        child: Scaffold(
+          body: Builder(
+            builder: (context) => ComponentRegistry.build(
+              context,
+              block,
+              RendelDispatcher(onAction: (_) async => true, canHandle: (_) => true, onSubmitForm: (_, __) async => RendelSubmitOutcome.sent),
+            ),
+          ),
+        ),
+      ),
+    ));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('A\$119.04'), findsOneWidget);
+    expect(find.text('119.04 A\$'), findsNothing);
   });
 
   test('the new words exist in all six languages', () {

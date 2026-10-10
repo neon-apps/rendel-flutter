@@ -55,6 +55,21 @@ void main() {
     );
   });
 
+  test('undoable rides in the manifest only when it is set', () {
+    RendelAction place({bool undoable = false}) => RendelAction(
+          name: 'place_cart_order',
+          description: 'Order the cart.',
+          params: RendelSchema.object({}),
+          risk: RendelRisk.destructive,
+          undoable: undoable,
+          handler: (_) async => RendelResult.ok(),
+        );
+    Map nc(Map<String, dynamic> m) => ((m['actions'] as List).single as Map)['nc'] as Map;
+    expect(nc(buildManifest([place(undoable: true)]))['undoable'], isTrue);
+    // Absent, not false: a build that never sets it keeps the hash it had.
+    expect(nc(buildManifest([place()])).containsKey('undoable'), isFalse);
+  });
+
   test('canonicalize sorts keys and drops nulls', () {
     expect(
       canonicalize({'b': 1, 'a': {'d': null, 'c': [2, 1]}}),

@@ -30,6 +30,17 @@ import 'remote_config.dart' show RendelConfigStore;
 /// users already know; `RendelAttachIcon.off` and `RendelVoiceIcon.off` remove the
 /// controls altogether.
 
+/// Thrown by a dictation when the person refused the microphone or speech
+/// recognition. The thread then says where to allow it, with a button to the
+/// app's settings, rather than that recognition is unavailable. A host's own
+/// `RendelConfig.onDictate` may throw it too.
+class RendelDictationDenied implements Exception {
+  const RendelDictationDenied();
+
+  @override
+  String toString() => 'RendelDictationDenied: microphone or speech recognition permission refused';
+}
+
 /// The SDK's own recogniser: `speech_to_text`, on the device.
 ///
 /// One instance per thread. A session can end four ways — a final result, a
@@ -49,6 +60,11 @@ class RendelSpeech {
   /// glow swells with it. Scaled against the quietest and loudest levels this
   /// session has reported, because the platforms report on different scales.
   final level = ValueNotifier<double>(0);
+
+  /// True once a session is actually listening. The first press asks for the
+  /// permissions, and the thread waits for this before it says "Listening",
+  /// which it otherwise said behind the system's own prompt.
+  final started = ValueNotifier<bool>(false);
   double? _quietest;
   double? _loudest;
 
@@ -63,6 +79,9 @@ class RendelSpeech {
 
   /// The errors that mean nobody spoke, rather than that nothing could listen.
   static const _silence = {'error_no_match', 'error_speech_timeout', 'error_retry'};
+
+  /// The errors that mean the person said no to a permission.
+  static const _refused = {'error_permission', 'error_insufficient_permissions'};
 
   /// `RendelConfig.onDictate`, built in.
   Future<String?> dictate(void Function(String partial) onPartial) async {
@@ -94,7 +113,16 @@ class RendelSpeech {
     }
     // False is a refused permission or a device with no recogniser — not
     // silence, so not null.
-    if (!ready) throw StateError('speech recognition was refused or is unavailable');
+    if (!ready) {
+      var refused = false;
+      try {
+        refused = !await _speech.hasPermission;
+      } catch (_) {
+        // A platform that cannot say: treated as unavailable, as before.
+      }
+      if (refused) throw const RendelDictationDenied();
+      throw StateError('speech recognition is unavailable');
+    }
 
     /* A session that has not finished letting go.
 
@@ -139,7 +167,11 @@ class RendelSpeech {
 
     // And if it did not start after all, say so now rather than leaving a lit
     // microphone attached to a future nobody will complete.
-    if (!_speech.isListening) _end();
+    if (!_speech.isListening) {
+      _end();
+    } else {
+      started.value = true;
+    }
 
     return completer.future;
   }
@@ -158,12 +190,17 @@ class RendelSpeech {
     if (!_listening) return;
     _listening = false;
     level.value = 0;
+    started.value = false;
     final pending = _dictation;
     final failure = _failure;
     _dictation = null;
     _failure = null;
     if (pending == null || pending.isCompleted) return;
     final text = _heard.trim();
+    if (text.isEmpty && failure != null && _refused.contains(failure.errorMsg)) {
+      pending.completeError(const RendelDictationDenied());
+      return;
+    }
     if (text.isEmpty && failure != null && !_silence.contains(failure.errorMsg)) {
       // Nothing heard because nothing could listen. The thread says so, and
       // logs the message, instead of sending somebody to check the microphone.
@@ -230,6 +267,18 @@ Future<bool> openExternally(String url) async {
     return await launchUrl(uri, mode: LaunchMode.externalApplication);
   } catch (err) {
     RendelLog.warn('open_external_failed', 'the link could not be handed to the system', error: err);
+    return false;
+  }
+}
+
+/// Opens this app's page in the iOS Settings app, where a refused microphone
+/// is allowed again. iOS only: Android has no URL for it that `url_launcher`
+/// can open, so the thread offers the button on iOS alone.
+Future<bool> openAppSettings() async {
+  try {
+    return await launchUrl(Uri.parse('app-settings:'), mode: LaunchMode.externalApplication);
+  } catch (err) {
+    RendelLog.warn('settings_failed', 'the app settings could not be opened', error: err);
     return false;
   }
 }

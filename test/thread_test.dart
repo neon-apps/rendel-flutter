@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -618,6 +619,96 @@ void main() {
       expect(find.text('That could not be heard. Try again.'), findsNothing);
       expect(logged.single.code, 'dictation_failed');
       expect('${logged.single.error}', contains('error_unknown (300)'));
+    });
+
+    // Grove report P1-9: a refused permission read "Speech recognition is not
+    // available right now", and voice mode said "Listening" behind the
+    // system's own prompt.
+    testWidgets('a refused microphone says where to allow it', (tester) async {
+      final c = controller();
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                strings: const RendelStrings(),
+                onDictate: (_) async => throw const RendelDictationDenied(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      await tester.pump();
+
+      expect(find.text(const RendelStrings().dictationDenied), findsOneWidget);
+      expect(find.text(const RendelStrings().dictationFailed), findsNothing);
+    });
+
+    testWidgets('offers the settings on iOS', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final c = controller();
+      addTearDown(c.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                strings: const RendelStrings(),
+                onDictate: (_) async => throw const RendelDictationDenied(),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      await tester.pump();
+      expect(find.text('Open Settings'), findsOneWidget);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('waits for the recogniser before it says it is listening',
+        (tester) async {
+      final c = controller();
+      addTearDown(c.dispose);
+      final started = ValueNotifier<bool>(false);
+      final pending = Completer<String?>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                strings: const RendelStrings(),
+                onDictate: (_) => pending.future,
+                onStopDictating: () {},
+                dictationStarted: started,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      await tester.pump(const Duration(milliseconds: 300));
+      // The permission prompt is up: nothing is listening yet.
+      expect(find.text('Listening'), findsNothing);
+
+      started.value = true;
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.textContaining('Listening'), findsWidgets);
+
+      pending.complete(null);
+      await tester.pump(const Duration(milliseconds: 600));
     });
 
     testWidgets('stays un-pressable when there is nothing to stop it with',
