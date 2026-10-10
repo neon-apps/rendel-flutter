@@ -5,6 +5,23 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.46.3
+
+**Changed**
+
+- Only the first paragraph of an opening answer is the lede; the rest of
+  that text reads at the body size under it.
+- A map leaves room at its sides for the widest pin label, which is
+  centred on its point, so a pin near the edge keeps its name.
+- A product's name gets three lines.
+- A slot sent with `available: false` is shown struck through and cannot
+  be picked; a day the slots' title already names is not said again.
+- A long pass value (a card number) takes a row of its own.
+- A comparison that marks a best value says what the mark means. New
+  string: `comparisonBest`.
+- A tap on a bar of a bar chart reads that bar out; a second tap goes back
+  to the latest.
+
 ## 0.46.2
 
 **Added**

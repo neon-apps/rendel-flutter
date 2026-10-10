@@ -409,6 +409,18 @@ void main() {
     expect(tester.widget<Text>(find.text('Soft, and in your size.')).style?.fontSize, 15);
   });
 
+  testWidgets('only the first paragraph of a long opening is the lede (Grove report)', (tester) async {
+    final c = seeded([
+      _text('a', "I can't give dietary advice.\n\nWhat I can do is show you the label for any snack."),
+    ]);
+    addTearDown(c.dispose);
+    await pump(tester, c);
+    await settle(tester);
+
+    expect(tester.widget<Text>(find.text("I can't give dietary advice.")).style?.fontSize, 21);
+    expect(tester.widget<Text>(find.text('What I can do is show you the label for any snack.')).style?.fontSize, 15);
+  });
+
   group('a marked phrase', () {
     final marks = find.byWidgetPredicate((w) => '${w.runtimeType}' == '_Marks');
 

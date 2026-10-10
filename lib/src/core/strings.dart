@@ -43,6 +43,7 @@ class RendelStrings {
     this.dictationFailed = 'Speech recognition is not available right now.',
     this.dictationDenied = 'Allow the microphone and speech recognition for this app in Settings to talk to the assistant.',
     this.openSettings = 'Open Settings',
+    this.comparisonBest = 'Highlighted: the best in its row.',
     this.composerHint = 'Ask anything',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
@@ -209,6 +210,10 @@ class RendelStrings {
   /// The button beside [dictationDenied] that opens this app's page in the
   /// system settings, where that switch is.
   final String openSettings;
+
+  /// Under a comparison that marks a best value: what the mark means, which
+  /// on its own read as "different" (Grove report).
+  final String comparisonBest;
 
   final String composerHint;
 
@@ -547,6 +552,7 @@ class RendelStrings {
     String? dictationFailed,
     String? dictationDenied,
     String? openSettings,
+    String? comparisonBest,
     String? composerHint,
     String? sendMessage,
     String? newConversation,
@@ -676,6 +682,7 @@ class RendelStrings {
       dictationFailed: dictationFailed ?? this.dictationFailed,
       dictationDenied: dictationDenied ?? this.dictationDenied,
       openSettings: openSettings ?? this.openSettings,
+      comparisonBest: comparisonBest ?? this.comparisonBest,
       composerHint: composerHint ?? this.composerHint,
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
@@ -812,6 +819,7 @@ const Map<String, RendelStrings> _byLocale = {
     dictationFailed: 'Konuşma tanıma şu anda kullanılamıyor.',
     dictationDenied: "Asistanla konuşmak için Ayarlar'da bu uygulamaya mikrofon ve konuşma tanıma izni verin.",
     openSettings: 'Ayarları aç',
+    comparisonBest: 'İşaretli: satırının en iyisi.',
     working: 'Çalışıyor…',
     emptyTitle: 'Bu uygulamayla ilgili ne isterseniz sorun.',
     emptyBody: 'Kendi cümlelerinizle sorun. Bir cümle yeterli.',
@@ -945,6 +953,7 @@ const Map<String, RendelStrings> _byLocale = {
     dictationFailed: 'Die Spracherkennung ist gerade nicht verfügbar.',
     dictationDenied: 'Erlauben Sie in den Einstellungen Mikrofon und Spracherkennung für diese App, um mit dem Assistenten zu sprechen.',
     openSettings: 'Einstellungen öffnen',
+    comparisonBest: 'Markiert: der beste Wert der Zeile.',
     working: 'Arbeitet…',
     emptyTitle: 'Fragen Sie alles über diese App.',
     emptyBody: 'Fragen Sie in Ihren eigenen Worten. Ein Satz genügt.',
@@ -1080,6 +1089,7 @@ const Map<String, RendelStrings> _byLocale = {
     dictationFailed: 'La reconnaissance vocale est indisponible pour le moment.',
     dictationDenied: "Autorisez le micro et la reconnaissance vocale pour cette app dans Réglages pour parler à l'assistant.",
     openSettings: 'Ouvrir Réglages',
+    comparisonBest: 'En surbrillance : le meilleur de la ligne.',
     working: 'En cours…',
     emptyTitle: 'Posez toutes vos questions sur cette application.',
     emptyBody: 'Posez votre question avec vos mots. Une phrase suffit.',
@@ -1214,6 +1224,7 @@ const Map<String, RendelStrings> _byLocale = {
     dictationFailed: 'El reconocimiento de voz no está disponible ahora.',
     dictationDenied: 'Permite el micrófono y el reconocimiento de voz para esta app en Ajustes para hablar con el asistente.',
     openSettings: 'Abrir Ajustes',
+    comparisonBest: 'Resaltado: el mejor de su fila.',
     working: 'Trabajando…',
     emptyTitle: 'Pregunta lo que quieras sobre esta aplicación.',
     emptyBody: 'Pregunta con tus propias palabras. Basta una frase.',
@@ -1347,6 +1358,7 @@ const Map<String, RendelStrings> _byLocale = {
     dictationFailed: 'التعرّف على الكلام غير متاح حاليًا.',
     dictationDenied: 'اسمح للتطبيق باستخدام الميكروفون والتعرّف على الكلام من الإعدادات للتحدث مع المساعد.',
     openSettings: 'فتح الإعدادات',
+    comparisonBest: 'المظلَّل: الأفضل في صفّه.',
     working: 'جارٍ العمل…',
     emptyTitle: 'اسأل أي شيء عن هذا التطبيق.',
     emptyBody: 'اسأل بكلماتك الخاصة. جملة واحدة تكفي.',

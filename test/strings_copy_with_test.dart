@@ -23,6 +23,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'dictationFailed': (s) => s.dictationFailed,
   'dictationDenied': (s) => s.dictationDenied,
   'openSettings': (s) => s.openSettings,
+  'comparisonBest': (s) => s.comparisonBest,
   'composerHint': (s) => s.composerHint,
   'sendMessage': (s) => s.sendMessage,
   'newConversation': (s) => s.newConversation,

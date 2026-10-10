@@ -121,6 +121,30 @@ Widget buildFallback(BuildContext context, WireBlock block) {
   );
 }
 
+/// One run of answer text in [style], its ==marks== drawn, with the
+/// streaming caret after it when more is coming.
+Widget _textParagraph(BuildContext context, String text, TextStyle style, TextAlign? align, {required bool caret}) {
+  final theme = RendelThemeScope.of(context);
+  final marks = _markSpans(text);
+  final drawn = Text.rich(
+    TextSpan(
+      children: [
+        ...?marks?.spans,
+        if (marks == null) TextSpan(text: text.isEmpty ? '…' : text),
+        if (caret)
+          WidgetSpan(
+            alignment: PlaceholderAlignment.middle,
+            child: _Caret(color: theme.colors.onSurface, height: theme.type.heading),
+          ),
+      ],
+    ),
+    style: style,
+    textAlign: align,
+  );
+  if (marks == null) return drawn;
+  return _Marks(ranges: marks.ranges, color: theme.mark, child: drawn);
+}
+
 Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
   final theme = RendelThemeScope.of(context);
   final page = RendelPage.maybeOf(context);
@@ -143,6 +167,30 @@ Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher di
             )
           : theme.text.prose.copyWith(fontSize: 15, height: 1.5);
   final align = summary ? TextAlign.center : null;
+
+  /* Only the first paragraph is the lede. An answer that ran on was drawn
+     whole at 21pt, two paragraphs of headline (Grove report); what follows
+     the first reads at the body size under it. */
+  final split = lede && !summary ? text.indexOf(RegExp(r'\n\s*\n')) : -1;
+  if (split > 0) {
+    final rest = text.substring(split).trim();
+    if (rest.isNotEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _textParagraph(context, text.substring(0, split).trim(), style, null, caret: false),
+          SizedBox(height: theme.space.md),
+          _textParagraph(
+            context,
+            rest,
+            theme.text.prose.copyWith(fontSize: 15, height: 1.5),
+            null,
+            caret: !block.ready,
+          ),
+        ],
+      );
+    }
+  }
   final marks = _markSpans(text);
 
   Widget paragraph() {
@@ -1106,7 +1154,9 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
       ],
       Text(
         _str(item['title']) ?? '',
-        maxLines: 2,
+        // Three lines: a brand-first name ("INNER GOODNESS Regular Soy Milk
+        // 1L") lost the product itself at two (Grove report).
+        maxLines: 3,
         overflow: TextOverflow.ellipsis,
         style: theme.part('title', theme.text.label),
       ),
@@ -2580,8 +2630,12 @@ Widget buildDatetimeSlots(
     // A "10:00" alone does not say which 10:00 was asked for, so the question
     // carries the day it sits under.
     final day = _dayKey(RendelStringsScope.of(context), slot['starts_at']);
+    // A booked-out window, shown so the reader sees it rather than reads
+    // about it, and not pickable (Grove report).
+    final open = slot['available'] != false;
     return RendelChip(
       label: label,
+      unavailable: !open,
       // Slot labels are clock times, so proportional digits would make every
       // chip a different width and re-flow the Wrap between renders.
       tabular: true,
@@ -2589,13 +2643,17 @@ Widget buildDatetimeSlots(
       // The pick goes up as a `selection`, and whoever sends it marks the
       // slot chosen, only if it does send: a slot marked after a tap the open
       // turn dropped is a booking the user believes they made.
-      onTap: id != null && select != null
+      onTap: open && id != null && select != null
           ? () => select(block, id, day.isEmpty ? label : '$day, $label')
           : null,
     );
   }
 
   final ordered = groups.entries.toList();
+  // One day that the title already names ("Tomorrow morning – Sun 11 Oct")
+  // is not said again over its slots.
+  final title = _str(block.props['title']) ?? '';
+  final saidInTitle = ordered.length == 1 && ordered.first.key.isNotEmpty && title.contains(ordered.first.key);
 
   return _Plate(
     enclosure: _Enclosure.live,
@@ -2605,7 +2663,7 @@ Widget buildDatetimeSlots(
         _BlockTitle(block.props['title']),
         for (var i = 0; i < ordered.length; i++) ...[
           if (i > 0) SizedBox(height: theme.space.lg),
-          if (ordered[i].key.isNotEmpty) ...[
+          if (ordered[i].key.isNotEmpty && !saidInTitle) ...[
             RendelOverline(ordered[i].key),
             SizedBox(height: theme.space.sm),
           ],
@@ -3003,7 +3061,11 @@ class _Plot extends StatelessWidget {
 /// The latest bar is lit like the primary action and its label set in full
 /// ink; every other bar is a 10% tint of the ink, and a month with nothing in
 /// it is a small dot rather than a sliver of bar.
-class _Bars extends StatelessWidget {
+///
+/// A tap on a bar reads that one out instead, and lights it; a second tap
+/// goes back to the latest. The bars carried no values at all, so a month
+/// other than the last could only be guessed from its height (Grove report).
+class _Bars extends StatefulWidget {
   const _Bars({
     required this.labels,
     required this.data,
@@ -3017,9 +3079,21 @@ class _Bars extends StatelessWidget {
   final String description;
 
   @override
+  State<_Bars> createState() => _BarsState();
+}
+
+class _BarsState extends State<_Bars> {
+  /// The bar read out; null is the latest.
+  int? _shown;
+
+  @override
   Widget build(BuildContext context) {
+    final labels = widget.labels;
+    final data = widget.data;
+    final unit = widget.unit;
+    final description = widget.description;
     final theme = RendelThemeScope.of(context);
-    final last = data.length - 1;
+    final last = (_shown != null && _shown! < data.length) ? _shown! : data.length - 1;
     final peak = data.reduce(math.max);
     final top = peak > 0 ? peak : 1.0;
     final latest = data[last];
@@ -3108,7 +3182,12 @@ class _Bars extends StatelessWidget {
                     for (var i = 0; i < data.length; i++) ...[
                       if (i > 0) SizedBox(width: gap),
                       Expanded(
-                        child: Column(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(
+                            () => _shown = _shown == i || i == data.length - 1 && _shown == null ? null : i,
+                          ),
+                          child: Column(
                           children: [
                             SizedBox(
                               height: height,
@@ -3131,6 +3210,7 @@ class _Bars extends StatelessWidget {
                                   : theme.text.caption,
                             ),
                           ],
+                          ),
                         ),
                       ),
                     ],
@@ -8265,6 +8345,14 @@ class _ComparisonState extends State<_Comparison> {
               ],
             ),
           ),
+        if (widget.rows.any((row) => row['best_index'] != null))
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Text(
+              strings.comparisonBest,
+              style: theme.text.caption.copyWith(color: theme.colors.onSurfaceSoft),
+            ),
+          ),
         if (widget.summary != null && widget.summary!.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 14),
@@ -11439,6 +11527,19 @@ Widget buildPlaceCard(BuildContext context, WireBlock block, RendelDispatcher di
 /// or its label.
 typedef _Pin = ({double lat, double lng, String label, String? subtitle});
 
+/// How far in from the sides the outermost pins stand: [least], or half the
+/// widest label, which is centred over its point, so a pin at the edge keeps
+/// its name on the map ("ove Parramatta", Grove report). Estimated from the
+/// label's length (12 pt, at most 180 wide) and held to a quarter of [width]
+/// each side, so a narrow map still has room to place them.
+double _pinRoom(List<_Pin> pins, double width, double least) {
+  var widest = 0.0;
+  for (final pin in pins) {
+    widest = math.max(widest, math.min(180.0, 20 + pin.label.length * 7.2));
+  }
+  return math.max(least, math.min(widest / 2, width / 4));
+}
+
 List<_Pin> _pinsOf(Map props) => [
       for (final pin in _maps(props['pins']))
         if ((_dbl(pin['lat']), _dbl(pin['lng']), _str(pin['label'])) case (final lat?, final lng?, final label?)
@@ -11531,7 +11632,10 @@ class _MapBlockState extends State<_MapBlock> {
               final camera = RendelMapCamera.fit(
                 [for (final pin in widget.pins) (lat: pin.lat, lng: pin.lng)],
                 size,
-                padding: const EdgeInsets.all(40),
+                padding: EdgeInsets.symmetric(
+                  horizontal: _pinRoom(widget.pins, size.width, 40),
+                  vertical: 40,
+                ),
               );
               return Stack(
                 fit: StackFit.expand,
@@ -11793,7 +11897,12 @@ class _MapScreenState extends State<_MapScreen> {
         final fitted = RendelMapCamera.fit(
           [for (final pin in widget.pins) (lat: pin.lat, lng: pin.lng)],
           size,
-          padding: EdgeInsets.fromLTRB(40, bar + 40, 40, foot + 40),
+          padding: EdgeInsets.fromLTRB(
+            _pinRoom(widget.pins, size.width, 40),
+            bar + 40,
+            _pinRoom(widget.pins, size.width, 40),
+            foot + 40,
+          ),
         );
         return Stack(
           fit: StackFit.expand,
@@ -11995,7 +12104,9 @@ class _PassFields extends StatelessWidget {
         children: [
           for (final (label, value) in fields)
             SizedBox(
-              width: width,
+              // A long value (a card number) takes the row: in a third of it
+              // "6018 2900 4471 0038" broke over two lines (Grove report).
+              width: value.length > 12 ? box.maxWidth : width,
               child: MergeSemantics(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
