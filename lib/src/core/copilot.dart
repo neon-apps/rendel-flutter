@@ -48,6 +48,11 @@ class Rendel {
   static String? _appKey;
   static bool _manifestSynced = false;
 
+  /// Bumped by every registration, so a sync knows whether what it sent is
+  /// still what is registered when its answer comes back.
+  static int _manifestEdits = 0;
+  static Future<void>? _manifestSyncing;
+
   /// Who is signed in, as the last [identify] said, until [reset]. Sent on
   /// every turn: the server no longer keeps it for the phone, because two
   /// people can use one phone.
@@ -228,6 +233,7 @@ class Rendel {
   static void registerAction(RendelAction action) {
     _actions[action.name] = action;
     _manifestSynced = false;
+    _manifestEdits++;
     unawaited(_syncManifest());
   }
 
@@ -269,6 +275,7 @@ class Rendel {
       open: open,
     );
     _manifestSynced = false;
+    _manifestEdits++;
     unawaited(_syncManifest());
   }
 
@@ -564,6 +571,8 @@ class Rendel {
     _routes.clear();
     _providers.clear();
     _manifestSynced = false;
+    _manifestEdits = 0;
+    _manifestSyncing = null;
     _configEtag = null;
     _store = RendelMemoryConfigStore();
     _theme = RendelTheme.paper();
@@ -728,16 +737,40 @@ class Rendel {
   static Map<String, dynamic> _manifest() =>
       buildManifest(_actions.values, routes: _routes.values);
 
-  static Future<void> _syncManifest() async {
+  /// One manifest request at a time, the last one always the newest.
+  ///
+  /// Each registration asks for a sync, and an app registers several in a row
+  /// right after `init`. Sent side by side, those requests raced: each carried
+  /// the routes registered so far, the server keeps whichever arrived last,
+  /// and a build could land with one screen missing (found by the AI setup
+  /// eval, 0.45.0). So a sync asked for while one is in flight is folded into
+  /// one more pass after it, with everything registered by then.
+  static Future<void> _syncManifest() {
+    final api = _api;
+    if (api == null || _manifestSynced) return Future.value();
+    final running = _manifestSyncing;
+    if (running != null) return running.then((_) => _syncManifest());
+    final pass = _sendManifest(api).whenComplete(() => _manifestSyncing = null);
+    _manifestSyncing = pass;
+    return pass;
+  }
+
+  static Future<void> _sendManifest(RendelApiClient api) async {
     // Sent with nothing registered too (§9.7): an empty manifest is how the
     // console tells "the SDK is in and has no screens yet" from "the SDK is
     // not in", which is a setup step of its own.
-    final api = _api;
-    if (api == null || _manifestSynced) return;
+    // A microtask first, so registrations made in the same breath as the one
+    // that asked are in this pass rather than the next.
+    // A microtask, not a timer: a widget test's clock never advances a timer
+    // it was not told about, and a pending one fails the test.
+    await Future<void>.microtask(() {});
+    final edits = _manifestEdits;
     _cachedHash = null;
     try {
       await api.syncManifest(_manifest(), _config.sdkVersion);
-      _manifestSynced = true;
+      // Only if nothing was registered while it was on the wire; otherwise
+      // the queued pass sends the newer manifest.
+      _manifestSynced = edits == _manifestEdits;
       _controller?.manifestHash = _currentManifestHash();
     } catch (err) {
       RendelLog.warn('manifest_sync_failed',

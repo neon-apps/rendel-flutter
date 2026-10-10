@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.45.1
+
+**Fixed**
+
+- Routes and actions registered one after another right after \`init\` are
+  sent as one manifest, one request at a time, the last one always the
+  newest. Before, each registration sent its own request with what was
+  registered so far, the server kept whichever arrived last, and a build
+  could land with a screen missing.
+
 ## 0.45.0
 
 **Changed**
