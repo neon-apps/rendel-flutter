@@ -38,6 +38,11 @@ class RendelLogRecord {
   /// * `config_unreadable` — a published config could not be parsed, or was
   ///   not legible on this device
   /// * `config_cache_write_failed` — the config store threw on write
+  /// * `app_not_live` — debug: the server refuses a live key until the app
+  ///   goes live in the console, so the launcher is hidden; use the test key
+  ///   or press Go live
+  /// * `app_suspended` — debug: the app is suspended, so the launcher is
+  ///   hidden
   /// * `device_id_ephemeral` — no `deviceIdStore`, so the id is per launch
   /// * `device_id_store_failed` — the device id store threw or hung
   /// * `usage_description_missing` — Info.plist lacks the microphone's or the

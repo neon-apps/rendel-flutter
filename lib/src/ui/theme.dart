@@ -1374,6 +1374,164 @@ class RendelTheme {
       displayFontFamily: displayFontFamily,
     );
   }
+
+  /// The theme [light] is drawn in when the device is in dark mode, for a
+  /// host that maps one theme and not two (design/AI-SETUP.md §9.5).
+  ///
+  /// [paper] is [deep], the published pair. A theme that is already dark is
+  /// its own dark theme: nothing is inverted. Any other gets the four roles
+  /// [rendelDarkRoles] derives from its own, and every surface, quiet ink and
+  /// accent role is then solved from those exactly as [fromTokens] solves a
+  /// light palette — so the dark theme is held to the same floors. Its sizes,
+  /// faces and builds are the light theme's; a card's own colours are not,
+  /// because they were chosen for a light plate.
+  ///
+  /// Pass `darkTheme` to `Rendel.init` to choose it yourself instead.
+  factory RendelTheme.darkFrom(RendelTheme light) {
+    if (identical(light, RendelTheme.paper())) return RendelTheme.deep();
+    if (light._lightOnDark) return light;
+    final roles = rendelDarkRoles(
+      surface: light.colors.surface,
+      onSurface: light.colors.onSurface,
+      accent: light.colors.accent,
+      onAccent: light.colors.onAccent,
+    );
+    return RendelTheme.fromTokens(
+      surface: roles.surface,
+      onSurface: roles.onSurface,
+      accent: roles.accent,
+      onAccent: roles.onAccent,
+      radius: light.radius,
+      type: light.type,
+      space: light.space,
+      motion: light.motion,
+      size: light.size,
+      elevation: light.elevation,
+      style: light.style,
+      cards: {
+        for (final MapEntry(key: kind, value: look) in light.cards.entries)
+          kind: RendelCardLook(
+            radius: look.radius,
+            style: look.style,
+            parts: {
+              for (final MapEntry(key: name, value: part) in look.parts.entries)
+                name: RendelPartLook(size: part.size, radius: part.radius),
+            },
+          ),
+      },
+      fontFamily: light.fontFamily,
+      displayFontFamily: light.displayFontFamily,
+    );
+  }
+}
+
+// ———————————————————————— dark mode ————————————————————————
+//
+// One derivation, written three times: `deriveDarkTokens` in
+// `packages/protocol/src/appconfig.ts` (the reference, and the console's),
+// `sdk/web/src/config.ts`, and this. Byte channels rounded to the nearest
+// integer throughout, so the three agree to the byte; `dark_test.dart` pins
+// the same inputs to the same hex as the protocol's own test.
+
+/// The four roles a dark theme is derived in: whatever the dark palette
+/// states ([darkSurface] and the rest), and for each one it leaves out, a
+/// derivation from the light four.
+///
+///   * A light palette that is already dark (its ink lighter than its
+///     ground) is its own dark palette.
+///   * Otherwise the ground and the ink are [RendelTheme.deep]'s.
+///   * The accent is kept where it reads on that ground as a boundary (3:1)
+///     and lightened along its own hue where it does not. A grey accent has
+///     no hue to keep — a light theme's black button is that theme's ink — so
+///     it becomes the dark ink. The brand's own palette takes the brand's
+///     yellow, so `paper()` derives to exactly `deep()`.
+///   * The label on the accent is the light one where it still clears 4.5:1,
+///     and otherwise whichever of near-black and white reads better.
+({Color surface, Color onSurface, Color accent, Color onAccent})
+    rendelDarkRoles({
+  required Color surface,
+  required Color onSurface,
+  required Color accent,
+  required Color onAccent,
+  Color? darkSurface,
+  Color? darkOnSurface,
+  Color? darkAccent,
+  Color? darkOnAccent,
+}) {
+  const deepSurface = Color(0xFF12110F);
+  const deepInk = Color(0xFFF4F2EE);
+  const brandYellow = Color(0xFFFEF7AF);
+  const nearBlack = Color(0xFF0A0A0A);
+  const white = Color(0xFFFFFFFF);
+
+  final alreadyDark =
+      _relativeLuminance(onSurface) > _relativeLuminance(surface);
+  final ground = darkSurface ?? (alreadyDark ? surface : deepSurface);
+  final ink = darkOnSurface ?? (alreadyDark ? onSurface : deepInk);
+  final paper = RendelTheme.paper().colors;
+  final brandDefault = _byte(surface) == _byte(paper.surface) &&
+      _byte(onSurface) == _byte(paper.onSurface) &&
+      _byte(accent) == _byte(paper.accent) &&
+      _byte(onAccent) == _byte(paper.onAccent);
+  final action = darkAccent ??
+      (alreadyDark
+          ? accent
+          : brandDefault
+              ? brandYellow
+              : _darkAccent(accent, ground, ink));
+  final label = darkOnAccent ??
+      (contrastRatio(onAccent, action) >= 4.5
+          ? onAccent
+          : contrastRatio(nearBlack, action) >= contrastRatio(white, action)
+              ? nearBlack
+              : white);
+  return (surface: ground, onSurface: ink, accent: action, onAccent: label);
+}
+
+/// A colour as its 24-bit RGB, for comparing two by value.
+int _byte(Color color) =>
+    (color.r * 255).round() << 16 |
+    (color.g * 255).round() << 8 |
+    (color.b * 255).round();
+
+/// [accent] on a dark [ground]; see [rendelDarkRoles].
+Color _darkAccent(Color accent, Color ground, Color ink) {
+  if (contrastRatio(accent, ground) >= 3) return accent;
+  final channels = [accent.r, accent.g, accent.b]
+      .map((v) => (v * 255).round())
+      .toList();
+  final max = channels.reduce(math.max) / 255;
+  final min = channels.reduce(math.min) / 255;
+  final lightness = (max + min) / 2;
+  final saturation =
+      max == min ? 0.0 : (max - min) / (1 - (2 * lightness - 1).abs());
+  if (saturation < 0.15) return ink;
+  // Toward white in whole bytes, as the console's mirror does, so the two
+  // land on the same value rather than a rounding apart.
+  Color toward(double t) => Color.fromARGB(
+        255,
+        (channels[0] + (255 - channels[0]) * t).round(),
+        (channels[1] + (255 - channels[1]) * t).round(),
+        (channels[2] + (255 - channels[2]) * t).round(),
+      );
+  // To the floor plus the margin every other rescue here keeps, so the
+  // rounding cannot land it at 2.99.
+  final wanted = 3 + _floorMargin;
+  var found = toward(1);
+  if (contrastRatio(found, ground) < wanted) return ink;
+  var low = 0.0;
+  var high = 1.0;
+  for (var i = 0; i < 12; i++) {
+    final mid = (low + high) / 2;
+    final candidate = toward(mid);
+    if (contrastRatio(candidate, ground) >= wanted) {
+      found = candidate;
+      high = mid;
+    } else {
+      low = mid;
+    }
+  }
+  return found;
 }
 
 /// How far [ink] may move toward [ground] before it stops clearing [minimum]

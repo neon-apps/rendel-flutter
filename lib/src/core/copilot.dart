@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -70,7 +71,20 @@ class Rendel {
   /// is always layered over the ORIGINAL rather than over the last applied
   /// one. Layering twice is how a radius drifts a point per launch.
   static RendelTheme _codeTheme = RendelTheme.paper();
+  static RendelTheme _codeDarkTheme = RendelTheme.deep();
   static RendelConfig _codeConfig = const RendelConfig();
+
+  /// The theme a device in dark mode draws: the host's `darkTheme`, or the
+  /// one [RendelTheme.darkFrom] derives from its light theme, with the
+  /// published `themeDark` over it.
+  static RendelTheme _darkTheme = RendelTheme.deep();
+
+  /// [RendelConfig.themeMode] until [setThemeMode] says otherwise.
+  static RendelThemeMode _themeMode = RendelThemeMode.system;
+
+  /// `app_not_live` or `app_suspended` while the server refuses this app its
+  /// copilot (design/AI-SETUP.md §2.6); null otherwise.
+  static String? _refusal;
   static RendelConfigStore _store = RendelMemoryConfigStore();
   static String? _configEtag;
 
@@ -80,18 +94,55 @@ class Rendel {
   static final ValueNotifier<int> configRevision = ValueNotifier<int>(0);
 
   static Stream<RendelEvent> get events => _events.stream;
-  static RendelTheme get theme => _theme;
+
+  /// The theme the copilot is drawn in right now: the light one or the dark
+  /// one, by [RendelConfig.themeMode] and the device's own setting.
+  ///
+  /// Inside a widget, prefer [themeOf], which also rebuilds the widget when
+  /// the device switches.
+  static RendelTheme get theme =>
+      themeFor(ui.PlatformDispatcher.instance.platformBrightness);
+
+  /// [theme] for a widget: read through `MediaQuery`, so a phone switched to
+  /// dark mode while the copilot is on screen repaints it there and then.
+  static RendelTheme themeOf(BuildContext context) => themeFor(
+        MediaQuery.maybePlatformBrightnessOf(context) ??
+            ui.PlatformDispatcher.instance.platformBrightness,
+      );
+
+  /// The light or the dark theme, for a device whose setting is [platform].
+  static RendelTheme themeFor(Brightness platform) => switch (_themeMode) {
+        RendelThemeMode.light => _theme,
+        RendelThemeMode.dark => _darkTheme,
+        RendelThemeMode.system =>
+          platform == Brightness.dark ? _darkTheme : _theme,
+      };
+
+  /// Changes [RendelConfig.themeMode] while the app runs: for an app with an
+  /// appearance switch of its own. The launcher and an open thread repaint.
+  static void setThemeMode(RendelThemeMode mode) {
+    if (mode == _themeMode) return;
+    _themeMode = mode;
+    configRevision.value++;
+  }
+
   static RendelConfig get config => _config;
 
-  /// False when the host turned the copilot off in code, or when the customer
-  /// published a kill switch. [RendelLauncher] draws nothing and [open]
-  /// returns without presenting.
-  static bool get isEnabled => _config.enabled;
+  /// False when the host turned the copilot off in code, when the customer
+  /// published a kill switch, or when the server refuses this app its
+  /// copilot — a live key before the app has gone live, or a suspended app.
+  /// [RendelLauncher] draws nothing and [open] returns without presenting.
+  static bool get isEnabled => _config.enabled && _refusal == null;
   static bool get isInitialized => _api != null;
 
+  /// Starts the copilot. [darkTheme] is drawn while the device is in dark mode (see
+  /// [RendelConfig.themeMode]). Left out, it is [RendelTheme.darkFrom] of
+  /// [theme]: [RendelTheme.deep] for the default, and for a brand of your own
+  /// a dark ground with your accent kept wherever it reads on one.
   static Future<void> init({
     required String appKey,
     RendelTheme? theme,
+    RendelTheme? darkTheme,
     List<RendelAction> actions = const [],
     RendelConfig config = const RendelConfig(),
   }) async {
@@ -123,9 +174,12 @@ class Rendel {
     _config = config;
     if (theme != null) _theme = theme;
     _codeTheme = _theme;
+    _darkTheme = _codeDarkTheme = darkTheme ?? RendelTheme.darkFrom(_theme);
+    _themeMode = config.themeMode;
     // The SDK's own storage unless the host brought one — see `batteries.dart`.
     _store = config.configStore ?? _defaultStore('nc_config');
     auditContrast(_theme);
+    if (darkTheme != null) auditContrast(darkTheme);
     for (final action in actions) {
       _actions[action.name] = action;
     }
@@ -333,7 +387,7 @@ class Rendel {
   /// calls `open()` from its own menu rather than from [RendelLauncher].
   static Future<void> open(BuildContext context) async {
     final api = _api;
-    if (api == null || !_config.enabled) return;
+    if (api == null || !isEnabled) return;
     // Already presented: in the bubble while a screen it opened is in front,
     // the launcher does what the bubble does. Over the app, a second sheet of
     // the same thread is not drawn.
@@ -379,12 +433,17 @@ class Rendel {
     late final RendelPresentation presentation;
     presentation = _presentation = RendelPresentation(
       context: context,
-      theme: () => _theme,
+      theme: themeOf,
       label: strings.backToAssistant,
       bubbleOffset: _config.bubbleOffset,
       openRoute: controller.tapAction,
-      thread: () => RendelThemeScope(
-        theme: _theme,
+      // The theme is chosen where the thread is drawn rather than here: it
+      // depends on the device's dark mode, which can change while the thread
+      // is open, and on [setThemeMode].
+      thread: () => ValueListenableBuilder<int>(
+        valueListenable: configRevision,
+        builder: (context, _, thread) =>
+            RendelThemeScope(theme: themeOf(context), child: thread!),
         child: ThreadScreen(
           strings: strings,
           controller: controller,
@@ -509,6 +568,10 @@ class Rendel {
     _store = RendelMemoryConfigStore();
     _theme = RendelTheme.paper();
     _codeTheme = _theme;
+    _darkTheme = _codeDarkTheme = RendelTheme.deep();
+    _themeMode = RendelThemeMode.system;
+    _refusal = null;
+    _appliedSignature = null;
     _config = const RendelConfig();
     _logoAssetId = null;
     _codeConfig = _config;
@@ -535,12 +598,15 @@ class Rendel {
   static Future<void> _refreshConfig() async {
     final api = _api;
     if (api == null || !_codeConfig.remoteConfig) return;
-    final result = await api.fetchConfig(etag: _configEtag);
-    // Null covers a 304, an error status and an unreachable network alike:
-    // all three mean "no new config today", and what is on screen is already
-    // correct.
-    if (result == null) return;
-    final parsed = RendelRemoteConfig.tryParse(result.$1, etag: result.$2);
+    final answer = await api.fetchConfig(etag: _configEtag);
+    // Null covers an error status and an unreachable network alike: both
+    // mean "no new config today", and what is on screen is already correct.
+    if (answer == null) return;
+    _refuse(answer.refusal);
+    // A 304, or a refusal: nothing to apply.
+    final body = answer.body;
+    if (body == null) return;
+    final parsed = RendelRemoteConfig.tryParse(body, etag: answer.etag);
     if (parsed == null) {
       RendelLog.warn('config_unreadable', 'published config was unreadable; ignoring it');
       return;
@@ -556,6 +622,35 @@ class Rendel {
     }
   }
 
+  /// The server refusing this app its copilot, or no longer refusing it
+  /// (design/AI-SETUP.md §2.6).
+  ///
+  /// `app_not_live` is a live key in a build made before anyone pressed Go
+  /// live — the developer's own mistake, never the user's. So the launcher
+  /// goes, nobody is shown an error they cannot act on, and the developer
+  /// gets one debug line saying what to do. Once a later answer is a 200 or a
+  /// 304 the app is live and the launcher comes back.
+  static void _refuse(String? code) {
+    if (code == _refusal) return;
+    _refusal = code;
+    if (code == 'app_not_live') {
+      RendelLog.report(
+        RendelLogLevel.debug,
+        'app_not_live',
+        'This app has not gone live, so the server refuses its live key and '
+            'the copilot is hidden. Use the test key (rd_pk_test_…) while you '
+            'build, or press Go live in the Rendel console.',
+      );
+    } else if (code == 'app_suspended') {
+      RendelLog.report(
+        RendelLogLevel.debug,
+        'app_suspended',
+        'This app is suspended in the Rendel console, so the copilot is hidden.',
+      );
+    }
+    configRevision.value++;
+  }
+
   /// Layers a payload over the ORIGINAL code config, never over the last
   /// applied one, and audits the result the same way `init()` audits a
   /// hand-mapped theme.
@@ -568,9 +663,11 @@ class Rendel {
     if (signature == _appliedSignature) return;
     _appliedSignature = signature;
     _theme = remote.applyTo(_codeTheme);
+    _darkTheme = remote.applyToDark(_codeTheme, _codeDarkTheme);
     _config = remote.applyToConfig(_codeConfig);
     _logoAssetId = remote.logoAssetId;
     auditContrast(_theme);
+    auditContrast(_darkTheme);
     configRevision.value++;
   }
 
@@ -632,8 +729,11 @@ class Rendel {
       buildManifest(_actions.values, routes: _routes.values);
 
   static Future<void> _syncManifest() async {
+    // Sent with nothing registered too (§9.7): an empty manifest is how the
+    // console tells "the SDK is in and has no screens yet" from "the SDK is
+    // not in", which is a setup step of its own.
     final api = _api;
-    if (api == null || (_actions.isEmpty && _routes.isEmpty) || _manifestSynced) return;
+    if (api == null || _manifestSynced) return;
     _cachedHash = null;
     try {
       await api.syncManifest(_manifest(), _config.sdkVersion);

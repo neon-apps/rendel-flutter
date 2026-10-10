@@ -71,6 +71,9 @@ void main() async {
       // This is the file-backed one so the example demonstrates the whole
       // path, including the offline launch.
       configStore: KicksConfigStore(),
+      // This app draws only a light theme, so the copilot does too, even on a
+      // phone in dark mode. An app with a dark theme leaves this out.
+      themeMode: RendelThemeMode.light,
 
       // Photos, Camera, Files and the microphone are the SDK's own, ready
       // without a line here. The three Info.plist strings the camera and the
@@ -88,7 +91,68 @@ void main() async {
     actions: KicksStore.instance.copilotActions(),
   );
   Rendel.addContextProvider('cart', () async => KicksStore.instance.cartSnapshot());
+  registerKicksRoutes();
   runApp(const NeonKicksApp());
+}
+
+/// The app's own navigator, so a screen the copilot offers is pushed where
+/// the app pushes its screens.
+final kicksNavigator = GlobalKey<NavigatorState>();
+
+/// The screens the copilot may open from an answer (design/NAVIGATE.md):
+/// each main screen of the app, under the name the app itself gives it. This
+/// is the shape the AI setup playbook writes for a host, and its eval reads
+/// this file as the reference.
+void registerKicksRoutes() {
+  final store = KicksStore.instance;
+  Future<void> push(Widget screen) async {
+    await kicksNavigator.currentState?.push(MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
+  Rendel.registerRoute(
+    'product_detail',
+    title: 'Shop › Product',
+    description: 'One sneaker: its price and the EU sizes in stock.',
+    params: {
+      'product_id': const RendelRouteParam.string(
+        description: 'The id search_products returns, e.g. p1',
+        required: true,
+        fromActions: true,
+      ),
+    },
+    open: (params) async {
+      final product = store.products.where((p) => p.id == '${params['product_id']}').firstOrNull;
+      if (product != null) await push(ProductScreen(product: product));
+    },
+  );
+  Rendel.registerRoute(
+    'cart',
+    title: 'Cart',
+    description: 'What is in the shopper\'s cart, its total and any promo code.',
+    open: (_) => push(const CartScreen()),
+  );
+  Rendel.registerRoute(
+    'orders',
+    title: 'Orders',
+    description: 'Every order the shopper has placed, with its status.',
+    open: (_) => push(const OrdersScreen()),
+  );
+  Rendel.registerRoute(
+    'order_detail',
+    title: 'Orders › Order',
+    description: 'One order: its items and delivery status.',
+    params: {
+      'order_id': const RendelRouteParam.string(
+        description: 'The order number, e.g. 1042',
+        required: true,
+        fromActions: true,
+      ),
+    },
+    open: (params) async {
+      final order = store.orders.where((o) => o.id == '${params['order_id']}').firstOrNull;
+      if (order != null) await push(OrderScreen(order: order));
+    },
+  );
 }
 
 /// Action params come off the wire, which means they came from a model. The
@@ -141,6 +205,29 @@ class KicksStore extends ChangeNotifier {
 
   final cart = <(Product, int)>[];
   String? promo;
+
+  /// Who is signed in. The demo has one account and no password.
+  String? shopper;
+
+  /// The app's own sign-in, and the one line the copilot needs from it:
+  /// `identify`, so every turn from here is this shopper's, across relaunches.
+  Future<void> signIn() async {
+    shopper = 'kicks-shopper-1042';
+    notifyListeners();
+    await Rendel.identify(userId: shopper!, traits: {'name': 'Demo Shopper', 'tier': 'member'});
+  }
+
+  /// Sign-out, and `reset`: the next turn is anonymous and the thread is gone.
+  void signOut() {
+    shopper = null;
+    notifyListeners();
+    Rendel.reset();
+  }
+
+  void addToCart(Product product, int size) {
+    cart.add((product, size));
+    notifyListeners();
+  }
 
   Map<String, dynamic> cartSnapshot() => {
         'items': cart.length,
@@ -256,6 +343,7 @@ class NeonKicksApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Neon Kicks',
+      navigatorKey: kicksNavigator,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
@@ -288,14 +376,35 @@ class ShopScreen extends StatelessWidget {
             ),
             icon: const Icon(Icons.grid_view_rounded),
           ),
+          IconButton(
+            tooltip: 'Orders',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const OrdersScreen()),
+            ),
+            icon: const Icon(Icons.receipt_long_outlined),
+          ),
+          ListenableBuilder(
+            listenable: store,
+            builder: (_, __) => IconButton(
+              tooltip: store.shopper == null ? 'Sign in' : 'Sign out',
+              onPressed: store.shopper == null ? store.signIn : store.signOut,
+              icon: Icon(store.shopper == null ? Icons.person_outline : Icons.logout_rounded),
+            ),
+          ),
           ListenableBuilder(
             listenable: store,
             builder: (_, __) => Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Badge(
-                label: Text('${store.cart.length}'),
-                isLabelVisible: store.cart.isNotEmpty,
-                child: const Icon(Icons.shopping_bag_outlined),
+              padding: const EdgeInsets.only(right: 8),
+              child: IconButton(
+                tooltip: 'Cart',
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const CartScreen()),
+                ),
+                icon: Badge(
+                  label: Text('${store.cart.length}'),
+                  isLabelVisible: store.cart.isNotEmpty,
+                  child: const Icon(Icons.shopping_bag_outlined),
+                ),
               ),
             ),
           ),
@@ -315,7 +424,11 @@ class ShopScreen extends StatelessWidget {
           itemCount: store.products.length,
           itemBuilder: (context, index) {
             final product = store.products[index];
-            return Container(
+            return GestureDetector(
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => ProductScreen(product: product)),
+              ),
+              child: Container(
               decoration: BoxDecoration(
                 border: Border.all(color: const Color(0x1A0E0E12)),
                 borderRadius: BorderRadius.circular(4),
@@ -345,8 +458,135 @@ class ShopScreen extends StatelessWidget {
                   ),
                 ],
               ),
+              ),
             );
           },
+        ),
+      ),
+    );
+  }
+}
+
+/// One sneaker. The copilot opens it as `product_detail`.
+class ProductScreen extends StatelessWidget {
+  const ProductScreen({super.key, required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(product.name)),
+      floatingActionButton: const RendelLauncher(),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text('\$${product.price.toStringAsFixed(0)}', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          const Text('EU sizes in stock'),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final size in product.sizes)
+                ActionChip(
+                  label: Text('$size'),
+                  onPressed: () {
+                    KicksStore.instance.addToCart(product, size);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('${product.name} ($size) is in your cart')),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The cart. The copilot opens it as `cart`.
+class CartScreen extends StatelessWidget {
+  const CartScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = KicksStore.instance;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Cart')),
+      floatingActionButton: const RendelLauncher(),
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) => ListView(
+          children: [
+            for (final (product, size) in store.cart)
+              ListTile(
+                title: Text(product.name),
+                subtitle: Text('EU $size'),
+                trailing: Text('\$${product.price.toStringAsFixed(0)}'),
+              ),
+            ListTile(
+              title: const Text('Total'),
+              subtitle: store.promo == null ? null : Text('Promo ${store.promo}'),
+              trailing: Text('\$${store.cartSnapshot()['total']}'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Every order. The copilot opens it as `orders`.
+class OrdersScreen extends StatelessWidget {
+  const OrdersScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = KicksStore.instance;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Orders')),
+      floatingActionButton: const RendelLauncher(),
+      body: ListenableBuilder(
+        listenable: store,
+        builder: (context, _) => ListView(
+          children: [
+            for (final order in store.orders)
+              ListTile(
+                title: Text('Order ${order.id}'),
+                subtitle: Text(order.items.join(', ')),
+                trailing: Text(order.status),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => OrderScreen(order: order)),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One order. The copilot opens it as `order_detail`.
+class OrderScreen extends StatelessWidget {
+  const OrderScreen({super.key, required this.order});
+
+  final Order order;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Order ${order.id}')),
+      floatingActionButton: const RendelLauncher(),
+      body: ListenableBuilder(
+        listenable: KicksStore.instance,
+        builder: (context, _) => ListView(
+          children: [
+            for (final item in order.items) ListTile(title: Text(item)),
+            ListTile(title: const Text('Status'), trailing: Text(order.status)),
+          ],
         ),
       ),
     );

@@ -10,9 +10,8 @@ It does not chat about your app. It operates it.
 dependencies:
   rendel:
     git:
-      url: https://github.com/neon-apps/rendel.git
-      path: sdk/flutter/rendel
-      ref: v0.44.0
+      url: https://github.com/neon-apps/rendel-flutter.git
+      ref: v0.45.0
 ```
 
 ## Three lines to a running copilot

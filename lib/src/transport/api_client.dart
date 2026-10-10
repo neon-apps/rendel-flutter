@@ -3,12 +3,38 @@ import 'dart:convert';
 import 'dart:typed_data';
 import '../core/locale.dart';
 
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
 import '../core/log.dart';
 import '../core/pairing.dart';
 import '../protocol/protocol.dart';
+
+/// What `GET /v1/apps/config` answered, as far as the SDK acts on it.
+class RendelConfigAnswer {
+  const RendelConfigAnswer.config(String this.body, this.etag) : refusal = null;
+  const RendelConfigAnswer.unchanged()
+      : body = null,
+        etag = null,
+        refusal = null;
+  const RendelConfigAnswer.refused(String this.refusal)
+      : body = null,
+        etag = null;
+
+  /// The envelope, on a 200. Null on a 304 and on a refusal.
+  final String? body;
+  final String? etag;
+
+  /// `app_not_live` — a live key before the app has gone live — or
+  /// `app_suspended`. Either way the copilot is not this app's to show.
+  final String? refusal;
+}
+
+/// What the config request names as the platform: `ios`, `android`,
+/// `macos`, `windows`, `linux`, `fuchsia`, or `web`.
+String rendelPlatformName() =>
+    kIsWeb ? 'web' : defaultTargetPlatform.name.toLowerCase();
 
 /// Hand-rolled SSE over POST — deliberately no extra dependency. The server
 /// closes the stream whenever it needs client input (continuation-POST model),
@@ -122,20 +148,24 @@ class RendelApiClient {
     }
   }
 
-  /// `GET /v1/apps/config` → the raw envelope, or null when there is nothing
-  /// new to apply.
+  /// `GET /v1/apps/config` → what the server said, or null when it said
+  /// nothing the SDK acts on.
   ///
-  /// Returns null on a 304, on any error status, and on any transport failure.
-  /// The caller treats all three the same way — keep what you already have —
-  /// because from the device's point of view they are the same event: no new
-  /// config today.
-  Future<(String body, String? etag)?> fetchConfig({String? etag}) async {
+  /// Null on an error status other than the two refusals below, and on any
+  /// transport failure: keep what you already have, because from the
+  /// device's point of view that is no new config today.
+  ///
+  /// Sends which build this is and what it runs on (§9.7), so the console can
+  /// say "Flutter 0.45.0 · iOS connected" and notice a build drifting behind.
+  Future<RendelConfigAnswer?> fetchConfig({String? etag}) async {
     try {
       final response = await _http
           .get(
             Uri.parse('${config.apiBaseUrl}/v1/apps/config'),
             headers: {
               ..._headers,
+              'X-Rendel-SDK': config.sdkVersion,
+              'X-Rendel-Platform': rendelPlatformName(),
               if (etag != null) 'If-None-Match': etag,
             },
           )
@@ -146,8 +176,24 @@ class RendelApiClient {
       if (response.statusCode == 401) {
         RendelLog.error('invalid_key', 'The Rendel server does not know this appKey. $rendelKeyHelp');
       }
+      if (response.statusCode == 304) return const RendelConfigAnswer.unchanged();
+      if (response.statusCode == 403) {
+        final code = _errorCode(response.body);
+        if (code == 'app_not_live' || code == 'app_suspended') {
+          return RendelConfigAnswer.refused(code!);
+        }
+      }
       if (response.statusCode != 200) return null;
-      return (response.body, response.headers['etag']);
+      return RendelConfigAnswer.config(response.body, response.headers['etag']);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static String? _errorCode(String body) {
+    try {
+      final error = (jsonDecode(body) as Map<String, dynamic>)['error'];
+      return error is Map && error['code'] is String ? error['code'] as String : null;
     } catch (_) {
       return null;
     }

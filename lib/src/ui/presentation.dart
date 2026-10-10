@@ -53,7 +53,7 @@ class RendelPresentation extends ChangeNotifier {
 
   /// The route's own `open`, through the controller.
   final Future<bool> Function(NavigateAction action) openRoute;
-  final RendelTheme Function() theme;
+  final RendelTheme Function(BuildContext context) theme;
 
   /// What a screen reader says the bubble does.
   final String label;
@@ -353,7 +353,7 @@ class _AloftState extends State<_Aloft> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final p = _p;
-    final theme = p.theme();
+    final theme = p.theme(context);
     final size = MediaQuery.sizeOf(context);
     final rest = p._rest(size, MediaQuery.paddingOf(context));
     final still = MediaQuery.disableAnimationsOf(context);

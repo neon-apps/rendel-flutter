@@ -157,8 +157,10 @@ void main() {
       final result = await pairing;
 
       expect(result.ok, isTrue);
-      expect(server.requests.single.headers['X-Rendel-Key'], 'nc_pk_test_x');
-      expect(server.requests.single.headers['X-Rendel-Device'], Rendel.deviceId);
+      final claim = server.requests.singleWhere(
+          (request) => request.url.path.endsWith('/v1/pairings/claim'));
+      expect(claim.headers['X-Rendel-Key'], 'nc_pk_test_x');
+      expect(claim.headers['X-Rendel-Device'], Rendel.deviceId);
     });
 
     test('reports each outcome on the log with a stable code', () async {
@@ -189,7 +191,11 @@ void main() {
       await init();
       final result = await Rendel.pair('  ');
       expect(result.reason, RendelPairFailure.failed);
-      expect(server.requests, isEmpty);
+      // `init` sends its manifest, empty or not; nothing else goes out.
+      expect(
+        server.requests.where((r) => r.url.path.endsWith('/v1/pairings/claim')),
+        isEmpty,
+      );
     });
 
     // A widget test for its clock: the wait is ten seconds, and the test

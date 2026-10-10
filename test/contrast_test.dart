@@ -240,7 +240,39 @@ void main() {
       accent: const Color(0xFF7C5BFF),
       onAccent: const Color(0xFFFFFFFF),
     ),
+    // Dark mode (design/AI-SETUP.md §9.5): the theme a phone in dark mode
+    // draws for a host that mapped only a light one. Each is held to every
+    // floor above, because nobody chose these values — the SDK did.
+    'hostile brand, in the dark': RendelTheme.darkFrom(RendelTheme.fromTokens(
+      surface: const Color(0xFFFFF6F0),
+      onSurface: const Color(0xFF2A1B12),
+      accent: const Color(0xFFFF9A3D),
+      onAccent: const Color(0xFF2A1B12),
+    )),
+    'navy brand, in the dark': RendelTheme.darkFrom(RendelTheme.fromTokens(
+      surface: const Color(0xFFFFFFFF),
+      onSurface: const Color(0xFF111111),
+      accent: const Color(0xFF1A237E),
+      onAccent: const Color(0xFFFFFFFF),
+    )),
+    'black action, in the dark': RendelTheme.darkFrom(RendelTheme.fromTokens(
+      surface: const Color(0xFFFFFFFF),
+      onSurface: const Color(0xFF111111),
+      accent: const Color(0xFF000000),
+      onAccent: const Color(0xFFFFFFFF),
+    )),
+    'pale accent, in the dark': RendelTheme.darkFrom(RendelTheme.fromTokens(
+      surface: const Color(0xFFF7F7F7),
+      onSurface: const Color(0xFF202020),
+      accent: const Color(0xFFFFD60A),
+      onAccent: const Color(0xFF202020),
+    )),
   };
+
+  test('paper in the dark is deep, which rdui.css draws as `.dark`', () {
+    expect(identical(RendelTheme.darkFrom(RendelTheme.paper()), RendelTheme.deep()),
+        isTrue);
+  });
 
   themes.forEach((name, theme) {
     final colors = theme.colors;

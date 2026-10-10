@@ -45,7 +45,7 @@ class RendelLauncher extends StatelessWidget {
     // the live static theme.
     final theme =
         context.dependOnInheritedWidgetOfExactType<RendelThemeScope>()?.theme ??
-            Rendel.theme;
+            Rendel.themeOf(context);
     // Nothing at all when the copilot is off: an affordance that opens a sheet
     // the SDK will refuse to present is worse than no affordance.
     if (!Rendel.isInitialized || !Rendel.isEnabled) {

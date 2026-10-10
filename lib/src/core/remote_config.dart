@@ -57,18 +57,23 @@ class RendelRemoteConfig {
     required this.theme,
     required this.copilot,
     required this.etag,
+    this.themeDark = const {},
   });
 
   /// 'published' for a live key, 'draft' for a test key.
   final String channel;
   final int? version;
   final Map<String, dynamic> theme;
+
+  /// The theme for a device in dark mode, as published. Partial: what it
+  /// leaves out is derived from the light palette — see [applyToDark].
+  final Map<String, dynamic> themeDark;
   final Map<String, dynamic> copilot;
 
   /// The ETag the payload arrived with, so the next launch can ask for a 304.
   final String? etag;
 
-  bool get isEmpty => theme.isEmpty && copilot.isEmpty;
+  bool get isEmpty => theme.isEmpty && themeDark.isEmpty && copilot.isEmpty;
 
   /// Parses a stored or fetched envelope. Returns null rather than throwing:
   /// a payload from a newer server, a truncated cache file or a hand-edited
@@ -86,6 +91,7 @@ class RendelRemoteConfig {
             : (map['channel'] as String? ?? 'published'),
         version: map['version'] is num ? (map['version'] as num).toInt() : null,
         theme: _submap(body['theme']),
+        themeDark: _submap(body['themeDark']),
         copilot: _submap(body['copilot']),
         // A cached envelope carries its own etag; a fresh one is handed the
         // header's.
@@ -104,6 +110,7 @@ class RendelRemoteConfig {
         if (etag != null) '_etag': etag,
         'config': {
           if (theme.isNotEmpty) 'theme': theme,
+          if (themeDark.isNotEmpty) 'themeDark': themeDark,
           if (copilot.isNotEmpty) 'copilot': copilot,
         },
       });
@@ -167,6 +174,102 @@ class RendelRemoteConfig {
     }
     return built;
   }
+
+  /// The host's dark theme with whatever the customer published for the dark
+  /// ground layered over it, under the same release-mode floor as [applyTo].
+  ///
+  /// Where the payload names any colour, light or dark, the dark theme is
+  /// rebuilt from the PUBLISHED palette: the four roles `themeDark` states,
+  /// the rest derived from the published light four by [rendelDarkRoles] —
+  /// the derivation the console ran when it measured them, so the console
+  /// and the device draw one theme. Other colours come only from
+  /// `themeDark`; a light theme's white plate is no plate on a dark ground.
+  /// Where it names none, [codeDark] keeps its colours. Either way the sizes,
+  /// faces and builds are `themeDark`'s, else the light theme's.
+  ///
+  /// [codeLight] is only read when a dark colour arrives without the light
+  /// palette the schema requires beside it — a hand-edited row.
+  RendelTheme applyToDark(RendelTheme codeLight, RendelTheme codeDark) {
+    if (theme.isEmpty && themeDark.isEmpty) return codeDark;
+    final merged = <String, dynamic>{
+      for (final MapEntry(:key, :value) in theme.entries)
+        if (!_darkOwnKeys.contains(key)) key: value,
+      if (theme['cards'] is Map) 'cards': _shapesOnly(_submap(theme['cards'])),
+      ...themeDark,
+    };
+    if (_colourKeys.any(theme.containsKey) ||
+        _colourKeys.any(themeDark.containsKey)) {
+      Color role(String key, Color code) => _color(theme[key]) ?? code;
+      final roles = rendelDarkRoles(
+        surface: role('surface', codeLight.colors.surface),
+        onSurface: role('onSurface', codeLight.colors.onSurface),
+        accent: role('accent', codeLight.colors.accent),
+        onAccent: role('onAccent', codeLight.colors.onAccent),
+        darkSurface: _color(themeDark['surface']),
+        darkOnSurface: _color(themeDark['onSurface']),
+        darkAccent: _color(themeDark['accent']),
+        darkOnAccent: _color(themeDark['onAccent']),
+      );
+      // Only where `themeDark` is silent: a value it states and this build
+      // cannot read must still discard the theme in `_build`, not be papered
+      // over by a derivation.
+      merged.putIfAbsent('surface', () => _hex(roles.surface));
+      merged.putIfAbsent('onSurface', () => _hex(roles.onSurface));
+      merged.putIfAbsent('accent', () => _hex(roles.accent));
+      merged.putIfAbsent('onAccent', () => _hex(roles.onAccent));
+    }
+    final dark = RendelRemoteConfig(
+      channel: channel,
+      version: version,
+      theme: merged,
+      copilot: const {},
+      etag: etag,
+    );
+    final built = dark._build(codeDark);
+    if (identical(built, codeDark)) return codeDark;
+    if (!_isLegible(built)) {
+      debugPrint(
+        '[rendel] the published dark theme is not legible on this device; '
+        'keeping the dark theme this build was compiled with.',
+      );
+      return codeDark;
+    }
+    return built;
+  }
+
+  /// What a dark theme never takes from the light one: its colours (and a
+  /// card's, which [_shapesOnly] strips), and the logo, which is one file.
+  static const _darkOwnKeys = {
+    ..._colourKeys,
+    'bubble',
+    'onBubble',
+    'cards',
+    'logoAssetId',
+  };
+
+  /// A card's corner, build and part sizes, without the colours that were
+  /// chosen for the light plate.
+  static Map<String, dynamic> _shapesOnly(Map<String, dynamic> cards) => {
+        for (final MapEntry(:key, :value) in cards.entries)
+          if (value is Map)
+            key: {
+              for (final field in const ['radius', 'style'])
+                if (value[field] != null) field: value[field],
+              if (value['parts'] is Map)
+                'parts': {
+                  for (final MapEntry(key: name, value: part)
+                      in (value['parts'] as Map).entries)
+                    if (part is Map)
+                      '$name': {
+                        for (final field in const ['size', 'radius'])
+                          if (part[field] != null) field: part[field],
+                      },
+                },
+            },
+      };
+
+  static String _hex(Color color) =>
+      '#${((color.r * 255).round() << 16 | (color.g * 255).round() << 8 | (color.b * 255).round()).toRadixString(16).padLeft(6, '0').toUpperCase()}';
 
   /// Whether the roles that carry meaning clear their floors on every surface
   /// they are drawn on.

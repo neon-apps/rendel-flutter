@@ -5,6 +5,38 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.45.0
+
+**Changed**
+
+- The copilot follows the device's dark mode. On a phone set to dark it is
+  drawn in a dark theme: `RendelTheme.deep()` for the default theme, and
+  for a theme of your own one derived from it (`RendelTheme.darkFrom`) — a
+  dark ground, your accent kept wherever it still reads on one, your sizes
+  and faces. An app that is always light should pass
+  `RendelConfig(themeMode: RendelThemeMode.light)` to keep the old look.
+- The manifest is sent at `init` even when no actions and no routes are
+  registered, so the console can tell an installed SDK with no screens yet
+  from one that is not installed.
+
+**Added**
+
+- `RendelConfig.themeMode` (`system`, the default; `light`; `dark`) and
+  `Rendel.setThemeMode` for an app with an appearance switch of its own.
+- `Rendel.init(darkTheme: …)` to choose the dark theme yourself.
+- `themeDark` in the published config: the console's dark theme, partial,
+  with what it leaves out derived from the published light palette.
+- `Rendel.themeOf(context)` and `Rendel.themeFor(brightness)`;
+  `Rendel.theme` is now the theme for the device's current setting.
+- The config request sends `X-Rendel-SDK` (`flutter/<version>`) and
+  `X-Rendel-Platform` (`ios`, `android`, `macos`, …), so the console can
+  show which build connected from where.
+- When the server answers the config request with `403 app_not_live` (a
+  live key before the app has gone live) or `app_suspended`, the launcher is
+  hidden, `open()` does nothing, and one debug line is logged with the code
+  `app_not_live` or `app_suspended`; the user sees no error. The launcher
+  comes back on the next answer once the app is live.
+
 ## 0.44.1
 
 **Fixed**
@@ -40,7 +72,7 @@ asks of you.
 - `place_card`: a place to go to, with open now, today's hours, a call and
   directions built from its coordinates for Apple or Google Maps.
 - `map`: places on a map, drawn with MapLibre over open OpenStreetMap data
-  served from the EU (OpenFreeMap). On the page it is still and scrolls with
+  served by OpenFreeMap. On the page it is still and scrolls with
   the page; a tap opens it full screen with pan, zoom and Open in Maps.
 - `pass`: a ticket, boarding pass, pickup code, coupon or membership card.
   Its QR, Code 128, PDF417 or Aztec code is drawn by the server and painted

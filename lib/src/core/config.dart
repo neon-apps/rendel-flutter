@@ -76,6 +76,23 @@ enum RendelSendIcon {
   }
 }
 
+/// Which of the copilot's two themes is drawn.
+///
+/// The SDK's own enum rather than Flutter's `ThemeMode`, because this file is
+/// read without a widget in sight and the three answers are the same three.
+/// A host whose `MaterialApp` already has a `themeMode` passes it across in
+/// one line: `RendelThemeMode.values.byName(themeMode.name)`.
+enum RendelThemeMode {
+  /// The device's own setting, followed as it changes. The default.
+  system,
+
+  /// Always the light theme, whatever the device says.
+  light,
+
+  /// Always the dark theme.
+  dark,
+}
+
 /// Everything about a copilot that is the host's choice rather than the
 /// protocol's: where it points, what it is called, and how long it waits.
 ///
@@ -115,9 +132,24 @@ class RendelConfig {
     this.onLog,
     this.httpClient,
     this.userToken,
+    this.themeMode = RendelThemeMode.system,
   });
 
   final String apiBaseUrl;
+
+  /// Whether the copilot is drawn in its light theme, its dark one, or
+  /// whichever the device is set to — the default, followed live, so the
+  /// thread changes with the phone as the rest of a dark-aware app does.
+  ///
+  /// Set it to what your own app does. An app that is always light should
+  /// say [RendelThemeMode.light], or a phone in dark mode opens a dark copilot
+  /// over a light app. An app with an appearance switch of its own passes the
+  /// choice it launches with here and calls `Rendel.setThemeMode` when the
+  /// user changes it.
+  ///
+  /// The two themes are `Rendel.init`'s `theme` and `darkTheme`, with
+  /// whatever the console publishes for each layered over them.
+  final RendelThemeMode themeMode;
 
   /// The signed-in person's token, from your own sign-in — what lets the
   /// copilot reach your API as them, with no API key.
@@ -423,6 +455,9 @@ class RendelConfig {
       deviceIdStore: deviceIdStore,
       onLog: onLog,
       userToken: userToken,
+      // The host's, like the floor above: the console publishes a dark
+      // theme, never which of the two this app shows.
+      themeMode: themeMode,
     );
   }
 }
