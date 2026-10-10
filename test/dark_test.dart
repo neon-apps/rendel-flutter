@@ -374,7 +374,13 @@ void main() {
         expect(find.text('Ask'), findsNothing);
         final said = logs.where((r) => r.code == code).toList();
         expect(said, hasLength(1));
-        expect(said.single.level, RendelLogLevel.debug);
+        expect(
+          said.single.level,
+          code == 'app_not_live'
+              ? RendelLogLevel.warning
+              : RendelLogLevel.debug,
+        );
+        expect(said.single.message, isNot(contains('\n')));
         if (code == 'app_not_live') {
           expect(said.single.message, contains('test key'));
           expect(said.single.message, contains('Go live'));

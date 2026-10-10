@@ -637,14 +637,14 @@ class Rendel {
   /// `app_not_live` is a live key in a build made before anyone pressed Go
   /// live — the developer's own mistake, never the user's. So the launcher
   /// goes, nobody is shown an error they cannot act on, and the developer
-  /// gets one debug line saying what to do. Once a later answer is a 200 or a
-  /// 304 the app is live and the launcher comes back.
+  /// gets one line saying what to do, at warning rather than debug so a sink
+  /// that drops debug still shows it. Once a later answer is a 200 or a 304
+  /// the app is live and the launcher comes back.
   static void _refuse(String? code) {
     if (code == _refusal) return;
     _refusal = code;
     if (code == 'app_not_live') {
-      RendelLog.report(
-        RendelLogLevel.debug,
+      RendelLog.warn(
         'app_not_live',
         'This app has not gone live, so the server refuses its live key and '
             'the copilot is hidden. Use the test key (rd_pk_test_…) while you '

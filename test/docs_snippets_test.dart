@@ -2,19 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
 
-/// The code the documentation tells people to write, compiled.
+/// The code the setup agent writes into an app, compiled.
 ///
-/// Every snippet in the quickstart and in the console's setup guide was prose:
-/// a string in an MDX file and a string in a TypeScript module, neither of
-/// which the Dart analyzer has ever seen. So a rename in the SDK broke both
-/// silently, and the first person to find out was a developer pasting code
-/// that does not compile on their first ten minutes with the product.
+/// Every snippet the setup file (`rendel-setup.md`) hands an agent is prose:
+/// a string in a TypeScript module (`apps/web/src/console/lib/snippets.ts`)
+/// that the Dart analyzer has never seen. So a rename in the SDK would break
+/// it silently, and the first to find out would be an agent writing code that
+/// does not compile into somebody's app.
 ///
 /// This file is the same code as real Dart. `flutter analyze` and `flutter
 /// test` fail here the moment the API moves, which is the whole point; the
 /// companion check in `apps/web/src/console/lib/snippets.test.ts` asserts that
-/// what the docs and the console SHOW is character-for-character what this
-/// file COMPILES.
+/// what the setup file WRITES is character-for-character what this file
+/// COMPILES.
 ///
 /// Keep the snippet bodies below verbatim. If one has to change, change it
 /// here first and let the string check tell you where else it is written down.
@@ -43,18 +43,40 @@ class _Auth {
 
 final auth = _Auth();
 
-// ————————————————————————— quickstart, step 3 —————————————————————————
+/// The host app's own root widget, which the install snippet runs.
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
-Future<void> initSnippet() async {
-  await Rendel.init(
-    // Your app's key: Rendel console → Settings → API keys → Copy.
-    appKey: 'rd_pk_test_...',
-    theme: RendelTheme.paper(),
-    config: RendelConfig(languages: ['tr']),
-  );
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink();
 }
 
-// ————————————————————————— quickstart, step 4 —————————————————————————
+// ———————————————————— setup file, step 2: install ————————————————————
+
+Future<void> installMain() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Rendel.init(
+    // Your app's key: Rendel console → Settings → API keys → Copy.
+    // Start on the test key; swap in the live key for release builds.
+    appKey: 'rd_pk_test_…',
+    // The languages the copilot answers in. Put yours here:
+    //   ['tr']        Turkish only, whatever the user writes in
+    //   ['tr', 'en']  Turkish or English, whichever the user writes;
+    //                 anything else is answered in the first, Turkish
+    //   ['en']        English only
+    // Leave out config and it answers in whatever the user writes.
+    config: RendelConfig(
+      languages: ['tr'],
+      // If people sign in to your app: their current token, from your own
+      // sign-in code, so the copilot reaches your API as them — no API key.
+      // Null when nobody is signed in.
+      // userToken: () async => auth.accessToken,
+    ),
+  );
+  runApp(const MyApp());
+}
+
+// ———————————————————— setup file, step 3: identity ————————————————————
 
 Future<void> identifySnippet() async {
   await Rendel.identify(
@@ -63,7 +85,7 @@ Future<void> identifySnippet() async {
   );
 }
 
-// ————————————————————— quickstart, step 4: as the person —————————————————————
+// ——————— the install snippet's commented token line, switched on ———————
 
 Future<void> userTokenSnippet() async {
   await Rendel.init(
@@ -76,7 +98,7 @@ Future<void> userTokenSnippet() async {
   );
 }
 
-// ————————————————————————— quickstart, step 5 —————————————————————————
+// ———————————————————— setup file: an action in code ————————————————————
 
 void registerActionSnippet() {
   Rendel.registerAction(RendelAction(
@@ -91,7 +113,7 @@ void registerActionSnippet() {
   ));
 }
 
-// ————————————————————————— quickstart, step 6 —————————————————————————
+// ———————————————————— setup file, step 2: a way in ————————————————————
 
 void openSnippet(BuildContext context) {
   Rendel.open(context);

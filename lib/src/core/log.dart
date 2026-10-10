@@ -38,7 +38,7 @@ class RendelLogRecord {
   /// * `config_unreadable` — a published config could not be parsed, or was
   ///   not legible on this device
   /// * `config_cache_write_failed` — the config store threw on write
-  /// * `app_not_live` — debug: the server refuses a live key until the app
+  /// * `app_not_live` — warning: the server refuses a live key until the app
   ///   goes live in the console, so the launcher is hidden; use the test key
   ///   or press Go live
   /// * `app_suspended` — debug: the app is suspended, so the launcher is

@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.45.2
+
+**Changed**
+
+- `app_not_live` (a live key before the app has gone live) is reported once
+  at `warning` instead of `debug`, still as one line and with nothing shown
+  to the user, so a log sink that drops debug records still says why the
+  launcher is hidden.
+
 ## 0.45.1
 
 **Fixed**
