@@ -293,8 +293,10 @@ void main() {
       await tester.tap(find.text('Choose an option').first);
       await tester.pumpAndSettle();
       expect(find.text('Search'), findsOneWidget);
-      Navigator.of(tester.element(find.text('Austria'))).pop();
+      // Shut again from its own field: the list opens in the row, not a sheet.
+      await tester.tap(find.text('Choose an option').first);
       await tester.pumpAndSettle();
+      expect(find.text('Austria'), findsNothing);
 
       await tester.tap(find.text('Choose an option').last);
       await tester.pumpAndSettle();
@@ -422,33 +424,38 @@ void main() {
   });
 
   group('dates', () {
-    testWidgets('a date picker is held to min_date and max_date', (tester) async {
+    testWidgets('a date\'s month is held to min_date and max_date', (tester) async {
+      final semantics = tester.ensureSemantics();
       await pump(tester, _dates);
 
       await tester.tap(find.text('Choose a date'));
       await tester.pumpAndSettle();
 
-      final picker = tester.widget<DatePickerDialog>(find.byType(DatePickerDialog));
-      expect(picker.firstDate, DateTime(2026, 9, 1));
-      expect(picker.lastDate, DateTime(2026, 9, 30));
-      expect(!picker.initialDate!.isBefore(picker.firstDate) && !picker.initialDate!.isAfter(picker.lastDate),
-          isTrue);
+      // Today, wherever it falls, is held into September; neither button
+      // turns past the bounds.
+      expect(find.text('September 2026'), findsOneWidget);
+      expect(tester.getSemantics(find.bySemanticsLabel('Previous month')), isSemantics(isEnabled: false));
+      expect(tester.getSemantics(find.bySemanticsLabel('Next month')), isSemantics(isEnabled: false));
+      expect(find.byType(DatePickerDialog), findsNothing);
+      semantics.dispose();
     });
 
     testWidgets('a range opens on the days it holds, inside its bounds, and sends both', (tester) async {
+      final semantics = tester.ensureSemantics();
       await pump(tester, _dates);
 
       expect(find.text('From'), findsOneWidget);
-      expect(find.text('2026-11-14'), findsOneWidget);
-      await tester.tap(find.text('2026-11-10'));
+      expect(find.textContaining('Nov 14'), findsOneWidget);
+      await tester.tap(find.textContaining('Nov 10'));
       await tester.pumpAndSettle();
 
-      final picker = tester.widget<DateRangePickerDialog>(find.byType(DateRangePickerDialog));
-      expect(picker.firstDate, DateTime(2026, 11, 1));
-      expect(picker.lastDate, DateTime(2026, 12, 31));
-      expect(picker.initialDateRange, DateTimeRange(start: DateTime(2026, 11, 10), end: DateTime(2026, 11, 14)));
-      Navigator.of(tester.element(find.byType(DateRangePickerDialog))).pop();
+      expect(find.text('November 2026'), findsOneWidget);
+      expect(tester.getSemantics(find.bySemanticsLabel('Tuesday, November 10, 2026')), isSemantics(isSelected: true));
+      expect(tester.getSemantics(find.bySemanticsLabel('Previous month')), isSemantics(isEnabled: false));
+      expect(find.byType(DateRangePickerDialog), findsNothing);
+      await tester.tap(find.textContaining('Nov 10'));
       await tester.pumpAndSettle();
+      semantics.dispose();
 
       await send(tester, 'Send claim');
       expect(submitted.single, {'stay_start': '2026-11-10', 'stay_end': '2026-11-14'});

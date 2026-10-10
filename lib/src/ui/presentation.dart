@@ -130,11 +130,18 @@ class RendelPresentation extends ChangeNotifier {
     final show = ++_shows;
     final context = _origin.mounted ? _origin : _navigator.context;
     final still = MediaQuery.disableAnimationsOf(context);
+    final corner = Radius.circular(theme(context).radius.hero);
+    // An iOS page sheet: from a little under the top safe area to the bottom
+    // edge, its top corners rounded and its bottom ones square, over the app
+    // dimmed by a quarter. Never square at the top, however tall the phone.
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       backgroundColor: Colors.transparent,
+      barrierColor: _scrim,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: corner)),
+      clipBehavior: Clip.antiAlias,
       // Coming back, the panel grows out of the bubble above the app, and the
       // sheet under it brings only the scrim, in the same time.
       sheetAnimationStyle: back
@@ -142,10 +149,21 @@ class RendelPresentation extends ChangeNotifier {
           : null,
       builder: (context) {
         if (show == _shows) _sheet = context;
-        return _seated(aloft: false, show: show);
+        return LayoutBuilder(
+          // Below the safe area already (`useSafeArea`); the gap is the
+          // page sheet's own, so the app shows behind its top edge.
+          builder: (context, box) => SizedBox(
+            height: math.max(0.0, box.maxHeight - _gap),
+            child: _seated(aloft: false, show: show),
+          ),
+        );
       },
     );
   }
+
+  /// The page sheet's gap under the top safe area, and its scrim.
+  static const double _gap = 8;
+  static const Color _scrim = Color(0x40000000);
 
   /// The thread where it is now, or nothing where it is not. Only the newest
   /// sheet seats it, so two sheets on the navigator at once cannot both ask

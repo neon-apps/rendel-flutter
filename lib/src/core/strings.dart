@@ -104,6 +104,8 @@ class RendelStrings {
     this.stepOf = 'Step {step} of {count}',
     this.readoutIn = 'in {label}',
     this.readoutPeak = 'in {label}, the highest',
+    this.readoutNow = '{label}',
+    this.readoutNowPeak = '{label}, the highest',
     this.soldOut = 'Sold out: {labels}',
     this.statusThinking = 'Thinking…',
     this.statusAction = 'Checking your app…',
@@ -133,6 +135,8 @@ class RendelStrings {
     this.searchOptions = 'Search',
     this.dateRangeStart = 'From',
     this.dateRangeEnd = 'To',
+    this.previousMonth = 'Previous month',
+    this.nextMonth = 'Next month',
     this.fieldAtLeast = 'Enter {min} or more.',
     this.fieldAtMost = 'Enter {max} or less.',
     this.fieldOnOrAfter = 'Pick {date} or later.',
@@ -326,6 +330,11 @@ class RendelStrings {
   final String readoutIn;
   final String readoutPeak;
 
+  /// The same, for a label that is itself a when ("Today", "This week"),
+  /// which reads wrong after "in".
+  final String readoutNow;
+  final String readoutNowPeak;
+
   /// Under a variant picker, naming the options that cannot be chosen, so a
   /// sold-out size is said and not only drawn fainter. `{labels}` is them,
   /// joined.
@@ -400,6 +409,11 @@ class RendelStrings {
   final String dateRangeStart;
   final String dateRangeEnd;
 
+  /// A date field's month: what a screen reader calls the two buttons that
+  /// turn it.
+  final String previousMonth;
+  final String nextMonth;
+
   /// What a form says under a number outside the field's `min` or `max`,
   /// with `{min}` or `{max}` the bound, and under a day outside its
   /// `min_date` or `max_date`, with `{date}` the bound. The web SDK's keys
@@ -449,8 +463,10 @@ class RendelStrings {
   String detailAskAbout(String title) => detailAsk.replaceAll('{title}', title);
   String stepOfCount(int step, int count) =>
       stepOf.replaceAll('{step}', '$step').replaceAll('{count}', '$count');
-  String readoutAt(String label, {required bool peak}) =>
-      (peak ? readoutPeak : readoutIn).replaceAll('{label}', label);
+  /// [now] for a label that is itself a when ("Today"): no "in" before it.
+  String readoutAt(String label, {required bool peak, bool now = false}) =>
+      (now ? (peak ? readoutNowPeak : readoutNow) : (peak ? readoutPeak : readoutIn))
+          .replaceAll('{label}', label);
   String soldOutNamed(List<String> labels) =>
       soldOut.replaceAll('{labels}', labels.join(', '));
   String choiceCountOf(int n, int m) =>
@@ -577,6 +593,8 @@ class RendelStrings {
     String? stepOf,
     String? readoutIn,
     String? readoutPeak,
+    String? readoutNow,
+    String? readoutNowPeak,
     String? soldOut,
     String? statusThinking,
     String? statusAction,
@@ -606,6 +624,8 @@ class RendelStrings {
     String? searchOptions,
     String? dateRangeStart,
     String? dateRangeEnd,
+    String? previousMonth,
+    String? nextMonth,
     String? fieldAtLeast,
     String? fieldAtMost,
     String? fieldOnOrAfter,
@@ -700,6 +720,8 @@ class RendelStrings {
       stepOf: stepOf ?? this.stepOf,
       readoutIn: readoutIn ?? this.readoutIn,
       readoutPeak: readoutPeak ?? this.readoutPeak,
+      readoutNow: readoutNow ?? this.readoutNow,
+      readoutNowPeak: readoutNowPeak ?? this.readoutNowPeak,
       soldOut: soldOut ?? this.soldOut,
       statusThinking: statusThinking ?? this.statusThinking,
       statusAction: statusAction ?? this.statusAction,
@@ -729,6 +751,8 @@ class RendelStrings {
       searchOptions: searchOptions ?? this.searchOptions,
       dateRangeStart: dateRangeStart ?? this.dateRangeStart,
       dateRangeEnd: dateRangeEnd ?? this.dateRangeEnd,
+      previousMonth: previousMonth ?? this.previousMonth,
+      nextMonth: nextMonth ?? this.nextMonth,
       fieldAtLeast: fieldAtLeast ?? this.fieldAtLeast,
       fieldAtMost: fieldAtMost ?? this.fieldAtMost,
       fieldOnOrAfter: fieldOnOrAfter ?? this.fieldOnOrAfter,
@@ -806,6 +830,8 @@ const Map<String, RendelStrings> _byLocale = {
     stepOf: 'Adım {step} / {count}',
     readoutIn: '{label} döneminde',
     readoutPeak: '{label} döneminde, en yüksek',
+    readoutNow: '{label}',
+    readoutNowPeak: '{label}, en yüksek',
     soldOut: 'Tükendi: {labels}',
     fieldRequired: 'Devam etmek için bunu doldurun.',
     fieldNumber: 'Bir sayı girin.',
@@ -869,6 +895,8 @@ const Map<String, RendelStrings> _byLocale = {
     searchOptions: 'Ara',
     dateRangeStart: 'Başlangıç',
     dateRangeEnd: 'Bitiş',
+    previousMonth: 'Önceki ay',
+    nextMonth: 'Sonraki ay',
     fieldAtLeast: '{min} veya daha fazlasını girin.',
     fieldAtMost: '{max} veya daha azını girin.',
     fieldOnOrAfter: '{date} veya sonrasını seçin.',
@@ -934,6 +962,8 @@ const Map<String, RendelStrings> _byLocale = {
     stepOf: 'Schritt {step} von {count}',
     readoutIn: 'bei {label}',
     readoutPeak: 'bei {label}, der höchste Wert',
+    readoutNow: '{label}',
+    readoutNowPeak: '{label}, der höchste Wert',
     soldOut: 'Ausverkauft: {labels}',
     fieldRequired: 'Füllen Sie dies aus, um fortzufahren.',
     fieldNumber: 'Geben Sie eine Zahl ein.',
@@ -998,6 +1028,8 @@ const Map<String, RendelStrings> _byLocale = {
     searchOptions: 'Suchen',
     dateRangeStart: 'Von',
     dateRangeEnd: 'Bis',
+    previousMonth: 'Vorheriger Monat',
+    nextMonth: 'Nächster Monat',
     fieldAtLeast: 'Geben Sie {min} oder mehr ein.',
     fieldAtMost: 'Geben Sie {max} oder weniger ein.',
     fieldOnOrAfter: 'Wählen Sie {date} oder später.',
@@ -1063,6 +1095,8 @@ const Map<String, RendelStrings> _byLocale = {
     stepOf: 'Étape {step} sur {count}',
     readoutIn: 'en {label}',
     readoutPeak: 'en {label}, le plus élevé',
+    readoutNow: '{label}',
+    readoutNowPeak: '{label}, le plus élevé',
     soldOut: 'Épuisé : {labels}',
     fieldRequired: 'Remplissez ce champ pour continuer.',
     fieldNumber: 'Saisissez un nombre.',
@@ -1126,6 +1160,8 @@ const Map<String, RendelStrings> _byLocale = {
     searchOptions: 'Rechercher',
     dateRangeStart: 'Du',
     dateRangeEnd: 'Au',
+    previousMonth: 'Mois précédent',
+    nextMonth: 'Mois suivant',
     fieldAtLeast: 'Saisissez {min} ou plus.',
     fieldAtMost: 'Saisissez {max} ou moins.',
     fieldOnOrAfter: 'Choisissez le {date} ou plus tard.',
@@ -1190,6 +1226,8 @@ const Map<String, RendelStrings> _byLocale = {
     stepOf: 'Paso {step} de {count}',
     readoutIn: 'en {label}',
     readoutPeak: 'en {label}, el más alto',
+    readoutNow: '{label}',
+    readoutNowPeak: '{label}, el más alto',
     soldOut: 'Agotado: {labels}',
     fieldRequired: 'Rellena esto para continuar.',
     fieldNumber: 'Escribe un número.',
@@ -1253,6 +1291,8 @@ const Map<String, RendelStrings> _byLocale = {
     searchOptions: 'Buscar',
     dateRangeStart: 'Desde',
     dateRangeEnd: 'Hasta',
+    previousMonth: 'Mes anterior',
+    nextMonth: 'Mes siguiente',
     fieldAtLeast: 'Escribe {min} o más.',
     fieldAtMost: 'Escribe {max} o menos.',
     fieldOnOrAfter: 'Elige el {date} o una fecha posterior.',
@@ -1317,6 +1357,8 @@ const Map<String, RendelStrings> _byLocale = {
     stepOf: 'الخطوة {step} من {count}',
     readoutIn: 'في {label}',
     readoutPeak: 'في {label}، الأعلى',
+    readoutNow: '{label}',
+    readoutNowPeak: '{label}، الأعلى',
     soldOut: 'نفد: {labels}',
     fieldRequired: 'املأ هذا الحقل للمتابعة.',
     fieldNumber: 'أدخل رقمًا.',
@@ -1379,6 +1421,8 @@ const Map<String, RendelStrings> _byLocale = {
     searchOptions: 'بحث',
     dateRangeStart: 'من',
     dateRangeEnd: 'إلى',
+    previousMonth: 'الشهر السابق',
+    nextMonth: 'الشهر التالي',
     fieldAtLeast: 'أدخل {min} أو أكثر.',
     fieldAtMost: 'أدخل {max} أو أقل.',
     fieldOnOrAfter: 'اختر {date} أو تاريخًا لاحقًا.',

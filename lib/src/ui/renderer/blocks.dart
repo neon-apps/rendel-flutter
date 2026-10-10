@@ -8,7 +8,7 @@ import 'package:flutter/foundation.dart' show Factory, defaultTargetPlatform, kI
 import 'package:flutter/gestures.dart' show OneSequenceGestureRecognizer, TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart' show StandardMessageCodec;
+import 'package:flutter/services.dart' show LogicalKeyboardKey, StandardMessageCodec;
 
 import '../../engine/conversation_controller.dart'
     show RendelDetail, RendelSubmitOutcome;
@@ -2950,6 +2950,7 @@ class _Bars extends StatelessWidget {
     final latest = data[last];
     final latestLabel = last < labels.length ? labels[last] : '';
     final height = theme.size.plotHeight;
+    final said = _chartFormat(data, unit);
 
     Widget bar(int i) {
       final value = data[i];
@@ -2994,7 +2995,7 @@ class _Bars extends StatelessWidget {
           children: [
             Flexible(
               child: Text(
-                _num(latest) + (unit == null ? '' : ' $unit'),
+                said(latest) + (unit == null ? '' : ' $unit'),
                 style: theme.text.displayTabular,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -3005,7 +3006,8 @@ class _Bars extends StatelessWidget {
               Flexible(
                 child: Text(
                   RendelStringsScope.of(context)
-                      .readoutAt(latestLabel, peak: latest >= peak),
+                      .readoutAt(latestLabel,
+                          peak: latest >= peak, now: _isWhen(latestLabel)),
                   style: theme.text.body,
                 ),
               ),
@@ -4471,6 +4473,39 @@ class _Field extends StatelessWidget {
       size: theme.type.body,
       color: theme.colors.onSurfaceFaint,
     );
+    final still = MediaQuery.disableAnimationsOf(context);
+    final motion = still ? Duration.zero : theme.motion.settle;
+    // Turned over while what it opens is open, as on the web.
+    Widget caretOf(bool open) => AnimatedRotation(
+          turns: open ? 0.5 : 0,
+          duration: motion,
+          curve: theme.motion.curve,
+          child: caret,
+        );
+
+    // What a select, a day or a time opens: a sheet in the field's own row,
+    // under the label and the value and the row's width, not a dialog or a
+    // route over the app (no picker of the platform's is drawn anywhere in a
+    // form). Nothing open is a zero-height slot, so the row grows and
+    // shrinks in place.
+    Widget sheetSlot(Widget? sheet) => AnimatedSize(
+          duration: motion,
+          curve: theme.motion.curve,
+          alignment: Alignment.topCenter,
+          child: sheet == null
+              ? const SizedBox(width: double.infinity)
+              : Padding(
+                  padding: EdgeInsets.fromLTRB(theme.space.md, 0, theme.space.md, inset),
+                  child: Container(
+                    width: double.infinity,
+                    clipBehavior: Clip.antiAlias,
+                    decoration: _white(theme, theme.radius.card * 0.8),
+                    child: sheet,
+                  ),
+                ),
+        );
+
+    final name = _str(field['name']) ?? label;
 
     final Widget content;
     switch (kind) {
@@ -4487,29 +4522,17 @@ class _Field extends StatelessWidget {
             // is not a switch.
             onTap: enabled ? () => onChanged(!on) : null,
             excludeSemantics: true,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
+            child: _Keyed(
               onTap: enabled ? () => onChanged(!on) : null,
-              child: row(
-                Icons.toggle_on_outlined,
-                labelled(Text(on ? 'Yes' : 'No', style: valueStyle)),
-                end: IgnorePointer(
-                  child: Switch(
-                    value: on,
-                    onChanged: enabled ? (next) => onChanged(next) : null,
-                    // Ink, not accent: the submit button is this block's one
-                    // accent role, and a switched-on toggle beside it would be
-                    // a second.
-                    activeThumbColor: theme.colors.surfaceHigh,
-                    activeTrackColor: theme.readoutFill,
-                    // Off is white with the hairline and a soft-ink thumb, not
-                    // a grey pill: a grey track reads as disabled, which is
-                    // what a toggle must never look like when it is only OFF.
-                    inactiveThumbColor: theme.colors.onSurfaceSoft,
-                    inactiveTrackColor: theme.colors.surfaceHigh,
-                    trackOutlineColor: WidgetStatePropertyAll(theme.rail),
-                    trackOutlineWidth: const WidgetStatePropertyAll(1),
-                  ),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: enabled ? () => onChanged(!on) : null,
+                // The whole row is the switch's target, so it is never under
+                // 44pt however small the track is drawn.
+                child: row(
+                  Icons.toggle_on_outlined,
+                  labelled(Text(on ? 'Yes' : 'No', style: valueStyle)),
+                  end: _SwitchMark(on: on, enabled: enabled),
                 ),
               ),
             ),
@@ -4521,156 +4544,269 @@ class _Field extends StatelessWidget {
         final shown = selected != null
             ? (_str(selected['label']) ?? '')
             : (placeholder ?? 'Choose an option');
-        content = Semantics(
-          isRequired: required ? true : null,
-          child: RendelPressable(
-            semanticLabel: '$label, ${selected != null ? shown : 'not chosen'}',
+        content = _Unfolding(
+          key: ValueKey('select:$name'),
+          enabled: enabled,
+          builder: (context, open, show, node) {
             // `options` is optional in the schema, so a select can legally
-            // arrive with none. Opening a sheet onto nothing is worse than
-            // not opening: everywhere else here an unusable control is inert.
-            onTap: enabled && options.isNotEmpty
-                ? () async {
-                    final picked = await _pickOption(
-                      context,
-                      theme,
-                      options,
-                      title: label.isEmpty ? strings.choose : label,
-                      current:
-                          selected != null ? _str(selected['value']) : null,
-                      // Past a dozen, a list is scrolled through rather than
-                      // read, so it gets a search field whether or not the
-                      // model asked for one.
-                      searchable:
-                          field['searchable'] == true || options.length > 12,
-                    );
-                    if (picked != null) onChanged(picked);
-                  }
-                : null,
-            child: row(
-              Icons.format_list_bulleted_rounded,
-              labelled(Text(
-                shown,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: selected != null ? valueStyle : hintStyle,
-              )),
-              end: caret,
-            ),
-          ),
+            // arrive with none. Opening onto nothing is worse than not
+            // opening: everywhere else here an unusable control is inert.
+            final flip = enabled && options.isNotEmpty
+                ? () => show(open == null ? 'list' : null)
+                : null;
+            return Column(
+              children: [
+                Semantics(
+                  isRequired: required ? true : null,
+                  child: _Keyed(
+                    focusNode: node('list'),
+                    onTap: flip,
+                    child: RendelPressable(
+                      semanticLabel: '$label, ${selected != null ? shown : 'not chosen'}',
+                      expanded: options.isEmpty ? null : open != null,
+                      onTap: flip,
+                      child: row(
+                        Icons.format_list_bulleted_rounded,
+                        labelled(Text(
+                          shown,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: selected != null ? valueStyle : hintStyle,
+                        )),
+                        end: caretOf(open != null),
+                      ),
+                    ),
+                  ),
+                ),
+                sheetSlot(open == null
+                    ? null
+                    : _OptionList(
+                        choices: [
+                          for (final o in options)
+                            if (_str(o['value']) case final v?)
+                              (value: v, label: _str(o['label']) ?? v),
+                        ],
+                        chosen: selected != null ? _str(selected['value']) : null,
+                        // Past a dozen, a list is scrolled through rather
+                        // than read, so it gets a search field whether or not
+                        // the model asked for one.
+                        searchable: field['searchable'] == true || options.length > 12,
+                        onPick: (picked) {
+                          onChanged(picked);
+                          show(null);
+                        },
+                      )),
+              ],
+            );
+          },
         );
       case 'date':
-      case 'time':
-        final time = kind == 'time';
         final chosen = _str(value);
-        final shown = chosen ??
-            placeholder ??
-            (time ? strings.chooseTime : strings.chooseDate);
-        content = Semantics(
-          isRequired: required ? true : null,
-          child: RendelPressable(
-            semanticLabel: '$label, ${chosen ?? strings.notChosen}',
-            onTap: enabled
-                ? () async {
-                    if (time) {
-                      final picked = await showTimePicker(
-                        context: context,
-                        initialTime: TimeOfDay.now(),
-                        builder: _pickerTheme(theme),
-                      );
-                      if (picked == null) return;
-                      onChanged('${_two(picked.hour)}:${_two(picked.minute)}');
-                    } else {
-                      final (first, last) = _dateBounds(field);
-                      // The picker opens on the day already chosen, and
-                      // asserts on a day outside its bounds, so both are
-                      // held inside them.
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _clampDay(
-                            _dayOf(chosen) ?? DateTime.now(), first, last),
-                        firstDate: first,
-                        lastDate: last,
-                        builder: _pickerTheme(theme),
-                      );
-                      if (picked == null) return;
-                      onChanged(_isoDay(picked));
-                    }
-                  }
-                : null,
-            child: row(
-              time ? Icons.schedule_outlined : Icons.calendar_today_outlined,
-              labelled(Text(
-                shown,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: chosen != null ? valueStyle.tabular : hintStyle,
-              )),
-              end: caret,
-            ),
-          ),
+        final day = _dayOf(chosen);
+        final shown = day != null
+            ? _dayWords(context, day)
+            : chosen ?? placeholder ?? strings.chooseDate;
+        content = _Unfolding(
+          key: ValueKey('date:$name'),
+          enabled: enabled,
+          builder: (context, open, show, node) {
+            final flip = enabled ? () => show(open == null ? 'day' : null) : null;
+            return Column(
+              children: [
+                Semantics(
+                  isRequired: required ? true : null,
+                  child: _Keyed(
+                    focusNode: node('day'),
+                    onTap: flip,
+                    child: RendelPressable(
+                      semanticLabel:
+                          '$label, ${day != null ? _spokenDay(context, day) : chosen ?? strings.notChosen}',
+                      expanded: open != null,
+                      onTap: flip,
+                      child: row(
+                        Icons.calendar_today_outlined,
+                        labelled(Text(
+                          shown,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: chosen != null ? valueStyle.tabular : hintStyle,
+                        )),
+                        end: caretOf(open != null),
+                      ),
+                    ),
+                  ),
+                ),
+                sheetSlot(open == null
+                    ? null
+                    : _MonthSheet(
+                        value: chosen,
+                        first: _str(field['min_date']),
+                        last: _str(field['max_date']),
+                        onPick: (picked) {
+                          onChanged(picked);
+                          show(null);
+                        },
+                      )),
+              ],
+            );
+          },
+        );
+      case 'time':
+        final chosen = _str(value);
+        final held = chosen != null && _hourMinute.hasMatch(chosen) ? chosen : null;
+        final shown = held != null
+            ? _clockWords(context, held)
+            : chosen ?? placeholder ?? strings.chooseTime;
+        content = _Unfolding(
+          key: ValueKey('time:$name'),
+          enabled: enabled,
+          builder: (context, open, show, node) {
+            final flip = enabled ? () => show(open == null ? 'time' : null) : null;
+            return Column(
+              children: [
+                Semantics(
+                  isRequired: required ? true : null,
+                  child: _Keyed(
+                    focusNode: node('time'),
+                    onTap: flip,
+                    child: RendelPressable(
+                      semanticLabel: '$label, ${held != null ? shown : chosen ?? strings.notChosen}',
+                      expanded: open != null,
+                      onTap: flip,
+                      child: row(
+                        Icons.schedule_outlined,
+                        labelled(Text(
+                          shown,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: chosen != null ? valueStyle.tabular : hintStyle,
+                        )),
+                        end: caretOf(open != null),
+                      ),
+                    ),
+                  ),
+                ),
+                sheetSlot(open == null
+                    ? null
+                    : _OptionList(
+                        choices: _quarterHours(context, held),
+                        chosen: held,
+                        start: _nextQuarter(DateTime.now()),
+                        onPick: (picked) {
+                          onChanged(picked);
+                          show(null);
+                        },
+                      )),
+              ],
+            );
+          },
         );
       case 'date_range':
         final range = _list(value);
         final start = range.isNotEmpty ? _str(range[0]) : null;
         final end = range.length > 1 ? _str(range[1]) : null;
-        final chosen = start != null && end != null;
-        Widget half(String caption, String day) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        final first = _str(field['min_date']);
+        final last = _str(field['max_date']);
+        content = _Unfolding(
+          key: ValueKey('range:$name'),
+          enabled: enabled,
+          builder: (context, open, show, node) {
+            // From and To, each its own button opening a month under the
+            // two, as on the web.
+            Widget half(String key, String caption, String? held) {
+              final day = _dayOf(held);
+              final isOpen = open == key;
+              final flip = enabled ? () => show(isOpen ? null : key) : null;
+              return _Keyed(
+                focusNode: node(key),
+                onTap: flip,
+                radius: 10,
+                child: RendelPressable(
+                  semanticLabel:
+                      '$label, $caption, ${day != null ? _spokenDay(context, day) : held ?? strings.notChosen}',
+                  expanded: isOpen,
+                  onTap: flip,
+                  child: AnimatedContainer(
+                    duration: motion,
+                    curve: theme.motion.curve,
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: theme.tint,
+                      borderRadius: BorderRadius.circular(10),
+                      // The open half is ringed, so it is plain which day
+                      // the month under them picks.
+                      border: Border.all(
+                        color: isOpen ? theme.colors.onSurface : theme.colors.onSurface.withValues(alpha: 0),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.text.caption),
+                        Text(
+                          day != null ? _shortDayWords(context, day) : held ?? strings.choose,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: held != null ? valueStyle.tabular : hintStyle,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }
+
+            return Column(
               children: [
-                Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.text.caption),
-                Text(day, maxLines: 1, overflow: TextOverflow.ellipsis, style: valueStyle.tabular),
+                Semantics(
+                  container: true,
+                  isRequired: required ? true : null,
+                  child: row(
+                    Icons.date_range_outlined,
+                    labelled(Padding(
+                      padding: EdgeInsets.only(top: theme.space.xs),
+                      child: Row(
+                        children: [
+                          Expanded(child: half('start', strings.dateRangeStart, start)),
+                          SizedBox(width: theme.space.sm),
+                          Expanded(child: half('end', strings.dateRangeEnd, end)),
+                        ],
+                      ),
+                    )),
+                    top: true,
+                  ),
+                ),
+                sheetSlot(switch (open) {
+                  'start' => _MonthSheet(
+                      key: const ValueKey('start'),
+                      value: start,
+                      first: first,
+                      last: last,
+                      onPick: (picked) {
+                        // To is kept while it is still on or after From;
+                        // otherwise it is cleared, and its month opens next.
+                        final keep = end != null && end.compareTo(picked) >= 0;
+                        onChanged([picked, keep ? end : null]);
+                        show(keep ? null : 'end');
+                      },
+                    ),
+                  'end' => _MonthSheet(
+                      key: const ValueKey('end'),
+                      value: end,
+                      // To starts no earlier than From, where From is set.
+                      first: start ?? first,
+                      last: last,
+                      onPick: (picked) {
+                        onChanged([start, picked]);
+                        show(null);
+                      },
+                    ),
+                  _ => null,
+                }),
               ],
             );
-        content = Semantics(
-          isRequired: required ? true : null,
-          child: RendelPressable(
-            semanticLabel: chosen
-                ? '$label, ${strings.dateRangeStart} $start, ${strings.dateRangeEnd} $end'
-                : '$label, ${strings.notChosen}',
-            onTap: enabled
-                ? () async {
-                    final (first, last) = _dateBounds(field);
-                    final from = _dayOf(start);
-                    final to = _dayOf(end);
-                    // Reopened on the range already chosen, when it is still
-                    // one the bounds allow; the picker asserts on any other.
-                    final initial = from != null &&
-                            to != null &&
-                            !from.isBefore(first) &&
-                            !to.isAfter(last) &&
-                            !to.isBefore(from)
-                        ? DateTimeRange(start: from, end: to)
-                        : null;
-                    final picked = await showDateRangePicker(
-                      context: context,
-                      firstDate: first,
-                      lastDate: last,
-                      initialDateRange: initial,
-                      builder: _pickerTheme(theme),
-                    );
-                    if (picked == null) return;
-                    onChanged([_isoDay(picked.start), _isoDay(picked.end)]);
-                  }
-                : null,
-            child: row(
-              Icons.date_range_outlined,
-              labelled(chosen
-                  ? Row(
-                      children: [
-                        Expanded(child: half(strings.dateRangeStart, start)),
-                        SizedBox(width: theme.space.sm),
-                        Expanded(child: half(strings.dateRangeEnd, end)),
-                      ],
-                    )
-                  : Text(
-                      placeholder ?? strings.chooseDate,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: hintStyle,
-                    )),
-              end: caret,
-            ),
-          ),
+          },
         );
       case 'multi_select':
         final options = _maps(field['options']);
@@ -4951,177 +5087,664 @@ class RendelControlShell extends StatelessWidget {
   }
 }
 
+/// Where an upload field's file comes from, when the build offers more than
+/// one place (the camera, the library, the files): a sheet of the SDK's own
+/// rows. A form's select, day and time open in the field's row instead.
 Future<String?> _pickOption(
   BuildContext context,
   RendelTheme theme,
   List<Map> options, {
   required String title,
-  String? current,
-  bool searchable = false,
 }) {
-  final strings = RendelStringsScope.of(context);
-  var query = '';
   return showModalBottomSheet<String>(
     context: context,
     backgroundColor: theme.colors.surface,
     useSafeArea: true,
-    // A search field brings the keyboard up, and a sheet that cannot grow
-    // past half the screen would leave the options under it.
-    isScrollControlled: searchable,
     builder: (sheetContext) => RendelThemeScope(
       theme: theme,
-      child: StatefulBuilder(
-        builder: (sheetContext, setSheet) {
-          final needle = query.trim().toLowerCase();
-          final shown = needle.isEmpty
-              ? options
-              : [
-                  for (final option in options)
-                    if ((_str(option['label']) ?? '').toLowerCase().contains(needle)) option,
-                ];
-          return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheetContext).bottom),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      theme.space.plate,
-                      theme.space.lg,
-                      theme.space.plate,
-                      theme.space.sm,
-                    ),
-                    child: RendelOverline(title),
-                  ),
-                  if (searchable)
-                    Padding(
-                      padding: EdgeInsets.fromLTRB(
-                        theme.space.plate,
-                        0,
-                        theme.space.plate,
-                        theme.space.sm,
-                      ),
-                      child: RendelControlShell(
-                        child: TextField(
-                          autofocus: true,
-                          onChanged: (text) => setSheet(() => query = text),
-                          style: theme.text.label.copyWith(fontSize: theme.type.body),
-                          decoration: InputDecoration(
-                            isDense: true,
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            hintText: strings.searchOptions,
-                            hintStyle: theme.text.label.copyWith(
-                              fontSize: theme.type.body,
-                              color: theme.colors.onSurfaceFaint,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            icon: Icon(
-                              Icons.search_rounded,
-                              size: theme.type.heading,
-                              color: theme.colors.onSurfaceSoft,
-                            ),
-                            contentPadding: EdgeInsets.zero,
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (shown.isEmpty)
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: theme.space.plate,
-                        vertical: theme.space.md,
-                      ),
-                      child: Text(strings.nothingToShow, style: theme.text.labelSoft),
-                    ),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: shown.length,
-                      itemBuilder: (_, i) {
-                        final label = _str(shown[i]['label']) ?? '';
-                        // The sheet opened with no memory of the answer already
-                        // given, so reopening a select to check what you picked
-                        // told you nothing and re-picking felt like a first pick.
-                        final chosen = current != null &&
-                            _str(shown[i]['value']) == current;
-                        return RendelPressable(
-                          semanticLabel: label,
-                          selected: chosen,
-                          onTap: () => Navigator.of(sheetContext)
-                              .pop(_str(shown[i]['value']) ?? ''),
-                          child: Container(
-                            alignment: AlignmentDirectional.centerStart,
-
-                            padding: EdgeInsets.symmetric(
-                              horizontal: theme.space.plate,
-                              vertical: theme.space.md,
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    label,
-                                    // `labelStrong` is onAccent ink, which is
-                                    // legible on an accent fill and nowhere else.
-                                    // The sheet is a plain surface: under a host
-                                    // that maps onAccent to white, the one row the
-                                    // user opened the sheet to find measured
-                                    // 1.00:1 against it.
-                                    style: chosen
-                                        ? theme.text.labelEmphasis
-                                        : theme.text.label,
-                                  ),
-                                ),
-                                if (chosen)
-                                  Icon(
-                                    Icons.check_rounded,
-                                    size: theme.type.body,
-                                    color: theme.colors.accent,
-                                  ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                theme.space.plate,
+                theme.space.lg,
+                theme.space.plate,
+                theme.space.sm,
               ),
+              child: RendelOverline(title),
             ),
-          );
-        },
+            for (final option in options)
+              RendelPressable(
+                semanticLabel: _str(option['label']) ?? '',
+                onTap: () => Navigator.of(sheetContext).pop(_str(option['value']) ?? ''),
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: theme.space.plate,
+                    vertical: theme.space.md,
+                  ),
+                  child: Text(_str(option['label']) ?? '', style: theme.text.label),
+                ),
+              ),
+          ],
+        ),
       ),
     ),
   );
 }
 
-/// The OS pickers are host chrome, so they keep the app's Material theme and
-/// borrow only the accent, which is the token the host actually mapped.
-///
-/// `accentText`, not `accent`. Material uses `colorScheme.primary` as the
-/// FOREGROUND of the dialog's own text buttons and its selected-date label,
-/// and a mid-value brand colour as text on a Material dialog is routinely
-/// under 3.5:1 — the brand orange is 3.34:1 on white. `accentText` is the
-/// derived form of the same hue that clears 4.5:1, which is exactly the role
-/// it exists for; the fills Material paints from `primary` keep their
-/// `onPrimary` label, which is audited separately.
-TransitionBuilder _pickerTheme(RendelTheme theme) => (context, child) {
-      final base = Theme.of(context);
-      return Theme(
-        data: base.copyWith(
-          colorScheme: base.colorScheme.copyWith(
-            primary: theme.accentText,
-            onPrimary: theme.colors.onAccent,
+/// Keyboard focus and Enter/Space for a control the SDK draws itself: a
+/// field that opens a sheet, an option, a day. Touch and a screen reader go
+/// through the [RendelPressable] inside it; this adds what a hardware
+/// keyboard needs, and a ring in the accent's edge while the keyboard is on
+/// it. It adds no semantics node of its own.
+class _Keyed extends StatefulWidget {
+  const _Keyed({
+    required this.onTap,
+    required this.child,
+    this.focusNode,
+    this.autofocus = false,
+    this.radius = 12,
+  });
+
+  final VoidCallback? onTap;
+  final Widget child;
+  final FocusNode? focusNode;
+  final bool autofocus;
+  final double radius;
+
+  @override
+  State<_Keyed> createState() => _KeyedState();
+}
+
+class _KeyedState extends State<_Keyed> {
+  bool _ring = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    void activate() => widget.onTap?.call();
+    return FocusableActionDetector(
+      enabled: widget.onTap != null,
+      focusNode: widget.focusNode,
+      autofocus: widget.autofocus,
+      includeFocusSemantics: false,
+      onShowFocusHighlight: (on) {
+        if (mounted && on != _ring) setState(() => _ring = on);
+      },
+      actions: {
+        ActivateIntent: CallbackAction<ActivateIntent>(onInvoke: (_) {
+          activate();
+          return null;
+        }),
+        ButtonActivateIntent: CallbackAction<ButtonActivateIntent>(onInvoke: (_) {
+          activate();
+          return null;
+        }),
+      },
+      child: DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: _ring
+            ? BoxDecoration(
+                border: Border.all(color: theme.accentEdge, width: 2),
+                borderRadius: BorderRadius.circular(widget.radius),
+              )
+            : const BoxDecoration(),
+        child: widget.child,
+      ),
+    );
+  }
+}
+
+/// Which sheet a field has open in its row, if any: a select's options, a
+/// month, a time's quarter hours, or one of a range's two months. Escape
+/// closes it, and closing it hands the keyboard back to the button that
+/// opened it, as the web SDK does. A form that is sending closes it.
+class _Unfolding extends StatefulWidget {
+  const _Unfolding({super.key, required this.enabled, required this.builder});
+
+  final bool enabled;
+  final Widget Function(
+    BuildContext context,
+    String? open,
+    ValueChanged<String?> show,
+    FocusNode Function(String key) node,
+  ) builder;
+
+  @override
+  State<_Unfolding> createState() => _UnfoldingState();
+}
+
+class _UnfoldingState extends State<_Unfolding> {
+  String? _open;
+  final Map<String, FocusNode> _nodes = {};
+
+  FocusNode _node(String key) => _nodes.putIfAbsent(key, () => FocusNode(debugLabel: key));
+
+  void _show(String? which) {
+    if (!mounted || which == _open) return;
+    final was = _open;
+    setState(() => _open = which);
+    if (which == null && was != null) _nodes[was]?.requestFocus();
+  }
+
+  @override
+  void didUpdateWidget(_Unfolding old) {
+    super.didUpdateWidget(old);
+    if (!widget.enabled) _open = null;
+  }
+
+  @override
+  void dispose() {
+    for (final node in _nodes.values) {
+      node.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => CallbackShortcuts(
+        bindings: {
+          if (_open != null) const SingleActivator(LogicalKeyboardKey.escape): () => _show(null),
+        },
+        child: widget.builder(context, _open, _show, _node),
+      );
+}
+
+/// A toggle's switch, drawn by the SDK rather than the platform: a 44 by 26
+/// track and a white knob that slides across it, the accent's fill when on
+/// and the strong line when off, as the web SDK draws its own. Only a mark:
+/// the row it sits in is the target and carries the `toggled` semantics.
+class _SwitchMark extends StatelessWidget {
+  const _SwitchMark({required this.on, required this.enabled});
+
+  final bool on;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 180);
+    return Opacity(
+      opacity: enabled ? 1 : 0.5,
+      child: AnimatedContainer(
+        duration: duration,
+        curve: theme.motion.curve,
+        width: 44,
+        height: 26,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: on ? theme.colors.accent : theme.colors.lineStrong,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: AnimatedAlign(
+          duration: duration,
+          curve: theme.motion.curve,
+          alignment: on ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+          child: Container(
+            width: 20,
+            height: 20,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFFFFFF),
+              shape: BoxShape.circle,
+              boxShadow: [BoxShadow(color: Color(0x40000000), offset: Offset(0, 1), blurRadius: 3)],
+            ),
           ),
         ),
-        child: child!,
+      ),
+    );
+  }
+}
+
+/// An option a field's list offers: what it sends, and what it says.
+typedef _Option = ({String value, String label});
+
+/// A list of [choices] in a field's row: a select's options, or a time's
+/// quarter hours. The one [chosen] is tinted and ticked; opened, the list is
+/// scrolled to it, or to [start] with nothing chosen, and the keyboard lands
+/// there. A [searchable] list has a search field over the options; Enter in
+/// it picks the first one it leaves. At most 264 tall, then it scrolls.
+class _OptionList extends StatefulWidget {
+  const _OptionList({
+    required this.choices,
+    required this.chosen,
+    required this.onPick,
+    this.searchable = false,
+    this.start,
+  });
+
+  final List<_Option> choices;
+  final String? chosen;
+  final ValueChanged<String> onPick;
+  final bool searchable;
+  final String? start;
+
+  @override
+  State<_OptionList> createState() => _OptionListState();
+}
+
+class _OptionListState extends State<_OptionList> {
+  static const double _row = 44;
+  static const double _most = 264;
+  static const double _pad = 4;
+
+  var _query = '';
+  late final ScrollController _scroll;
+
+  String? get _at => widget.chosen ?? widget.start;
+
+  @override
+  void initState() {
+    super.initState();
+    // Every row is one line at 44, so where the one to show sits is known
+    // before anything is laid out: in the middle of the list's window.
+    final count = widget.choices.length;
+    final index = math.max(0, widget.choices.indexWhere((c) => c.value == _at));
+    final whole = count * _row + _pad * 2;
+    final window = math.min(_most, whole);
+    final offset = (index * _row - (window - _row) / 2).clamp(0.0, math.max(0.0, whole - window));
+    _scroll = ScrollController(initialScrollOffset: offset.toDouble());
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final needle = _query.trim().toLowerCase();
+    final shown = needle.isEmpty
+        ? widget.choices
+        : [
+            for (final c in widget.choices)
+              if (c.label.toLowerCase().contains(needle)) c,
+          ];
+    final textStyle = theme.text.label.copyWith(fontSize: theme.type.body);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (widget.searchable)
+          DecoratedBox(
+            decoration: BoxDecoration(border: Border(bottom: BorderSide(color: theme.hairline))),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: TextField(
+                autofocus: true,
+                textInputAction: TextInputAction.search,
+                onChanged: (text) {
+                  setState(() => _query = text);
+                  if (_scroll.hasClients) _scroll.jumpTo(0);
+                },
+                // Enter in a form's field would otherwise send nothing at all.
+                onSubmitted: (_) {
+                  if (shown.isNotEmpty) widget.onPick(shown.first.value);
+                },
+                style: textStyle,
+                decoration: InputDecoration(
+                  isDense: true,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  hintText: strings.searchOptions,
+                  hintStyle: textStyle.copyWith(
+                    color: theme.colors.onSurfaceFaint,
+                    fontWeight: FontWeight.w400,
+                  ),
+                  icon: Icon(
+                    Icons.search_rounded,
+                    size: theme.type.heading,
+                    color: theme.colors.onSurfaceSoft,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+          ),
+        if (shown.isEmpty)
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Text(strings.nothingToShow, style: theme.text.labelSoft),
+          )
+        else
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxHeight: _most),
+            child: ListView.builder(
+              controller: _scroll,
+              shrinkWrap: true,
+              padding: const EdgeInsets.all(_pad),
+              itemCount: shown.length,
+              itemBuilder: (context, i) {
+                final choice = shown[i];
+                final on = choice.value == widget.chosen;
+                void pick() => widget.onPick(choice.value);
+                return _Keyed(
+                  // The keyboard lands on the one chosen, or else the first.
+                  autofocus: !widget.searchable && choice.value == (_at ?? shown.first.value),
+                  onTap: pick,
+                  radius: 10,
+                  child: RendelPressable(
+                    semanticLabel: choice.label,
+                    selected: on,
+                    onTap: pick,
+                    pressedScale: 0.98,
+                    child: Container(
+                      constraints: const BoxConstraints(minHeight: _row),
+                      alignment: AlignmentDirectional.centerStart,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: on
+                          ? BoxDecoration(color: theme.tint, borderRadius: BorderRadius.circular(10))
+                          : null,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              choice.label,
+                              // `labelStrong` is onAccent ink, legible on an
+                              // accent fill and nowhere else; the list is a
+                              // plain surface.
+                              style: on ? theme.text.labelEmphasis : theme.text.label,
+                            ),
+                          ),
+                          if (on) ...[
+                            SizedBox(width: theme.space.sm),
+                            Icon(Icons.check_rounded, size: theme.type.body, color: theme.colors.onSurface),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// A month of days to pick one from, drawn by the SDK in a date field's row
+/// (the web SDK's calendar): the month and year between the two buttons that
+/// turn it, the week starting on the day the host's locale starts it
+/// (Monday where nothing says), today ringed, the day picked lit like the
+/// primary, and the days before [first] or after [last] there but not to be
+/// picked. The buttons stop at the bounds. Opened, it shows the month of
+/// the day it holds, or of today held to the bounds, and the keyboard lands
+/// on that day; the arrows move between days.
+class _MonthSheet extends StatefulWidget {
+  const _MonthSheet({
+    super.key,
+    required this.value,
+    required this.first,
+    required this.last,
+    required this.onPick,
+  });
+
+  /// The day held, as YYYY-MM-DD, or null.
+  final String? value;
+
+  /// The bounds, as YYYY-MM-DD: `min_date` and `max_date`.
+  final String? first;
+  final String? last;
+  final ValueChanged<String> onPick;
+
+  @override
+  State<_MonthSheet> createState() => _MonthSheetState();
+}
+
+class _MonthSheetState extends State<_MonthSheet> {
+  late DateTime _month;
+  late DateTime _landing;
+
+  DateTime? get _lo => _dayOf(widget.first);
+  DateTime? get _hi => _dayOf(widget.last);
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    var at = _dayOf(widget.value) ?? DateTime(now.year, now.month, now.day);
+    final lo = _lo;
+    final hi = _hi;
+    if (lo != null && at.isBefore(lo)) at = lo;
+    if (hi != null && at.isAfter(hi)) at = hi;
+    _landing = at;
+    _month = DateTime(at.year, at.month);
+  }
+
+  bool _outside(DateTime day) {
+    final lo = _lo;
+    final hi = _hi;
+    return (lo != null && day.isBefore(lo)) || (hi != null && day.isAfter(hi));
+  }
+
+  void _turn(int by) => setState(() => _month = DateTime(_month.year, _month.month + by));
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final material = _material(context);
+    // 0 is Sunday, as MaterialLocalizations counts.
+    final weekStart = material?.firstDayOfWeekIndex ?? 1;
+    final year = _month.year;
+    final month = _month.month;
+    final days = DateTime(year, month + 1, 0).day;
+    final lead = (DateTime(year, month).weekday % 7 - weekStart + 7) % 7;
+    final lo = _lo;
+    final hi = _hi;
+    final canBack = lo == null || !DateTime(year, month, 0).isBefore(lo);
+    final canOn = hi == null || !DateTime(year, month + 1).isAfter(hi);
+    final now = DateTime.now();
+    final chosen = _dayOf(widget.value);
+
+    Widget turn(IconData icon, String name, VoidCallback? onTap) => _Keyed(
+          onTap: onTap,
+          radius: 999,
+          child: RendelPressable(
+            semanticLabel: name,
+            onTap: onTap,
+            pressedScale: 0.92,
+            child: Center(
+              child: Opacity(
+                opacity: onTap == null ? 0.35 : 1,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(color: theme.tint, shape: BoxShape.circle),
+                  child: Icon(icon, size: 18, color: theme.colors.onSurface),
+                ),
+              ),
+            ),
+          ),
+        );
+
+    final dayStyle = theme.text.label.copyWith(fontSize: 14, fontWeight: FontWeight.w500).tabular;
+
+    Widget cell(DateTime day, double side) {
+      final off = _outside(day);
+      final on = chosen != null && DateUtils.isSameDay(day, chosen);
+      final today = DateUtils.isSameDay(day, now);
+      final pick = off ? null : () => widget.onPick(_isoDay(day));
+      return _Keyed(
+        autofocus: DateUtils.isSameDay(day, _landing),
+        onTap: pick,
+        radius: 999,
+        child: RendelPressable(
+          semanticLabel: _spokenDay(context, day),
+          selected: on,
+          onTap: pick,
+          pressedScale: 0.92,
+          child: Center(
+            child: Container(
+              width: side,
+              height: side,
+              alignment: Alignment.center,
+              decoration: on
+                  ? _lit(theme, BorderRadius.circular(999), shadow: const [])
+                  : today
+                      ? BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: theme.rail, width: 1.5),
+                        )
+                      : null,
+              child: Text(
+                '${day.day}',
+                style: on
+                    ? dayStyle.copyWith(color: theme.colors.onAccent, fontWeight: FontWeight.w600)
+                    : off
+                        ? dayStyle.copyWith(color: theme.colors.onSurfaceFaint.withValues(alpha: 0.5))
+                        : today
+                            ? dayStyle.copyWith(fontWeight: FontWeight.w600)
+                            : dayStyle,
+              ),
+            ),
+          ),
+        ),
       );
-    };
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              turn(Icons.chevron_left_rounded, strings.previousMonth, canBack ? () => _turn(-1) : null),
+              Expanded(
+                child: Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    material?.formatMonthYear(_month) ?? '${strings.shortMonths[month - 1]} $year',
+                    textAlign: TextAlign.center,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.text.label.copyWith(fontSize: 14.5, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              turn(Icons.chevron_right_rounded, strings.nextMonth, canOn ? () => _turn(1) : null),
+            ],
+          ),
+          SizedBox(height: theme.space.xs),
+          // Each day's button says its whole date, so the letters over the
+          // columns are drawn, not read.
+          ExcludeSemantics(
+            child: Row(
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        material?.narrowWeekdays[(weekStart + i) % 7] ??
+                            strings.shortDays[((weekStart + i) % 7 + 6) % 7],
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        style: theme.text.caption.copyWith(fontSize: 11.5, color: theme.colors.onSurfaceFaint),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          LayoutBuilder(
+            builder: (context, box) {
+              final side = math.min(40.0, box.maxWidth / 7 - 2);
+              final cells = <Widget?>[
+                for (var i = 0; i < lead; i++) null,
+                for (var d = 1; d <= days; d++) cell(DateTime(year, month, d), side),
+              ];
+              while (cells.length % 7 != 0) {
+                cells.add(null);
+              }
+              return Column(
+                children: [
+                  for (var w = 0; w < cells.length; w += 7)
+                    Row(
+                      children: [
+                        for (final c in cells.sublist(w, w + 7))
+                          Expanded(child: c ?? const SizedBox(height: _minTarget)),
+                      ],
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The host's Material words, when it has any: the SDK carries no date
+/// library, so a month's name and a day said in full come from them.
+MaterialLocalizations? _material(BuildContext context) =>
+    Localizations.of<MaterialLocalizations>(context, MaterialLocalizations);
+
+/// A day as a date field shows it, in the host's language: "Nov 14, 2026".
+String _dayWords(BuildContext context, DateTime day) =>
+    _material(context)?.formatShortDate(day) ??
+    '${day.day} ${RendelStringsScope.of(context).shortMonths[day.month - 1]} ${day.year}';
+
+/// A day short enough for half a row: without its year in this one.
+String _shortDayWords(BuildContext context, DateTime day) {
+  if (day.year != DateTime.now().year) return _dayWords(context, day);
+  return _material(context)?.formatShortMonthDay(day) ??
+      '${day.day} ${RendelStringsScope.of(context).shortMonths[day.month - 1]}';
+}
+
+/// A day as a screen reader says it: "Saturday, November 14, 2026".
+String _spokenDay(BuildContext context, DateTime day) =>
+    _material(context)?.formatFullDate(day) ??
+    '${RendelStringsScope.of(context).dayHeadingFor(day)} ${day.year}';
+
+/// A time on the wire: HH:MM, 00:00 to 23:59.
+final RegExp _hourMinute = RegExp(r'^([01]\d|2[0-3]):[0-5]\d$');
+
+/// HH:MM on the device's clock: "14:30", or "2:30 PM" where the locale
+/// keeps a 12-hour one.
+String _clockWords(BuildContext context, String hm) {
+  final at = TimeOfDay(hour: int.parse(hm.substring(0, 2)), minute: int.parse(hm.substring(3)));
+  return _material(context)?.formatTimeOfDay(
+        at,
+        alwaysUse24HourFormat: MediaQuery.maybeAlwaysUse24HourFormatOf(context) ?? false,
+      ) ??
+      hm;
+}
+
+/// The day's quarter hours, sent as HH:MM and shown on the device's clock;
+/// a [held] time off the quarter is listed in its place.
+List<_Option> _quarterHours(BuildContext context, String? held) {
+  final slots = [
+    for (var i = 0; i < 96; i++) '${_two(i ~/ 4)}:${_two(i % 4 * 15)}',
+  ];
+  if (held != null && !slots.contains(held)) {
+    slots
+      ..add(held)
+      ..sort();
+  }
+  return [for (final hm in slots) (value: hm, label: _clockWords(context, hm))];
+}
+
+/// The quarter hour at or after [now], where a time list with nothing
+/// chosen opens.
+String _nextQuarter(DateTime now) {
+  final quarter = ((now.hour * 60 + now.minute) / 15).ceil() % 96;
+  return '${_two(quarter ~/ 4)}:${_two(quarter % 4 * 15)}';
+}
 
 String _two(int value) => value.toString().padLeft(2, '0');
 
@@ -5146,18 +5769,6 @@ const Map<String, String> _autofillHints = {
   'country': AutofillHints.countryName,
 };
 
-/// The first and last day a date field's picker offers: `min_date` and
-/// `max_date` where the model gave them, the year behind and the three ahead
-/// where it did not, and never a last day before the first.
-(DateTime, DateTime) _dateBounds(Map field) {
-  final now = DateTime.now();
-  final first = _dayOf(field['min_date']) ?? DateTime(now.year - 1);
-  var last = _dayOf(field['max_date']) ??
-      DateTime((first.year > now.year ? first.year : now.year) + 3);
-  if (last.isBefore(first)) last = first;
-  return (first, last);
-}
-
 /// What a form says under [day] when it falls outside [field]'s `min_date`
 /// or `max_date`, or nothing. Compared as YYYY-MM-DD text, which sorts as
 /// the days do.
@@ -5174,13 +5785,6 @@ DateTime? _dayOf(Object? value) {
   if (value is! String) return null;
   final parsed = DateTime.tryParse(value);
   return parsed == null ? null : DateTime(parsed.year, parsed.month, parsed.day);
-}
-
-DateTime _clampDay(DateTime day, DateTime first, DateTime last) {
-  final only = DateTime(day.year, day.month, day.day);
-  if (only.isBefore(first)) return first;
-  if (only.isAfter(last)) return last;
-  return only;
 }
 
 String _isoDay(DateTime day) =>
@@ -7992,6 +8596,41 @@ String _num(double value) {
   }
   return value.toStringAsFixed(1);
 }
+
+/// A currency as a chart's unit: a sign like € or ₺, or a code like EUR.
+final RegExp _currencyUnit = RegExp(r'^(\p{Sc}|[A-Z]{3})$', unicode: true);
+
+/// How a chart writes its values, as the web SDK does: all with as many
+/// decimals as the most precise of them has, at most two, so 53.4 beside
+/// 48.25 reads 53.40; and money with cents anywhere always with two.
+String Function(double) _chartFormat(List<double> values, String? unit) {
+  int own(double v) {
+    if (v == v.roundToDouble()) return 0;
+    final text = v.toString();
+    final dot = text.indexOf('.');
+    return text.contains('e') || dot == -1 ? 2 : text.length - dot - 1;
+  }
+
+  final fractional = values.any((v) => v != v.roundToDouble());
+  final money = unit != null && _currencyUnit.hasMatch(unit.trim());
+  final places = money && fractional ? 2 : math.min(2, values.map(own).fold(0, math.max));
+  return (value) => value.toStringAsFixed(places);
+}
+
+/// Whether a chart's [label] is itself a when ("Today", "This week",
+/// "Bugün") that "in" reads wrong before. The SDK carries no date library,
+/// so the words are the six languages' own, by hand.
+bool _isWhen(String label) => _whenWords.hasMatch(label.trim().toLowerCase());
+
+final RegExp _whenWords = RegExp(
+  r'^(today|tonight|yesterday|tomorrow|now|this |last |next |past '
+  r'|bugün|dün|yarın|şimdi|bu |geçen |gelecek '
+  r'|heute|gestern|morgen|jetzt|diese|dieser|dieses|letzte|nächste'
+  r'|aujourd|hier|demain|maintenant|ce |cet |cette '
+  r'|hoy|ayer|mañana|ahora|este |esta '
+  r'|اليوم|أمس|غدا|غدًا|الآن|هذا|هذه)',
+  unicode: true,
+);
 
 /// The day heading for a slot, or an empty string when the model sent no
 /// timestamp and there is nothing true to say.
@@ -11897,7 +12536,7 @@ class _ReceiptLine extends StatelessWidget {
 }
 
 /// One to three goals as rings side by side, 88 pt each or as many as fit
-/// the plate: the track the v6 rail, the arc the ink, the value in the
+/// the plate: the track the v6 rail, the arc the accent, the value in the
 /// middle and the label under it.
 class _ProgressRings extends StatelessWidget {
   const _ProgressRings({required this.items});
@@ -11958,7 +12597,9 @@ class _ProgressRing extends StatelessWidget {
               painter: _RingPainter(
                 fraction: fraction,
                 track: theme.rail,
-                arc: theme.colors.onSurface,
+                // The accent as the web's ring draws it, at the strength
+                // that holds 3:1 on every ground (WCAG 1.4.11).
+                arc: theme.accentEdge,
                 stroke: stroke,
               ),
               child: Center(
@@ -12024,7 +12665,7 @@ class _RingPainter extends CustomPainter {
       ..strokeWidth = stroke;
     canvas.drawArc(rect, 0, math.pi * 2, false, paint..color = track);
     if (fraction <= 0) return;
-    // From twelve o'clock, clockwise, with round ends: a readout, so in ink.
+    // From twelve o'clock, clockwise, with round ends.
     canvas.drawArc(
       rect,
       -math.pi / 2,
@@ -12070,6 +12711,7 @@ class _HBars extends StatelessWidget {
       }
     }
     final top = peak > 0 ? peak : 1.0;
+    final said = _chartFormat([for (final s in series) ...s.data], unit);
     final thickness = one ? 14.0 : 8.0;
     // One series has no legend to match, so it takes the readout's fill; more
     // take the inks their legend names.
@@ -12109,7 +12751,7 @@ class _HBars extends StatelessWidget {
           SizedBox(width: theme.space.sm),
           _TrailingSlot(
             child: Text(
-              _num(value) + (unit == null ? '' : ' $unit'),
+              said(value) + (unit == null ? '' : ' $unit'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.text.captionTabular,

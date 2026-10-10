@@ -5,6 +5,44 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.46.0
+
+**Changed**
+
+- A form draws no control of the platform's own, as the web SDK does since
+  0.23.0. A `date` opens the SDK's month in the field's row (the week
+  starting where the host's locale starts it, Monday where nothing says;
+  today ringed; days outside `min_date`/`max_date` drawn but not to be
+  picked; the month buttons stopping at the bounds), a `time` a list of the
+  day's quarter hours on the locale's 12- or 24-hour clock (a prefilled time
+  off the quarter listed in its place, an empty one opening at the next
+  quarter), and a `date_range` two buttons, From and To, each opening a
+  month: picking From goes on to To, and clears To when it is now earlier.
+  Days and times are shown in the host's language and still sent as
+  YYYY-MM-DD and HH:MM (`{name}_start` / `{name}_end` for a range).
+- A `select` opens its options in its row instead of a bottom sheet, with a
+  search field only when it is `searchable` or has more than twelve.
+- A `toggle` is the SDK's own switch, a track in the accent with a white
+  knob, flipped by the whole row and still announced as toggled.
+- The pickers, options and days take keyboard focus: Enter or Space picks,
+  the arrows move between days, Escape closes, and closing hands focus back
+  to the field.
+- `Rendel.open` presents the copilot as a page sheet: 8pt under the top safe
+  area, its top corners rounded and the app behind dimmed by a quarter.
+  `RendelRadiusScale.hero` is 24 (was 28).
+- Progress rings draw their arc in the accent (`accentEdge`), not the ink.
+
+**Fixed**
+
+- The action lit beside the microphone reads whole at 360pt ("Add to
+  basket", "Track my order"): the microphone narrows to a circle beside it.
+  Before, labels past about nine letters were cut off.
+- A bar chart keeps one count of decimals across its values, money with
+  cents always two ("53.40 €", not "53.4"; 48.25 is no longer "48.3"), and
+  says "Today", not "in Today", before a label that is itself a when
+  (`RendelStrings.readoutNow` / `readoutNowPeak`). New strings in all six
+  languages: `previousMonth`, `nextMonth`, `readoutNow`, `readoutNowPeak`.
+
 ## 0.45.2
 
 **Changed**

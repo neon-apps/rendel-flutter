@@ -1789,7 +1789,9 @@ class _ComposerState extends State<_Composer> {
     return _Arrive(
       key: const ValueKey(_Mode.rest),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(6, 2, 6, 4),
+        // 2 at the sides, not 6, as on the web: the room goes to a lit
+        // action's label.
+        padding: const EdgeInsets.fromLTRB(2, 2, 2, 4),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -1825,10 +1827,10 @@ class _ComposerState extends State<_Composer> {
                             },
                             label: strings.speak,
                             onTap: widget.busy ? null : _listen,
-                            // Narrower beside a lit action, as on the web; a
-                            // circle beside a screen to open, whose label
-                            // is the longer one.
-                            width: primary == null ? 128 : (primary.go ? 52 : 92),
+                            // A circle beside a lit action, as on the web, so
+                            // at 360pt "Add to basket" and "Track my order"
+                            // read whole; at 92 they cut off past ~9 letters.
+                            width: primary == null ? 128 : 52,
                           ),
                           if (primary != null) ...[
                             const SizedBox(width: 8),
@@ -2966,7 +2968,9 @@ class _LitAction extends StatelessWidget {
       onTap: onTap,
       child: Container(
         height: 52,
-        padding: EdgeInsets.symmetric(horizontal: go ? 20 : 26),
+        // The web's widths (Web 0.23.0): with the microphone a circle beside
+        // it, ~14 letters fit at a 360pt screen.
+        padding: EdgeInsets.symmetric(horizontal: go ? 14 : 18),
         decoration: _litPill(theme),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -2976,11 +2980,11 @@ class _LitAction extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.text.labelStrong.copyWith(fontSize: 15.5),
+                style: theme.text.labelStrong.copyWith(fontSize: go ? 14.5 : 15),
               ),
             ),
             if (go) ...[
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Icon(Icons.north_east_rounded, size: 15, color: theme.text.labelStrong.color),
             ],
           ],

@@ -479,7 +479,7 @@ void main() {
   });
 
   group('progress rings', () {
-    testWidgets('88 pt rings side by side: the rail, the ink arc, the value inside and the label under',
+    testWidgets('88 pt rings side by side: the rail, the accent arc (as on the web), the value inside and the label under',
         (tester) async {
       await pump(tester, [_goals]);
       expect(find.text('64%'), findsOneWidget, reason: 'the share, with no value label');
@@ -491,7 +491,7 @@ void main() {
         tester.renderObject(ring),
         paints
           ..arc(color: theme.rail, strokeWidth: theme.size.trackHeight)
-          ..arc(color: theme.colors.onSurface, startAngle: -math.pi / 2, sweepAngle: math.pi * 2 * 0.64),
+          ..arc(color: theme.accentEdge, startAngle: -math.pi / 2, sweepAngle: math.pi * 2 * 0.64),
       );
       expect(tester.getRect(find.text('Steps')).top, greaterThan(tester.getRect(ring).bottom));
       expect(tester.getRect(find.text('Steps')).top, tester.getRect(find.text('Water')).top);

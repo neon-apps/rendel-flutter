@@ -153,7 +153,7 @@ class RendelRadiusScale {
     this.xs = 6,
     this.sm = 10,
     this.card = 14,
-    this.hero = 28,
+    this.hero = 24,
     this.control = 999,
   });
 
@@ -166,7 +166,8 @@ class RendelRadiusScale {
   /// Block plates and cards.
   final double card;
 
-  /// The largest frame: the sheet the thread is presented in.
+  /// The largest frame: the top corners of the page sheet the thread is
+  /// presented in, 24 as an iOS page sheet's.
   final double hero;
 
   /// Pills survive on controls only: buttons, chips, slots.
