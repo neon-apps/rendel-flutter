@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.46.1
+
+**Changed**
+
+- The opening screen has no mark: the greeting opens it, and the suggestions
+  are one card with a hairline between each, not a row of chips.
+- The header keeps only its controls until there is a conversation; then it
+  shows the name, after the customer's logo when one is published.
+- A reset arrow in the header starts a new conversation. It is drawn only once
+  there is a conversation, and not while a turn is running.
+
 ## 0.46.0
 
 **Changed**

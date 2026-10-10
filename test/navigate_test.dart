@@ -516,6 +516,18 @@ void main() {
       expect(find.text('It arrives today by 18:00.'), findsOneWidget);
     });
 
+    testWidgets('the reset arrow shows once there is a conversation, and starts over', (tester) async {
+      // `host` has already asked and been answered. On the opening screen
+      // there is nothing to start over from (Tuna, 2026-10-10).
+      await host(tester);
+      final reset = find.bySemanticsLabel('Start a new conversation');
+      expect(reset, findsOneWidget);
+      await tester.tap(reset);
+      await settle(tester);
+      expect(find.text('Where is my order?'), findsOneWidget);
+      expect(reset, findsNothing);
+    });
+
     testWidgets('closing the panel makes no bubble', (tester) async {
       await host(tester);
       await tester.tap(find.bySemanticsLabel('Close the copilot'));

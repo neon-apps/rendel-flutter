@@ -16,7 +16,6 @@ import 'renderer/blocks.dart'
     show
         BlockEnter,
         RendelActionButton,
-        RendelChip,
         RendelPage,
         RendelPhoto,
         RendelPressable,
@@ -888,6 +887,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
             logoUrl: widget.logoUrl,
             logoHeaders: widget.logoHeaders,
             sandbox: controller.sandbox,
+            fresh: controller.messages.isEmpty,
+            onReset: idle && controller.messages.isNotEmpty ? controller.reset : null,
             onBack: idle && controller.page > -1 ? () => _step(-1) : null,
             onForward: idle && controller.page < controller.pages.length - 1
                 ? () => _step(1)
@@ -1141,10 +1142,20 @@ class _Header extends StatelessWidget {
     this.logoHeaders = const {},
     this.onBack,
     this.onForward,
+    this.fresh = false,
+    this.onReset,
   });
 
   final String title;
   final bool sandbox;
+
+  /// No conversation yet. The opening screen says who this is, so the header
+  /// keeps only its controls until there is one (Tuna, 2026-10-10).
+  final bool fresh;
+
+  /// Start over: a new conversation. Null while there is nothing to start
+  /// over from, or a turn is running, and then the button is not drawn.
+  final VoidCallback? onReset;
 
   /// A step back through the pages and forward again. Null is "nothing that
   /// way", which spends the button rather than removing it, so the pair never
@@ -1203,7 +1214,7 @@ class _Header extends StatelessWidget {
           // object that went missing — has to leave the header looking the way
           // it did before anyone uploaded anything, not leave a broken frame
           // in it.
-          if (logoUrl != null) ...[
+          if (logoUrl != null && !fresh) ...[
             Image.network(
               logoUrl!,
               headers: logoHeaders,
@@ -1217,7 +1228,22 @@ class _Header extends StatelessWidget {
             ),
             SizedBox(width: theme.space.sm),
           ],
-          Expanded(child: RendelOverline(title, maxLines: 1)),
+          Expanded(child: fresh ? const SizedBox.shrink() : RendelOverline(title, maxLines: 1)),
+          if (onReset != null)
+            RendelPressable(
+              semanticLabel: RendelStringsScope.of(context).newConversation,
+              onTap: onReset!,
+              child: SizedBox(
+                height: 44,
+                width: 44,
+                child: Icon(
+                  // Counter-clockwise: start over, which is what it does.
+                  Icons.replay_rounded,
+                  size: theme.type.display - 2,
+                  color: theme.colors.onSurfaceSoft,
+                ),
+              ),
+            ),
           RendelPressable(
             semanticLabel: RendelStringsScope.of(context).closeCopilot,
             onTap: () => Navigator.of(context).maybePop(),
@@ -1517,19 +1543,68 @@ class _EmptyState extends StatelessWidget {
             ],
             if (suggestions.isNotEmpty) ...[
               SizedBox(height: theme.space.xl),
-              Wrap(
-                alignment: WrapAlignment.start,
-                spacing: theme.space.sm,
-                runSpacing: theme.space.sm,
-                children: [
-                  // The same chip the catalog draws for quick_replies: the
-                  // empty state is a preview of the conversation, not a
-                  // separate look.
-                  for (final suggestion in suggestions)
-                    RendelChip(label: suggestion, onTap: () => onPick(suggestion)),
-                ],
+              // One card, a hairline between each suggestion (Tuna,
+              // 2026-10-10): a list to pick from, not four boxes. The web
+              // panel draws the same (`.rd-suggestions`).
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colors.surfaceHigh,
+                  border: Border.all(color: theme.hairline),
+                  borderRadius: BorderRadius.circular(theme.radius.card),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(theme.radius.card),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < suggestions.length; i++) ...[
+                        if (i > 0)
+                          Padding(
+                            padding: EdgeInsetsDirectional.only(start: theme.space.lg, end: theme.space.md),
+                            child: SizedBox(height: 1, child: ColoredBox(color: theme.hairline)),
+                          ),
+                        _Suggestion(text: suggestions[i], onTap: () => onPick(suggestions[i])),
+                      ],
+                    ],
+                  ),
+                ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One row of the opening screen's suggestion card.
+class _Suggestion extends StatelessWidget {
+  const _Suggestion({required this.text, required this.onTap});
+
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return RendelPressable(
+      semanticLabel: text,
+      onTap: onTap,
+      pressedScale: 0.99,
+      child: Padding(
+        padding: EdgeInsetsDirectional.fromSTEB(theme.space.lg, theme.space.md, theme.space.md, theme.space.md),
+        child: Row(
+          children: [
+            Expanded(child: Text(text, style: theme.text.label)),
+            SizedBox(width: theme.space.md),
+            Icon(
+              Directionality.of(context) == TextDirection.rtl
+                  ? Icons.arrow_back_rounded
+                  : Icons.arrow_forward_rounded,
+              size: 16,
+              color: theme.colors.onSurfaceFaint,
+            ),
           ],
         ),
       ),
