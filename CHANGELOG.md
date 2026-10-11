@@ -5,6 +5,24 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.46.4
+
+**Added**
+
+- `RendelAction.editable`: parameters the user may change on the
+  confirmation card before confirming. The card draws a control that fits
+  each (stepper, number or text field, choice, switch), sends a change to
+  `POST /v1/invocations/:id/edit` after a short pause and shows the card the
+  server redraws; Confirm waits while a change is on its way or was refused.
+  The handler runs with the values the user confirmed.
+- New strings in six languages: `cardEditInvalid`, `cardEditFailed`,
+  `cardLess`, `cardMore`.
+
+**Changed**
+
+- An answer page keeps its question as one faint line over the answer, cut
+  short when long, with a small square of the photo when one was sent.
+
 ## 0.46.3
 
 **Changed**

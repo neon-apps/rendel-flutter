@@ -64,6 +64,7 @@ class RendelAction {
     this.timeout = const Duration(seconds: 15),
     this.sandboxResult,
     this.undoable = false,
+    this.editable = const [],
   })  : assert(
           handler != null || onInvoke != null,
           'RendelAction needs a handler or an onInvoke.',
@@ -126,6 +127,17 @@ class RendelAction {
   /// being packed. Its confirmation card then does not say "This cannot be
   /// undone", and its confirm button is not drawn as a danger control.
   final bool undoable;
+
+  /// Parameters the user may change on the confirmation card before they
+  /// confirm: a quantity, a note, which of a few options. Each gets the
+  /// control its type takes, and the server checks a change as it checks the
+  /// model's call before the card is redrawn with it. Never an id, or an
+  /// amount the app works out.
+  ///
+  /// ```dart
+  /// editable: ['quantity'],
+  /// ```
+  final List<String> editable;
 
   /// How long the platform waits for this action before giving up on it.
   final Duration timeout;

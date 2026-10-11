@@ -319,6 +319,40 @@ class RendelApiClient {
     }
   }
 
+  /// POST /v1/invocations/:id/edit — values the user changed on a
+  /// confirmation card, checked by the server as it checks the model's call.
+  ///
+  /// `card`: the card redrawn with them, which is the one to confirm.
+  /// `fields`: what was wrong, by parameter. Both null when the request could
+  /// not be made, or the card is no longer open.
+  Future<({Map<String, dynamic>? card, Map<String, String>? fields})> editInvocation(
+    String invocationId,
+    Map<String, dynamic> params,
+  ) async {
+    try {
+      final response = await _http
+          .post(
+            Uri.parse('${config.apiBaseUrl}/v1/invocations/$invocationId/edit'),
+            headers: _headers,
+            body: jsonEncode({'params': params}),
+          )
+          .timeout(config.requestTimeout);
+      final parsed = jsonDecode(response.body);
+      if (response.statusCode == 200 && parsed is Map && parsed['card'] is Map) {
+        return (card: (parsed['card'] as Map).cast<String, dynamic>(), fields: null);
+      }
+      if (response.statusCode == 422 && parsed is Map && parsed['error'] is Map) {
+        final fields = (parsed['error'] as Map)['fields'];
+        if (fields is Map) {
+          return (card: null, fields: fields.map((k, v) => MapEntry('$k', '$v')));
+        }
+      }
+    } catch (_) {
+      // Nothing to show but the generic line.
+    }
+    return (card: null, fields: null);
+  }
+
   /// POST /v1/feedback. Best effort by design: a thumb is a nicety, and a
   /// failed one must never surface an error over the answer it was about.
   /// Returns whether the server accepted it, for the tests.

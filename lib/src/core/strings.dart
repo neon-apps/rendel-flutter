@@ -44,6 +44,10 @@ class RendelStrings {
     this.dictationDenied = 'Allow the microphone and speech recognition for this app in Settings to talk to the assistant.',
     this.openSettings = 'Open Settings',
     this.comparisonBest = 'Highlighted: the best in its row.',
+    this.cardEditInvalid = 'That value can’t be used here.',
+    this.cardEditFailed = 'That change didn’t go through. Try again.',
+    this.cardLess = 'Fewer',
+    this.cardMore = 'More',
     this.composerHint = 'Ask anything',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
@@ -214,6 +218,16 @@ class RendelStrings {
   /// Under a comparison that marks a best value: what the mark means, which
   /// on its own read as "different" (Grove report).
   final String comparisonBest;
+
+  /// Under a value changed on a confirmation card that the server refused.
+  final String cardEditInvalid;
+
+  /// Under a confirmation card whose change did not reach the server.
+  final String cardEditFailed;
+
+  /// The stepper's two buttons on a confirmation card, for a screen reader.
+  final String cardLess;
+  final String cardMore;
 
   final String composerHint;
 
@@ -553,6 +567,10 @@ class RendelStrings {
     String? dictationDenied,
     String? openSettings,
     String? comparisonBest,
+    String? cardEditInvalid,
+    String? cardEditFailed,
+    String? cardLess,
+    String? cardMore,
     String? composerHint,
     String? sendMessage,
     String? newConversation,
@@ -683,6 +701,10 @@ class RendelStrings {
       dictationDenied: dictationDenied ?? this.dictationDenied,
       openSettings: openSettings ?? this.openSettings,
       comparisonBest: comparisonBest ?? this.comparisonBest,
+      cardEditInvalid: cardEditInvalid ?? this.cardEditInvalid,
+      cardEditFailed: cardEditFailed ?? this.cardEditFailed,
+      cardLess: cardLess ?? this.cardLess,
+      cardMore: cardMore ?? this.cardMore,
       composerHint: composerHint ?? this.composerHint,
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
@@ -820,6 +842,10 @@ const Map<String, RendelStrings> _byLocale = {
     dictationDenied: "Asistanla konuşmak için Ayarlar'da bu uygulamaya mikrofon ve konuşma tanıma izni verin.",
     openSettings: 'Ayarları aç',
     comparisonBest: 'İşaretli: satırının en iyisi.',
+    cardEditInvalid: 'Bu değer burada kullanılamaz.',
+    cardEditFailed: 'Bu değişiklik iletilemedi. Tekrar deneyin.',
+    cardLess: 'Azalt',
+    cardMore: 'Artır',
     working: 'Çalışıyor…',
     emptyTitle: 'Bu uygulamayla ilgili ne isterseniz sorun.',
     emptyBody: 'Kendi cümlelerinizle sorun. Bir cümle yeterli.',
@@ -954,6 +980,10 @@ const Map<String, RendelStrings> _byLocale = {
     dictationDenied: 'Erlauben Sie in den Einstellungen Mikrofon und Spracherkennung für diese App, um mit dem Assistenten zu sprechen.',
     openSettings: 'Einstellungen öffnen',
     comparisonBest: 'Markiert: der beste Wert der Zeile.',
+    cardEditInvalid: 'Dieser Wert ist hier nicht möglich.',
+    cardEditFailed: 'Die Änderung kam nicht an. Versuchen Sie es erneut.',
+    cardLess: 'Weniger',
+    cardMore: 'Mehr',
     working: 'Arbeitet…',
     emptyTitle: 'Fragen Sie alles über diese App.',
     emptyBody: 'Fragen Sie in Ihren eigenen Worten. Ein Satz genügt.',
@@ -1090,6 +1120,10 @@ const Map<String, RendelStrings> _byLocale = {
     dictationDenied: "Autorisez le micro et la reconnaissance vocale pour cette app dans Réglages pour parler à l'assistant.",
     openSettings: 'Ouvrir Réglages',
     comparisonBest: 'En surbrillance : le meilleur de la ligne.',
+    cardEditInvalid: 'Cette valeur n’est pas possible ici.',
+    cardEditFailed: 'La modification n’est pas passée. Réessayez.',
+    cardLess: 'Moins',
+    cardMore: 'Plus',
     working: 'En cours…',
     emptyTitle: 'Posez toutes vos questions sur cette application.',
     emptyBody: 'Posez votre question avec vos mots. Une phrase suffit.',
@@ -1225,6 +1259,10 @@ const Map<String, RendelStrings> _byLocale = {
     dictationDenied: 'Permite el micrófono y el reconocimiento de voz para esta app en Ajustes para hablar con el asistente.',
     openSettings: 'Abrir Ajustes',
     comparisonBest: 'Resaltado: el mejor de su fila.',
+    cardEditInvalid: 'Ese valor no se puede usar aquí.',
+    cardEditFailed: 'El cambio no se aplicó. Inténtalo de nuevo.',
+    cardLess: 'Menos',
+    cardMore: 'Más',
     working: 'Trabajando…',
     emptyTitle: 'Pregunta lo que quieras sobre esta aplicación.',
     emptyBody: 'Pregunta con tus propias palabras. Basta una frase.',
@@ -1359,6 +1397,10 @@ const Map<String, RendelStrings> _byLocale = {
     dictationDenied: 'اسمح للتطبيق باستخدام الميكروفون والتعرّف على الكلام من الإعدادات للتحدث مع المساعد.',
     openSettings: 'فتح الإعدادات',
     comparisonBest: 'المظلَّل: الأفضل في صفّه.',
+    cardEditInvalid: 'لا يمكن استخدام هذه القيمة هنا.',
+    cardEditFailed: 'لم يصل هذا التغيير. حاول مرة أخرى.',
+    cardLess: 'أقل',
+    cardMore: 'أكثر',
     working: 'جارٍ العمل…',
     emptyTitle: 'اسأل أي شيء عن هذا التطبيق.',
     emptyBody: 'اسأل بكلماتك الخاصة. جملة واحدة تكفي.',

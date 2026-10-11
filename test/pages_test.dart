@@ -161,9 +161,10 @@ void main() {
 
       await api.answer(tester, [_text('b0', 'The Aero Glide 2.')]);
       await settle(tester);
-      // …and gone once the answer starts, with no bubble left behind.
+      // …and once the answer starts, only the small line over it remains
+      // (Tuna, 2026-10-11): one line, no bubble.
       expect(find.text('The Aero Glide 2.'), findsOneWidget);
-      expect(find.text('Which shoe should I buy?'), findsNothing);
+      expect(tester.widget<Text>(find.text('Which shoe should I buy?')).maxLines, 1);
     });
 
     testWidgets('is revealed a word at a time, unless it was spoken',
@@ -407,6 +408,23 @@ void main() {
 
     expect(tester.widget<Text>(find.text('The Aero Glide 2.')).style?.fontSize, 21);
     expect(tester.widget<Text>(find.text('Soft, and in your size.')).style?.fontSize, 15);
+  });
+
+  // Tuna, 2026-10-11: the question stays on its answer page, as a small line.
+  testWidgets('an answer page keeps its question as one faint line over it', (tester) async {
+    final c = seeded([_text('a', 'The Aero Glide 2.')]);
+    addTearDown(c.dispose);
+    await pump(tester, c);
+    await settle(tester);
+
+    final line = tester.widget<Text>(find.text('Which shoe should I buy?'));
+    expect(line.maxLines, 1);
+    expect(line.overflow, TextOverflow.ellipsis);
+    // Above the answer's own first line.
+    expect(
+      tester.getTopLeft(find.text('Which shoe should I buy?')).dy,
+      lessThan(tester.getTopLeft(find.text('The Aero Glide 2.')).dy),
+    );
   });
 
   testWidgets('only the first paragraph of a long opening is the lede (Grove report)', (tester) async {

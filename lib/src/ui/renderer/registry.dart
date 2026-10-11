@@ -29,7 +29,14 @@ class RendelDispatcher {
     this.onPickFile,
     this.fileSources = RendelAttachSource.values,
     this.onUpload,
+    this.onEditCard,
   });
+
+  /// Sends values the user changed on [card], a `confirm_card`, to be
+  /// checked and the card redrawn. Resolves null when it was; otherwise what
+  /// was wrong, by parameter, `''` for a change that did not get there. Null
+  /// where nothing can be changed: the card's values are drawn as text.
+  final Future<Map<String, String>?> Function(WireBlock card, Map<String, dynamic> edits)? onEditCard;
 
   /// Picks a file for a form's `upload` field from [source]: the composer's
   /// own picker, the host's when it brought one. Resolves null when the user

@@ -1330,9 +1330,237 @@ Widget buildConfirmCard(BuildContext context, WireBlock block, RendelDispatcher 
   // full-ink accent button and nothing whatsoever happens.
   return _ExpiryWatch(
     at: DateTime.tryParse(_str(block.props['expires_at']) ?? ''),
-    builder: (context, expired) =>
-        _confirmCard(context, block, dispatch, expired),
+    builder: (context, expired) {
+      final open = !expired && _str(block.props[RendelLocalKeys.resolved]) == null;
+      // Values the user may change here, while the card waits for an answer
+      // and something can send the change (`_CardEdits`).
+      if (!open || dispatch.onEditCard == null || _maps(block.props['editable']).isEmpty) {
+        return _confirmCard(context, block, dispatch, expired, null);
+      }
+      return _CardEdits(
+        block: block,
+        dispatch: dispatch,
+        builder: (context, edits) => _confirmCard(context, block, dispatch, expired, edits),
+      );
+    },
   );
+}
+
+/// What the user changed on a confirmation card, not yet redrawn by the
+/// server: held here, sent after a short pause (`RendelDispatcher.onEditCard`),
+/// and dropped once the server has redrawn the card with it. While a change
+/// is waiting, on its way or refused, the card cannot be confirmed: the card
+/// confirmed is always the one the server drew last.
+class _CardEdits extends StatefulWidget {
+  const _CardEdits({required this.block, required this.dispatch, required this.builder});
+
+  final WireBlock block;
+  final RendelDispatcher dispatch;
+  final Widget Function(BuildContext context, _CardEditsState edits) builder;
+
+  @override
+  State<_CardEdits> createState() => _CardEditsState();
+}
+
+class _CardEditsState extends State<_CardEdits> {
+  final Map<String, dynamic> _pending = {};
+  Map<String, String> errors = const {};
+  bool _sending = false;
+  Timer? _timer;
+
+  /// The value shown for [param]: the user's while it is waiting, the
+  /// card's otherwise.
+  dynamic valueOf(String param) => _pending.containsKey(param)
+      ? _pending[param]
+      : (widget.block.props['params'] is Map ? (widget.block.props['params'] as Map)[param] : null);
+
+  bool get blocked => _sending || _pending.isNotEmpty || errors.isNotEmpty;
+
+  void change(String param, dynamic value, {Duration wait = const Duration(milliseconds: 450)}) {
+    setState(() {
+      _pending[param] = value;
+      errors = {...errors}..remove(param)..remove('');
+    });
+    _timer?.cancel();
+    _timer = Timer(wait, _send);
+  }
+
+  Future<void> _send() async {
+    if (_pending.isEmpty || _sending) return;
+    final edits = Map<String, dynamic>.of(_pending);
+    setState(() => _sending = true);
+    final problems = await widget.dispatch.onEditCard!(widget.block, edits);
+    if (!mounted) return;
+    setState(() {
+      _sending = false;
+      if (problems == null) {
+        _pending.removeWhere((k, v) => edits.containsKey(k) && edits[k] == v);
+      } else {
+        errors = problems;
+      }
+    });
+    if (problems == null && _pending.isNotEmpty) unawaited(_send());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, this);
+}
+
+/// One value the user may change on a card, with the control its kind
+/// takes: a stepper, a number or text field, the options, a switch.
+class _EditRow extends StatefulWidget {
+  const _EditRow({required this.control, required this.edits});
+
+  final Map control;
+  final _CardEditsState edits;
+
+  @override
+  State<_EditRow> createState() => _EditRowState();
+}
+
+class _EditRowState extends State<_EditRow> {
+  TextEditingController? _text;
+
+  String get _param => _str(widget.control['param']) ?? '';
+  String get _kind => _str(widget.control['kind']) ?? 'text';
+
+  @override
+  void initState() {
+    super.initState();
+    if (_kind == 'text' || _kind == 'number') {
+      final value = widget.edits.valueOf(_param);
+      _text = TextEditingController(text: value == null ? '' : '$value');
+    }
+  }
+
+  @override
+  void dispose() {
+    _text?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final label = _str(widget.control['label']) ?? _param;
+    final value = widget.edits.valueOf(_param);
+    final labelStyle = _asPart(theme, 'details', theme.text.caption);
+    final valueStyle = _asPart(theme, 'details', theme.text.captionSoftTabular);
+    final error = widget.edits.errors[_param];
+
+    Widget control;
+    switch (_kind) {
+      case 'stepper':
+        final n = value is num ? value.toInt() : int.tryParse('$value') ?? 0;
+        final min = _dbl(widget.control['min']);
+        final max = _dbl(widget.control['max']);
+        Widget step(IconData icon, String name, int to, bool allowed) => RendelPressable(
+              semanticLabel: name,
+              onTap: allowed ? () => widget.edits.change(_param, to) : null,
+              child: Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: _white(theme, 999),
+                child: Icon(icon, size: 16, color: allowed ? theme.colors.onSurface : theme.colors.onSurfaceFaint),
+              ),
+            );
+        control = Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            step(Icons.remove_rounded, strings.cardLess, n - 1, min == null || n - 1 >= min),
+            SizedBox(
+              width: 36,
+              child: Text('$n', textAlign: TextAlign.center, style: valueStyle.copyWith(color: theme.colors.onSurface)),
+            ),
+            step(Icons.add_rounded, strings.cardMore, n + 1, max == null || n + 1 <= max),
+          ],
+        );
+      case 'toggle':
+        final on = value == true;
+        control = Semantics(
+          toggled: on,
+          label: label,
+          onTap: () => widget.edits.change(_param, !on, wait: Duration.zero),
+          excludeSemantics: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => widget.edits.change(_param, !on, wait: Duration.zero),
+            child: _SwitchMark(on: on, enabled: true),
+          ),
+        );
+      case 'choice':
+        control = Wrap(
+          spacing: theme.space.xs,
+          runSpacing: theme.space.xs,
+          children: [
+            for (final option in _maps(widget.control['options']))
+              RendelChip(
+                label: _str(option['label']) ?? '',
+                selected: option['value'] == value,
+                onTap: () => widget.edits.change(_param, option['value'], wait: Duration.zero),
+              ),
+          ],
+        );
+      default:
+        control = TextField(
+          controller: _text,
+          keyboardType: _kind == 'number' ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
+          maxLength: _dbl(widget.control['max_length'])?.toInt(),
+          minLines: 1,
+          maxLines: _kind == 'number' ? 1 : 4,
+          style: valueStyle.copyWith(color: theme.colors.onSurface),
+          onChanged: (text) => widget.edits.change(
+            _param,
+            _kind == 'number' ? (num.tryParse(text) ?? text) : text,
+            wait: const Duration(milliseconds: 700),
+          ),
+          decoration: InputDecoration(
+            isDense: true,
+            counterText: '',
+            contentPadding: EdgeInsets.symmetric(horizontal: theme.space.sm, vertical: theme.space.xs + 2),
+            filled: true,
+            fillColor: theme.colors.surfaceHigh,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.hairline)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.hairline)),
+          ),
+        );
+    }
+
+    final stacked = _kind == 'text' || _kind == 'choice';
+    return MergeSemantics(
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: theme.space.xs),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (stacked) ...[
+              Text(label, style: labelStyle),
+              SizedBox(height: theme.space.xs),
+              control,
+            ] else
+              Row(
+                children: [
+                  Expanded(child: Text(label, style: labelStyle)),
+                  control,
+                ],
+              ),
+            if (error != null) ...[
+              SizedBox(height: theme.space.hair * 2),
+              Text(strings.cardEditInvalid, style: theme.text.caption.copyWith(color: theme.danger)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Rebuilds once, when [at] passes.
@@ -1397,6 +1625,7 @@ Widget _confirmCard(
   WireBlock block,
   RendelDispatcher dispatch,
   bool expired,
+  _CardEditsState? edits,
 ) {
   final theme = RendelThemeScope.of(context);
   final resolved = _str(block.props[RendelLocalKeys.resolved]);
@@ -1406,6 +1635,13 @@ Widget _confirmCard(
   final destructive = (_str(block.props['risk']) ?? 'write') == 'destructive' &&
       block.props['irreversible'] != false;
   final display = _maps(block.props['params_display']);
+  // The parameters the user may change here, by name, when they can.
+  final controls = {
+    if (edits != null)
+      for (final control in _maps(block.props['editable']))
+        if (_str(control['param']) != null) _str(control['param'])!: control,
+  };
+  final rowParams = {for (final row in display) _str(row['param'])};
   // The server's verb for the button, with the amount when it charges one
   // ("Place order · A$8.41"); the build's own word otherwise.
   final confirmLabel = _str(block.props['confirm_label']) ?? RendelStringsScope.of(context).confirm;
@@ -1443,24 +1679,36 @@ Widget _confirmCard(
           _str(block.props['summary']) ?? block.fallbackText,
           style: theme.part('summary', theme.text.prose),
         ),
-        if (display.isNotEmpty) ...[
+        if (display.isNotEmpty || controls.isNotEmpty) ...[
           SizedBox(height: theme.space.md),
           _KvPanel(children: [
             for (final row in display)
+              if (controls[_str(row['param'])] case final control?)
+                _EditRow(control: control, edits: edits!)
               // A support message or an address is read whole, from the left,
               // not squeezed into the value column.
-              (_str(row['value']) ?? '').length > 40
-                  ? _StackedRow(
-                      label: _str(row['label']) ?? '',
-                      value: _str(row['value']) ?? '',
-                      part: 'details',
-                    )
-                  : _KeyValueRow(
-                      label: _str(row['label']) ?? '',
-                      value: _str(row['value']) ?? '',
-                      part: 'details',
-                    ),
+              else if ((_str(row['value']) ?? '').length > 40)
+                _StackedRow(
+                  label: _str(row['label']) ?? '',
+                  value: _str(row['value']) ?? '',
+                  part: 'details',
+                )
+              else
+                _KeyValueRow(
+                  label: _str(row['label']) ?? '',
+                  value: _str(row['value']) ?? '',
+                  part: 'details',
+                ),
+            // An editable value the call left empty (an optional note) still
+            // has its control.
+            for (final entry in controls.entries)
+              if (!rowParams.contains(entry.key)) _EditRow(control: entry.value, edits: edits!),
           ]),
+          if (edits != null && edits.errors.containsKey('')) ...[
+            SizedBox(height: theme.space.xs),
+            Text(RendelStringsScope.of(context).cardEditFailed,
+                style: theme.text.caption.copyWith(color: theme.danger)),
+          ],
         ],
         SizedBox(height: theme.space.lg),
         // Resolving a confirm card is the highest-stakes state change in the
@@ -1510,7 +1758,9 @@ Widget _confirmCard(
                     label: confirmLabel,
                     expand: true,
                     danger: destructive,
-                    onTap: _tap(dispatch, block.props['confirm']),
+                    // Not while a change is waiting for the server: the card
+                    // confirmed is the one it drew last.
+                    onTap: edits?.blocked == true ? null : _tap(dispatch, block.props['confirm']),
                     part: 'confirm',
                   ),
                   cancel: RendelActionButton(

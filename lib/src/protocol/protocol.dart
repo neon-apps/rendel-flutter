@@ -655,6 +655,7 @@ Map<String, dynamic> buildManifest(
             // Only when set, for the same reason: every manifest from before
             // this flag keeps the hash it had.
             if (a.undoable) 'undoable': true,
+            if (a.editable.isNotEmpty) 'editable': a.editable,
           },
         },
     ],

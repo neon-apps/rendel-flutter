@@ -70,6 +70,20 @@ void main() {
     expect(nc(buildManifest([place()])).containsKey('undoable'), isFalse);
   });
 
+  test('editable rides in the manifest only when it names something', () {
+    RendelAction add({List<String> editable = const []}) => RendelAction(
+          name: 'add_to_cart',
+          description: 'Put a product in the cart.',
+          params: RendelSchema.object({}),
+          risk: RendelRisk.write,
+          editable: editable,
+          handler: (_) async => RendelResult.ok(),
+        );
+    Map nc(Map<String, dynamic> m) => ((m['actions'] as List).single as Map)['nc'] as Map;
+    expect(nc(buildManifest([add(editable: ['quantity'])]))['editable'], ['quantity']);
+    expect(nc(buildManifest([add()])).containsKey('editable'), isFalse);
+  });
+
   test('canonicalize sorts keys and drops nulls', () {
     expect(
       canonicalize({'b': 1, 'a': {'d': null, 'c': [2, 1]}}),

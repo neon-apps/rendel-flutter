@@ -166,6 +166,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
       onChoose: (block, ids, shown, {otherText, lit = Duration.zero}) => widget.controller
           .choose(block, ids, shown: shown, otherText: otherText, lit: lit),
       onRate: (block, score, {comment}) => widget.controller.rate(block, score, comment: comment),
+      onEditCard: widget.controller.editCard,
       routeTitle: _routeTitle,
       // A form's upload field picks and uploads the way the composer does,
       // so a photo of the damage costs the host no second picker or path.
@@ -189,6 +190,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
           widget.controller.choose(block, ids, shown: shown, otherText: otherText, lit: lit)),
       // A rating asks nothing, so the sheet stays over it.
       onRate: (block, score, {comment}) => widget.controller.rate(block, score, comment: comment),
+      onEditCard: widget.controller.editCard,
       routeTitle: _routeTitle,
       onPickFile: widget.onPickAttachment,
       fileSources: widget.attachSources,
@@ -428,6 +430,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
        in flight, and this is the belt to that brace. */
     if (_attachments.any((pending) => pending.id == null)) return;
     final ids = [for (final pending in _attachments) pending.id!];
+    // The first picture goes with the question, for the line its answer page
+    // opens with.
+    final image = _attachments.where((pending) => pending.mediaType.startsWith('image/')).firstOrNull?.bytes;
     _input.clear();
     setState(() {
       _attachments.clear();
@@ -436,7 +441,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
     final spoken = _spoken;
     _overDetail(() {
       _spoken = spoken;
-      final sent = widget.controller.send(text, attachments: ids);
+      final sent = widget.controller.send(text, attachments: ids, image: image);
       _spoken = false;
       return sent;
     });
@@ -1035,9 +1040,23 @@ class _ThreadScreenState extends State<ThreadScreen> {
                       : 30;
         }
 
+        // What was asked, as a faint line over its answer (Tuna, 2026-10-11:
+        // the question stays as a small line, not a bubble). Not over a
+        // card's detail, which opens under the card's own head.
+        final at = answers.isEmpty ? -1 : controller.messages.indexOf(answers.first);
+        final asked = detail || at <= 0
+            ? null
+            : controller.messages.sublist(0, at).reversed.where((m) => m.role == 'user').firstOrNull;
+        final askedText = asked?.blocks.firstOrNull?.props['markdown'];
+
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (asked != null && askedText is String && askedText.trim().isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 14),
+                child: _AskedLine(text: askedText.trim(), image: asked.image),
+              ),
             for (var i = 0; i < blocks.length; i++)
               Padding(
                 padding: EdgeInsets.only(top: gap(i)),
@@ -1095,6 +1114,41 @@ class _ThreadScreenState extends State<ThreadScreen> {
           ],
         );
       },
+    );
+  }
+}
+
+/// The question an answer page answers, over it: one faint line, cut with an
+/// ellipsis, and the picture sent with it as a small thumbnail. Read as a
+/// caption, not as something said, so it is never a bubble (design/PAGES.md).
+class _AskedLine extends StatelessWidget {
+  const _AskedLine({required this.text, this.image});
+
+  final String text;
+  final Uint8List? image;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final picture = image;
+    return Row(
+      children: [
+        if (picture != null) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: Image.memory(picture, width: 22, height: 22, fit: BoxFit.cover, gaplessPlayback: true),
+          ),
+          SizedBox(width: theme.space.sm),
+        ],
+        Expanded(
+          child: Text(
+            text.replaceAll(RegExp(r'\s+'), ' '),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.text.caption.copyWith(color: theme.colors.onSurfaceFaint),
+          ),
+        ),
+      ],
     );
   }
 }

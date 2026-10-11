@@ -80,6 +80,10 @@ class RendelMessage extends ChangeNotifier {
   /// interrupting anyone about.
   int? rating;
 
+  /// The first picture the user sent with this question, kept on this device
+  /// for the line its answer page opens with. Null for every other message.
+  Uint8List? image;
+
   /// The card this turn was about, when it was asked by opening one over its
   /// page, or answered such a question. Null for every other turn: a detail
   /// is no page.
@@ -305,13 +309,16 @@ class ConversationController extends ChangeNotifier {
     String text, {
     List<String> attachments = const [],
     RendelDetail? detail,
+    Uint8List? image,
   }) async {
     if (busy || text.trim().isEmpty) return false;
     errorText = null;
     errorCode = null;
     _abandonOpenConfirmCards();
     _detail = detail;
-    messages.add(RendelMessage.user(text.trim())..detail = detail);
+    messages.add(RendelMessage.user(text.trim())
+      ..detail = detail
+      ..image = image);
     _notify();
 
     onEvent?.call(RendelEvent.messageSent);
@@ -404,6 +411,31 @@ class ConversationController extends ChangeNotifier {
   /// answer, and a chip that waits for a round trip to light reads as a tap
   /// that missed. Returns false when nothing was sent: a turn is still open,
   /// or the block does not offer [id] for picking, as with a sold-out size.
+  /// Values the user changed on [card], a `confirm_card`, before confirming:
+  /// sent to the server, which checks them as it checks the model's call and
+  /// redraws the card. On success the card's props become the redrawn ones,
+  /// which is what a confirm then runs on, and null is returned. Otherwise
+  /// what was wrong, by parameter, with `''` for a change that did not reach
+  /// the server at all.
+  Future<Map<String, String>?> editCard(WireBlock card, Map<String, dynamic> edits) async {
+    final invocationId = card.props['invocation_id'];
+    if (invocationId is! String || _isResolved(invocationId)) return {'': 'closed'};
+    final answer = await api.editInvocation(invocationId, edits);
+    final redrawn = answer.card;
+    if (redrawn == null) return answer.fields ?? {'': 'unreachable'};
+    // What this device keeps on the card itself survives the redraw.
+    final local = {
+      for (final entry in card.props.entries)
+        if (entry.key.startsWith('_')) entry.key: entry.value,
+    };
+    card.props
+      ..clear()
+      ..addAll(redrawn)
+      ..addAll(local);
+    _notify();
+    return null;
+  }
+
   Future<bool> select(WireBlock block, String id, {required String shown}) async {
     if (busy || !_stillOffers(block, id)) return false;
     block.props[RendelLocalKeys.chosen] = id;

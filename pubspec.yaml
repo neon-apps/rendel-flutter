@@ -2,7 +2,7 @@ name: rendel
 description: >-
   Embed an AI copilot that answers with native UI components and safely
   executes registered app actions. "Your entire app, one sentence away."
-version: 0.46.3
+version: 0.46.4
 homepage: https://rendel.ai
 repository: https://github.com/neon-apps/rendel-flutter
 

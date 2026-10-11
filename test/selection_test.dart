@@ -189,7 +189,8 @@ void main() {
     await api.answer(tester, [_text('t2', 'Size 43 is in stock.')]);
     await settle(tester);
     expect(find.text('Size 43 is in stock.'), findsOneWidget);
-    expect(find.text('Size: 43'), findsNothing);
+    // Off the screen, and kept as the page's one faint line (2026-10-11).
+    expect(tester.widget<Text>(find.text('Size: 43')).maxLines, 1);
     expect(c.page, 1, reason: 'the answer is a new page');
   });
 
