@@ -236,7 +236,7 @@ void main() {
 
     await c.send('Something hard').timeout(const Duration(seconds: 5));
 
-    expect(c.errorText, 'The copilot stopped responding.');
+    expect(c.errorText, 'The assistant stopped responding.');
     expect(c.errorCode, 'copilot_stalled');
     c.dispose();
   });

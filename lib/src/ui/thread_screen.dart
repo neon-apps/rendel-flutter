@@ -42,7 +42,7 @@ class ThreadScreen extends StatefulWidget {
   const ThreadScreen({
     super.key,
     required this.controller,
-    this.title = 'Copilot',
+    this.title = 'Rendel',
     this.logoUrl,
     this.logoHeaders = const {},
     this.headline,

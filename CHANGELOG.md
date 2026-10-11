@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.46.6
+
+**Changed**
+
+- The default `assistantName` (and the thread screen's default title) is
+  `Rendel`, not `Copilot`. A name from the console or from `RendelConfig`
+  still wins.
+- The spoken labels and the stalled-answer message say "the assistant" in
+  every language: `openCopilot`, `closeCopilot` and `copilotStalled` keep
+  their names, only their text changed. The SDK's log messages say Rendel.
+
 ## 0.46.5
 
 **Added**

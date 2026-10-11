@@ -169,7 +169,7 @@ class Rendel {
       final why = placeholder
           ? 'appKey is still the example\'s placeholder ("$appKey"), not your app\'s key.'
           : 'appKey must start with rd_pk_ (got "$appKey").';
-      RendelLog.error('invalid_key', '$why $rendelKeyHelp The copilot is disabled for this run.');
+      RendelLog.error('invalid_key', '$why $rendelKeyHelp Rendel is disabled for this run.');
       assert(false, 'rendel: $why $rendelKeyHelp');
       _handOverClient(null);
       return;
@@ -334,7 +334,7 @@ class Rendel {
       result = api == null
           ? const RendelPairResult.failed(
               RendelPairFailure.failed,
-              'The copilot has not started; call init with the app\'s test key first.',
+              'Rendel has not started; call init with the app\'s test key first.',
             )
           : await api.pair(given);
     }
@@ -648,14 +648,14 @@ class Rendel {
       RendelLog.warn(
         'app_not_live',
         'This app has not gone live, so the server refuses its live key and '
-            'the copilot is hidden. Use the test key (rd_pk_test_…) while you '
+            'Rendel is hidden. Use the test key (rd_pk_test_…) while you '
             'build, or press Go live in the Rendel console.',
       );
     } else if (code == 'app_suspended') {
       RendelLog.report(
         RendelLogLevel.debug,
         'app_suspended',
-        'This app is suspended in the Rendel console, so the copilot is hidden.',
+        'This app is suspended in the Rendel console, so Rendel is hidden.',
       );
     }
     configRevision.value++;

@@ -121,7 +121,7 @@ void main() {
     await tester.pump();
     expect(find.text('Test modu'), findsOneWidget);
     expect(find.text('Test mode'), findsNothing);
-    expect(find.bySemanticsLabel('Copilotu kapat'), findsOneWidget);
+    expect(find.bySemanticsLabel('Asistanı kapat'), findsOneWidget);
     expect(find.bySemanticsLabel('Dosya ekle'), findsOneWidget);
     expect(find.bySemanticsLabel('Yazmak yerine konuşun'), findsOneWidget);
     await tester.tap(find.bySemanticsLabel('Mesaj yaz'));

@@ -1120,7 +1120,7 @@ class ConversationController extends ChangeNotifier {
         if (visible) _notify(structure: structural);
       }
     } on TimeoutException {
-      errorText = 'The copilot stopped responding.';
+      errorText = 'The assistant stopped responding.';
       errorCode = 'copilot_stalled';
       _lastErrorRetryable = true;
     } catch (err) {

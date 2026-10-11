@@ -108,7 +108,7 @@ class RendelConfig {
     this.sdkVersion = version.sdkVersion,
     this.locale,
     this.languages = const [],
-    this.assistantName = 'Copilot',
+    this.assistantName = 'Rendel',
     this.suggestions = const [],
     this.emptyStateTitle,
     this.emptyStateBody,

@@ -534,7 +534,7 @@ void main() {
 
       // And it is the sheet again: closing it leaves the app's screen, and no
       // bubble.
-      await tester.tap(find.bySemanticsLabel('Close the copilot'));
+      await tester.tap(find.bySemanticsLabel('Close the assistant'));
       await settle(tester);
       expect(find.byType(ThreadScreen, skipOffstage: false), findsNothing);
       expect(_bubble, findsNothing);
@@ -582,7 +582,7 @@ void main() {
 
     testWidgets('closing the panel makes no bubble', (tester) async {
       await host(tester);
-      await tester.tap(find.bySemanticsLabel('Close the copilot'));
+      await tester.tap(find.bySemanticsLabel('Close the assistant'));
       await settle(tester);
       expect(find.byType(ThreadScreen, skipOffstage: false), findsNothing);
       expect(_bubble, findsNothing);
