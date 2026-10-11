@@ -390,6 +390,27 @@ class RendelApiClient {
     }
   }
 
+  /// POST /v1/events: a screen of the app opened from a block in a reply
+  /// (0073), for the app's Screens page to count against how often it was
+  /// offered. Never a throw, and nothing the user sees waits on it.
+  Future<void> sendScreenOpen(Map<String, String> open) async {
+    try {
+      await _http
+          .post(
+            Uri.parse('${config.apiBaseUrl}/v1/events'),
+            headers: _headers,
+            body: jsonEncode({
+              'events': [
+                {'type': 'screen_open', ...open},
+              ],
+            }),
+          )
+          .timeout(config.requestTimeout);
+    } catch (_) {
+      // A count that did not land is only a count.
+    }
+  }
+
   /// POST /v1/pairings/claim — this device answers the code the console
   /// shows, so the console can watch its conversation for the next two hours.
   ///

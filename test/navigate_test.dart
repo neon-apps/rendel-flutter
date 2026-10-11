@@ -25,6 +25,14 @@ class _Silent extends RendelApiClient {
   }
 }
 
+/// A server that records the screen opens it is told about.
+class _Opens extends _Silent {
+  final List<Map<String, String>> opens = [];
+
+  @override
+  Future<void> sendScreenOpen(Map<String, String> open) async => opens.add(open);
+}
+
 WireBlock _block(String id, String type, Map<String, dynamic> props) =>
     WireBlock(id: id, type: type, fallbackText: 'A $type block.', props: props)..ready = true;
 
@@ -81,6 +89,50 @@ void main() {
 
       expect(opened, isFalse);
       expect(logged.map((r) => r.code), ['route_open_failed']);
+    });
+
+    test('an open is reported with the reply and block it came from, and only an open', () async {
+      final api = _Opens();
+      final opened = <Map<String, Object?>>[];
+      final c = ConversationController(
+        api: api,
+        actions: const {},
+        routes: {
+          'order_detail': RendelRoute(
+            name: 'order_detail',
+            title: 'Orders › Order',
+            description: 'One order.',
+            open: opened.add,
+          ),
+          'broken': RendelRoute(
+            name: 'broken',
+            title: 'Broken',
+            description: 'Throws.',
+            open: (_) => throw StateError('no navigator'),
+          ),
+        },
+        sdkVersion: 'flutter/test',
+      );
+      addTearDown(c.dispose);
+      c.messages.add(RendelMessage.assistant()
+        ..serverId = 'm1'
+        ..blocks.add(_screens));
+
+      expect(await c.tapAction(UIAction.tryParse(_go('order_detail', {'order_id': '4821'}))!), isTrue);
+      expect(opened, [
+        {'order_id': '4821'},
+      ]);
+      expect(api.opens, [
+        {'message_id': 'm1', 'block_id': 'screens', 'route': 'order_detail'},
+      ]);
+
+      // The same route with values no reply offered opens, but is not counted as an open of that card.
+      expect(await c.tapAction(UIAction.tryParse(_go('order_detail', {'order_id': '9999'}))!), isTrue);
+      expect(api.opens, hasLength(1));
+
+      // A route that throws opened nothing, so nothing is reported.
+      expect(await c.tapAction(UIAction.tryParse(_go('broken'))!), isFalse);
+      expect(api.opens, hasLength(1));
     });
 
     test('a navigate parses with the primitive params the wire allows', () {

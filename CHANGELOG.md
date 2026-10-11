@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.46.5
+
+**Added**
+
+- A screen opened from an answer is reported to `POST /v1/events` as a
+  `screen_open` (the answer's id, the card's id and the route's name), so the
+  console's Screens page can count opens against how often each screen was
+  offered. Only after the route's `open` returns; never for a route that
+  threw or is not registered. No change in your code.
+
 ## 0.46.4
 
 **Added**

@@ -751,6 +751,34 @@ class ConversationController extends ChangeNotifier {
         AppActionRef(:final invocationId) => invocationId != null,
       };
 
+  /// The reply and block a navigate to [route] with [params] came from, newest
+  /// reply first, or null for one no reply carries or a reply the server
+  /// never named. A control parses its action from the block's raw props as
+  /// it draws, so the block is found by the same navigate in those props.
+  Map<String, String>? navigateOrigin(String route, Map<String, Object?> params) {
+    bool same(Object? raw) {
+      if (raw is! Map || raw['kind'] != 'navigate' || raw['route'] != route) return false;
+      final parsed = UIAction.tryParse(raw);
+      return parsed is NavigateAction && mapEquals(parsed.params, params);
+    }
+
+    bool holds(Object? value) {
+      if (same(value)) return true;
+      if (value is Map) return value.values.any(holds);
+      if (value is List) return value.any(holds);
+      return false;
+    }
+
+    for (final message in messages.reversed) {
+      final id = message.serverId;
+      if (message.role != 'assistant' || id == null) continue;
+      for (final block in message.blocks) {
+        if (holds(block.props)) return {'message_id': id, 'block_id': block.id};
+      }
+    }
+    return null;
+  }
+
   /// Runs [action], reporting whether it actually went anywhere.
   ///
   /// False means the tap was dropped — almost always because the previous turn
@@ -781,12 +809,16 @@ class ConversationController extends ChangeNotifier {
         // a while to open costs nothing here.
         final screen = routes[route];
         if (screen == null) return false;
+        final from = navigateOrigin(route, params);
         try {
           await screen.open(params);
         } catch (err) {
           RendelLog.warn('route_open_failed', 'the "$route" route threw while opening', error: err);
           return false;
         }
+        // The open, reported for the app's Screens page (0073). Not awaited:
+        // a count that does not land never holds up the screen.
+        if (from != null) unawaited(api.sendScreenOpen({...from, 'route': route}));
         return true;
       // These three wait on no turn, as a link does not: they put something
       // into the user's hands and the copilot hears nothing of it.

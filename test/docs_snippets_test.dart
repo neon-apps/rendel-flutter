@@ -59,7 +59,7 @@ Future<void> installMain() async {
     // Your app's key: Rendel console → Settings → API keys → Copy.
     // Start on the test key; swap in the live key for release builds.
     appKey: 'rd_pk_test_…',
-    // The languages the copilot answers in. Put yours here:
+    // The languages Rendel answers in. Put yours here:
     //   ['tr']        Turkish only, whatever the user writes in
     //   ['tr', 'en']  Turkish or English, whichever the user writes;
     //                 anything else is answered in the first, Turkish
@@ -68,7 +68,7 @@ Future<void> installMain() async {
     config: RendelConfig(
       languages: ['tr'],
       // If people sign in to your app: their current token, from your own
-      // sign-in code, so the copilot reaches your API as them — no API key.
+      // sign-in code, so Rendel reaches your API as them — no API key.
       // Null when nobody is signed in.
       // userToken: () async => auth.accessToken,
     ),
