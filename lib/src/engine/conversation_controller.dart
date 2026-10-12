@@ -146,6 +146,7 @@ class ConversationController extends ChangeNotifier {
     this.sandbox = false,
     this.onOpenUrl,
     this.streamIdleTimeout = const Duration(seconds: 45),
+    this.autoRetryDelay = const Duration(seconds: 3),
     this.locale,
     this.languages = const [],
     this.onEvent,
@@ -183,6 +184,14 @@ class ConversationController extends ChangeNotifier {
 
   /// How long a turn may go without a server event before it is abandoned.
   final Duration streamIdleTimeout;
+
+  /// How long to wait before trying a turn again by itself when the server
+  /// said the model is busy, once (resilience plan §4.3). A random 0–2 s is
+  /// added so devices do not retry in step; zero (tests) adds nothing.
+  final Duration autoRetryDelay;
+
+  /// True while a busy model's turn is being tried again by itself.
+  bool _retryingByItself = false;
 
   /// Where lifecycle events go. `RendelEvent.messageSent` and
   /// `.actionExecuted` were declared on the public enum from the first
@@ -1281,6 +1290,26 @@ class ConversationController extends ChangeNotifier {
     if (awaitingReads) {
       await _runPendingReads(generation);
       return; // _runPendingReads issues the continuation, which re-enters _run.
+    }
+
+    // A busy model, before anything was drawn: try the same turn again once,
+    // by itself, after a short wait. It carries the same turn id, so the
+    // server reuses the conversation and nothing is written twice. A second
+    // `model_busy` is shown as usual, with its Retry.
+    final busyPayload = _lastPayload;
+    if (errorCode == 'model_busy' && !produced && !_retryingByItself && busyPayload != null) {
+      _retryingByItself = true;
+      errorText = null;
+      errorCode = null;
+      _notify();
+      final jitter = autoRetryDelay == Duration.zero ? 0 : Random().nextInt(2000);
+      await Future<void>.delayed(autoRetryDelay + Duration(milliseconds: jitter));
+      try {
+        if (generation == _generation) await _run(busyPayload, inherited);
+      } finally {
+        _retryingByItself = false;
+      }
+      return;
     }
 
     // A turn that ends having said nothing is indistinguishable, on screen,

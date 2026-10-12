@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.49.1
+
+**Changed**
+
+- A `model_busy` error that arrives before anything was drawn is retried
+  once by the SDK itself, after 3 s plus up to 2 s of jitter, with the same
+  turn id. Only a second `model_busy` shows the error and Retry; other
+  errors are never retried on their own. `ConversationController.autoRetryDelay`
+  sets the wait (3 s by default).
+
 ## 0.49.0
 
 **Added**

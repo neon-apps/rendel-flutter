@@ -259,16 +259,21 @@ void main() {
       api: api,
       actions: const {},
       sdkVersion: 'flutter/test',
+      autoRetryDelay: Duration.zero,
     );
 
     await c.send('Where is order 1042?').timeout(const Duration(seconds: 5));
     expect(c.canRetry, isTrue);
     await c.retry().timeout(const Duration(seconds: 5));
 
-    expect(api.sent, hasLength(2));
+    // A busy model is also tried once by itself on each attempt (busy_retry_test),
+    // so there are four requests here: every one carries the same turn id.
+    expect(api.sent, hasLength(4));
     final first = api.sent[0]['turn_id'];
     expect(first, isA<String>());
-    expect(api.sent[1]['turn_id'], first);
+    for (final body in api.sent) {
+      expect(body['turn_id'], first);
+    }
     c.dispose();
   });
 
