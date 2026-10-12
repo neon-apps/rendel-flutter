@@ -13,14 +13,27 @@ import '../protocol/protocol.dart';
 
 /// What `GET /v1/apps/config` answered, as far as the SDK acts on it.
 class RendelConfigAnswer {
-  const RendelConfigAnswer.config(String this.body, this.etag) : refusal = null;
+  const RendelConfigAnswer.config(String this.body, this.etag)
+      : refusal = null,
+        unreachable = false;
   const RendelConfigAnswer.unchanged()
       : body = null,
         etag = null,
-        refusal = null;
+        refusal = null,
+        unreachable = false;
   const RendelConfigAnswer.refused(String this.refusal)
       : body = null,
-        etag = null;
+        etag = null,
+        unreachable = false;
+
+  /// The API could not be reached: no network, a timeout, or a server
+  /// error. The launcher hides until it can be reached again, so nobody
+  /// presses a button whose every press fails (resilience plan §1.2).
+  const RendelConfigAnswer.unreachable()
+      : body = null,
+        etag = null,
+        refusal = null,
+        unreachable = true;
 
   /// The envelope, on a 200. Null on a 304 and on a refusal.
   final String? body;
@@ -29,7 +42,13 @@ class RendelConfigAnswer {
   /// `app_not_live` — a live key before the app has gone live — or
   /// `app_suspended`. Either way the copilot is not this app's to show.
   final String? refusal;
+
+  /// True when the request failed rather than being answered.
+  final bool unreachable;
 }
+
+/// How long the config may take on launch before the launcher is hidden.
+const Duration rendelConfigTimeout = Duration(seconds: 8);
 
 /// What the config request names as the platform: `ios`, `android`,
 /// `macos`, `windows`, `linux`, `fuchsia`, or `web`.
@@ -169,7 +188,7 @@ class RendelApiClient {
               if (etag != null) 'If-None-Match': etag,
             },
           )
-          .timeout(config.requestTimeout);
+          .timeout(config.requestTimeout < rendelConfigTimeout ? config.requestTimeout : rendelConfigTimeout);
       /* The first call every launch makes, so the one place to say a key the
          server does not know is the reason nothing works — rather than a
          network error on the first question. */
@@ -183,10 +202,12 @@ class RendelApiClient {
           return RendelConfigAnswer.refused(code!);
         }
       }
+      if (response.statusCode >= 500) return const RendelConfigAnswer.unreachable();
       if (response.statusCode != 200) return null;
       return RendelConfigAnswer.config(response.body, response.headers['etag']);
     } catch (_) {
-      return null;
+      // No network, a timeout, or the API down.
+      return const RendelConfigAnswer.unreachable();
     }
   }
 
@@ -387,6 +408,25 @@ class RendelApiClient {
       return response.statusCode == 200;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// POST /v1/events with one event: a contact channel tapped, Rendel opened
+  /// (analytics-roi T3, T4). Never a throw, and nothing the user sees waits
+  /// on it; the server ignores an event it does not know.
+  Future<void> sendEvent(Map<String, dynamic> event) async {
+    try {
+      await _http
+          .post(
+            Uri.parse('${config.apiBaseUrl}/v1/events'),
+            headers: _headers,
+            body: jsonEncode({
+              'events': [event],
+            }),
+          )
+          .timeout(config.requestTimeout);
+    } catch (_) {
+      // A count that did not land is only a count.
     }
   }
 

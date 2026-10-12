@@ -124,6 +124,7 @@ class RendelConfig {
     this.attachIcon = RendelAttachIcon.plus,
     this.voiceIcon = RendelVoiceIcon.microphone,
     this.sendIcon = RendelSendIcon.arrowUp,
+    this.feedback = false,
     this.enabled = true,
     this.remoteConfig = true,
     this.strings,
@@ -361,6 +362,11 @@ class RendelConfig {
   final RendelVoiceIcon voiceIcon;
   final RendelSendIcon sendIcon;
 
+  /// "Helpful?" with a thumb up and down at the foot of each answer, sent
+  /// to `POST /v1/feedback` (analytics-roi T1). Off unless true; usually
+  /// switched on from the console rather than here.
+  final bool feedback;
+
   /// The kill switch, in code. The console can flip the published one, which
   /// is how a customer pulls the copilot out of a shipped binary without an
   /// App Store review. Setting it false here disables it regardless.
@@ -424,6 +430,7 @@ class RendelConfig {
     RendelAttachIcon? attachIcon,
     RendelVoiceIcon? voiceIcon,
     RendelSendIcon? sendIcon,
+    bool? feedback,
   }) {
     return RendelConfig(
       apiBaseUrl: apiBaseUrl,
@@ -446,6 +453,7 @@ class RendelConfig {
       attachIcon: attachIcon ?? this.attachIcon,
       voiceIcon: voiceIcon ?? this.voiceIcon,
       sendIcon: sendIcon ?? this.sendIcon,
+      feedback: feedback ?? this.feedback,
       // A host that turned the copilot off in code stays off whatever the
       // console publishes: the local switch is the floor, not a default.
       enabled: enabled == null ? this.enabled : (this.enabled && enabled),

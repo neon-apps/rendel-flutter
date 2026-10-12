@@ -30,7 +30,13 @@ class RendelDispatcher {
     this.fileSources = RendelAttachSource.values,
     this.onUpload,
     this.onEditCard,
+    this.onContactOpen,
   });
+
+  /// A channel of a `contact` block was tapped: [channel] is its kind
+  /// (`call`, `email`, `url`), never its address (analytics-roi T3). Counted
+  /// on the side; the channel opens whether or not this is set.
+  final void Function(WireBlock block, String channel)? onContactOpen;
 
   /// Sends values the user changed on [card], a `confirm_card`, to be
   /// checked and the card redrawn. Resolves null when it was; otherwise what

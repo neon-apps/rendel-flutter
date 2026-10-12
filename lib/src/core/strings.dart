@@ -152,6 +152,7 @@ class RendelStrings {
     this.ratingStars = '{n} of 5',
     this.thumbsUp = 'Good',
     this.thumbsDown = 'Not good',
+    this.helpful = 'Helpful?',
     this.expand = 'Show',
     this.collapse = 'Hide',
     this.directions = 'Directions',
@@ -461,6 +462,9 @@ class RendelStrings {
   final String ratingStars;
   final String thumbsUp;
   final String thumbsDown;
+
+  /// The answer page's thumbs (analytics-roi T1): the question beside them.
+  final String helpful;
   final String expand;
   final String collapse;
 
@@ -671,6 +675,7 @@ class RendelStrings {
     String? ratingStars,
     String? thumbsUp,
     String? thumbsDown,
+    String? helpful,
     String? expand,
     String? collapse,
     String? directions,
@@ -805,6 +810,7 @@ class RendelStrings {
       ratingStars: ratingStars ?? this.ratingStars,
       thumbsUp: thumbsUp ?? this.thumbsUp,
       thumbsDown: thumbsDown ?? this.thumbsDown,
+      helpful: helpful ?? this.helpful,
       expand: expand ?? this.expand,
       collapse: collapse ?? this.collapse,
       directions: directions ?? this.directions,
@@ -956,6 +962,9 @@ const Map<String, RendelStrings> _byLocale = {
     ratingStars: '5 üzerinden {n}',
     thumbsUp: 'İyi',
     thumbsDown: 'İyi değil',
+    // Not written yet: Turkish copy comes only from the Gemini loop. Empty
+    // draws the thumbs alone.
+    helpful: '',
     expand: 'Göster',
     collapse: 'Gizle',
     directions: 'Yol tarifi',
@@ -1096,6 +1105,7 @@ const Map<String, RendelStrings> _byLocale = {
     ratingStars: '{n} von 5',
     thumbsUp: 'Gut',
     thumbsDown: 'Nicht gut',
+    helpful: 'Hilfreich?',
     expand: 'Anzeigen',
     collapse: 'Ausblenden',
     directions: 'Route',
@@ -1235,6 +1245,7 @@ const Map<String, RendelStrings> _byLocale = {
     ratingStars: '{n} sur 5',
     thumbsUp: 'Bien',
     thumbsDown: 'Pas bien',
+    helpful: 'Utile ?',
     expand: 'Afficher',
     collapse: 'Masquer',
     directions: 'Itinéraire',
@@ -1373,6 +1384,7 @@ const Map<String, RendelStrings> _byLocale = {
     ratingStars: '{n} de 5',
     thumbsUp: 'Bien',
     thumbsDown: 'Mal',
+    helpful: '¿Te ha servido?',
     expand: 'Mostrar',
     collapse: 'Ocultar',
     directions: 'Cómo llegar',
@@ -1510,6 +1522,7 @@ const Map<String, RendelStrings> _byLocale = {
     ratingStars: '{n} من 5',
     thumbsUp: 'جيد',
     thumbsDown: 'غير جيد',
+    helpful: 'هل كان هذا مفيدًا؟',
     expand: 'إظهار',
     collapse: 'إخفاء',
     directions: 'الاتجاهات',

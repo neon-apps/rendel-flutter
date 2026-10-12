@@ -53,6 +53,7 @@ class ThreadScreen extends StatefulWidget {
     this.attachIcon = RendelAttachIcon.plus,
     this.voiceIcon = RendelVoiceIcon.microphone,
     this.sendIcon = RendelSendIcon.arrowUp,
+    this.feedback = false,
     this.onPickAttachment,
     this.attachSources = RendelAttachSource.values,
     this.onDictate,
@@ -104,6 +105,9 @@ class ThreadScreen extends StatefulWidget {
   final RendelAttachIcon attachIcon;
   final RendelVoiceIcon voiceIcon;
   final RendelSendIcon sendIcon;
+
+  /// "Helpful?" thumbs at the foot of each finished answer (T1).
+  final bool feedback;
 
   /// The picker and the recogniser, from `RendelConfig` or the SDK's own. Null
   /// for either leaves that control undrawn.
@@ -167,6 +171,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
           .choose(block, ids, shown: shown, otherText: otherText, lit: lit),
       onRate: (block, score, {comment}) => widget.controller.rate(block, score, comment: comment),
       onEditCard: widget.controller.editCard,
+      onContactOpen: widget.controller.contactOpened,
       routeTitle: _routeTitle,
       // A form's upload field picks and uploads the way the composer does,
       // so a photo of the damage costs the host no second picker or path.
@@ -191,6 +196,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
       // A rating asks nothing, so the sheet stays over it.
       onRate: (block, score, {comment}) => widget.controller.rate(block, score, comment: comment),
       onEditCard: widget.controller.editCard,
+      onContactOpen: widget.controller.contactOpened,
       routeTitle: _routeTitle,
       onPickFile: widget.onPickAttachment,
       fileSources: widget.attachSources,
@@ -1045,7 +1051,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
     double bar = 0,
   }) {
     return ListenableBuilder(
-      listenable: Listenable.merge(answers),
+      // The thumbs wait for the turn to end, which the controller says.
+      listenable: Listenable.merge([...answers, if (widget.feedback && !detail) controller]),
       builder: (context, _) {
         final blocks = [for (final answer in answers) ...answer.blocks];
         final dispatch = detail ? _detailDispatch : _dispatch;
@@ -1074,6 +1081,12 @@ class _ThreadScreenState extends State<ThreadScreen> {
             ? null
             : controller.messages.sublist(0, at).reversed.where((m) => m.role == 'user').firstOrNull;
         final askedText = asked?.blocks.firstOrNull?.props['markdown'];
+        // "Helpful?" under a finished answer, when the app asked for it (T1).
+        final answered = answers.reversed
+            .where((m) => m.role == 'assistant' && m.serverId != null && m.blocks.isNotEmpty)
+            .firstOrNull;
+        final finished = answered != null &&
+            (controller.phase == RendelPhase.idle || !identical(controller.messages.lastOrNull, answered));
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1137,9 +1150,79 @@ class _ThreadScreenState extends State<ThreadScreen> {
                   ),
                 ),
               ),
+            if (!detail && widget.feedback && finished)
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: _Helpful(
+                  strings: widget.strings,
+                  given: answered.rating,
+                  onRate: (rating) => controller.rateTurn(answered, rating),
+                ),
+              ),
           ],
         );
       },
+    );
+  }
+}
+
+/// "Helpful?" with a thumb up and down at the foot of an answer page
+/// (analytics-roi T1). A tap is the answer, once: the line becomes the thanks
+/// and the thumb given stays lit.
+class _Helpful extends StatelessWidget {
+  const _Helpful({required this.strings, required this.given, required this.onRate});
+
+  final RendelStrings strings;
+  final int? given;
+  final void Function(int rating) onRate;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final faint = theme.colors.onSurface.withValues(alpha: 0.55);
+    Widget thumb(int rating) {
+      final on = given == rating;
+      return Semantics(
+        button: true,
+        selected: on,
+        label: rating == 1 ? strings.thumbsUp : strings.thumbsDown,
+        excludeSemantics: true,
+        child: Opacity(
+          opacity: given != null && !on ? 0.35 : 1,
+          child: Material(
+            color: on ? theme.colors.onSurface.withValues(alpha: 0.07) : Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: given == null ? () => onRate(rating) : null,
+              child: SizedBox.square(
+                dimension: 44,
+                child: Icon(
+                  rating == 1 ? Icons.thumb_up_alt_outlined : Icons.thumb_down_alt_outlined,
+                  size: 18,
+                  color: on ? theme.colors.onSurface : faint,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final words = given != null ? strings.ratingThanks : strings.helpful;
+    return Row(
+      children: [
+        // A language with no word for it yet draws the thumbs alone.
+        if (words.isNotEmpty) ...[
+          Semantics(
+            liveRegion: given != null,
+            child: Text(words, style: theme.text.body.copyWith(fontSize: 13, color: faint)),
+          ),
+          const SizedBox(width: 6),
+        ],
+        thumb(1),
+        thumb(-1),
+      ],
     );
   }
 }

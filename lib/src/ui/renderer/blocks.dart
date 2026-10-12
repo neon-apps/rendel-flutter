@@ -10674,7 +10674,7 @@ Widget buildContact(BuildContext context, WireBlock block, RendelDispatcher disp
         ],
         for (final (i, channel) in channels.indexed) ...[
           SizedBox(height: i == 0 ? 14 : 10),
-          _contactButton(channel, quiet: i > 0, dispatch: dispatch),
+          _contactButton(block, channel, quiet: i > 0, dispatch: dispatch),
         ],
         if (hours != null && hours.isNotEmpty) ...[
           const SizedBox(height: 10),
@@ -10692,7 +10692,7 @@ Widget buildContact(BuildContext context, WireBlock block, RendelDispatcher disp
 /// One channel's button. A call and an email carry their number or address
 /// on the button, so the user reads where a tap goes before making it; a
 /// link reads as its label alone, since a URL is not something to read.
-Widget _contactButton(Map channel, {required bool quiet, required RendelDispatcher dispatch}) {
+Widget _contactButton(WireBlock block, Map channel, {required bool quiet, required RendelDispatcher dispatch}) {
   final label = _str(channel['label'])!;
   final value = _str(channel['value'])!.trim();
   final (UIAction? action, String words) = switch (_str(channel['kind'])) {
@@ -10706,7 +10706,12 @@ Widget _contactButton(Map channel, {required bool quiet, required RendelDispatch
     label: words,
     // A channel this build cannot open is still drawn, as no button, rather
     // than left out: the app listed it, and the user can still read it.
-    onTap: action != null && dispatch.canHandle(action) ? () => dispatch.onAction(action) : null,
+    onTap: action != null && dispatch.canHandle(action)
+        ? () {
+            dispatch.onContactOpen?.call(block, _str(channel['kind'])!);
+            dispatch.onAction(action);
+          }
+        : null,
     quiet: quiet,
     expand: true,
   );

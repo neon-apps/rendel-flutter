@@ -490,6 +490,7 @@ class RendelRemoteConfig {
       attachIcon: RendelAttachIcon.fromName(_iconName(copilot['attachIcon'])),
       voiceIcon: RendelVoiceIcon.fromName(_iconName(copilot['voiceIcon'])),
       sendIcon: RendelSendIcon.fromName(_iconName(copilot['sendIcon'])),
+      feedback: copilot['feedback'] is bool ? copilot['feedback'] as bool : null,
     );
   }
 

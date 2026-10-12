@@ -431,6 +431,9 @@ class Rendel {
     // usually wins the race against the user's first send, and losing it once
     // costs one retryable error, not the session.
     if (!_manifestSynced) unawaited(_syncManifest());
+    // The adoption funnel's middle step (analytics-roi T4); the server keeps
+    // one a device a day.
+    unawaited(api.sendEvent({'type': 'assistant_open'}));
     _controller ??= ConversationController(
       api: api,
       actions: _actions,
@@ -480,6 +483,7 @@ class Rendel {
           attachIcon: _config.attachIcon,
           voiceIcon: _config.voiceIcon,
           sendIcon: _config.sendIcon,
+          feedback: _config.feedback,
           // The host's own picker and recogniser when it has them, the SDK's
           // when it does not — see `batteries.dart`. The stop control belongs
           // to whichever recogniser is listening.
@@ -625,9 +629,17 @@ class Rendel {
     final api = _api;
     if (api == null || !_codeConfig.remoteConfig) return;
     final answer = await api.fetchConfig(etag: _configEtag);
-    // Null covers an error status and an unreachable network alike: both
-    // mean "no new config today", and what is on screen is already correct.
+    // Null is an error status the SDK does not act on: no new config today.
     if (answer == null) return;
+    // The API could not be reached: hide the launcher rather than offer a
+    // button whose every press fails, and look again every minute.
+    if (answer.unreachable) {
+      _setAvailable(false, 'unreachable');
+      return;
+    }
+    // Reached again. A 304 or a refusal carries no `available`, so the
+    // unreachable state is cleared here; a 200 sets it from its body below.
+    if (_unavailable == 'unreachable') _setAvailable(true);
     _refuse(answer.refusal);
     // A 304, or a refusal: nothing to apply.
     final body = answer.body;
@@ -676,7 +688,10 @@ class Rendel {
         'unavailable',
         'New conversations are paused ($next), so Rendel is hidden until they can start again.',
       );
-      _recheck = Timer.periodic(const Duration(minutes: 5), (_) => unawaited(_refreshConfig()));
+      _recheck = Timer.periodic(
+        next == 'unreachable' ? const Duration(minutes: 1) : const Duration(minutes: 5),
+        (_) => unawaited(_refreshConfig()),
+      );
       _lifecycle ??= AppLifecycleListener(onResume: () {
         if (_unavailable != null) unawaited(_refreshConfig());
       });

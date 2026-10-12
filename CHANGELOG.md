@@ -5,6 +5,28 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.49.0
+
+**Added**
+
+- "Helpful?" with a thumb up and down at the foot of each finished answer
+  page, sent to `POST /v1/feedback`. Off unless the published config says
+  `copilot.feedback: true` (Appearance › Message box) or `RendelConfig`
+  sets `feedback: true`. One tap per answer; the line becomes the thanks.
+- `RendelStrings.helpful`, the question beside the thumbs, in every
+  language the package carries.
+- Analytics events, fire and forget: `assistant_open` when `Rendel.open`
+  presents the thread, and `contact_open` with the kind of channel
+  (`call`, `email`, `url`) when a contact block's button is tapped, never
+  its value. `RendelDispatcher.onContactOpen` carries the tap.
+
+**Changed**
+
+- A config fetch that cannot reach the API (a thrown error, a timeout, a
+  5xx) now hides the launcher and sets `Rendel.available` false, with a
+  recheck every minute until the API answers again. The config request
+  times out at 8 seconds.
+
 ## 0.48.0
 
 **Added**

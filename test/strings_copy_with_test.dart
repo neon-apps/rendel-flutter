@@ -128,6 +128,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'ratingStars': (s) => s.ratingStars,
   'thumbsUp': (s) => s.thumbsUp,
   'thumbsDown': (s) => s.thumbsDown,
+  'helpful': (s) => s.helpful,
   'expand': (s) => s.expand,
   'collapse': (s) => s.collapse,
   'directions': (s) => s.directions,

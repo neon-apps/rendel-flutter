@@ -595,6 +595,23 @@ class ConversationController extends ChangeNotifier {
     await api.sendFeedback({'message_id': id, 'rating': rating});
   }
 
+  /// A channel of the `contact` block [block] was tapped (analytics-roi T3):
+  /// its kind only, never the address. Fire and forget.
+  void contactOpened(WireBlock block, String channel) {
+    if (!const {'call', 'email', 'url'}.contains(channel)) return;
+    final id = messages
+        .where((message) => message.blocks.any((b) => identical(b, block)))
+        .firstOrNull
+        ?.serverId;
+    if (id == null) return;
+    unawaited(api.sendEvent({
+      'type': 'contact_open',
+      'message_id': id,
+      'block_id': block.id,
+      'channel': channel,
+    }));
+  }
+
   /// Answer [block], a `rating`, with [score], and with [comment] when the
   /// user wrote one: `POST /v1/ratings`, recorded as it is (A4).
   ///
