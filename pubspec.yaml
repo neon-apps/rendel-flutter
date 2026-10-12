@@ -1,8 +1,7 @@
 name: rendel
 description: >-
-  A Generative UI SDK for Flutter, made by Neon Apps: turns what users say,
-  type and tap into native screens in your app, while your team controls
-  every action.
+  A Generative UI SDK for Flutter: turns what users say, type and tap into
+  native screens in your app, while your team controls every action.
 version: 0.48.0
 homepage: https://rendel.ai
 repository: https://github.com/neon-apps/rendel-flutter
