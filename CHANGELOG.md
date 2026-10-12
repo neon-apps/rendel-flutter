@@ -151,7 +151,7 @@ asks of you.
 - The pickers, options and days take keyboard focus: Enter or Space picks,
   the arrows move between days, Escape closes, and closing hands focus back
   to the field.
-- `Rendel.open` presents the copilot as a page sheet: 8pt under the top safe
+- `Rendel.open` presents the assistant as a page sheet: 8pt under the top safe
   area, its top corners rounded and the app behind dimmed by a quarter.
   `RendelRadiusScale.hero` is 24 (was 28).
 - Progress rings draw their arc in the accent (`accentEdge`), not the ink.
@@ -190,7 +190,7 @@ asks of you.
 
 **Changed**
 
-- The copilot follows the device's dark mode. On a phone set to dark it is
+- The assistant follows the device's dark mode. On a phone set to dark it is
   drawn in a dark theme: `RendelTheme.deep()` for the default theme, and
   for a theme of your own one derived from it (`RendelTheme.darkFrom`) — a
   dark ground, your accent kept wherever it still reads on one, your sizes
@@ -268,7 +268,7 @@ asks of you.
 
 - `contact`: how to reach a person at your company, with only the channels
   you list under **Settings → Contact channels** in the console (phone,
-  email, a help page). The copilot never hands over or promises a person.
+  email, a help page). The assistant never hands over or promises a person.
 - `rating`: your app's own question about how something went (five stars, a
   thumb or 0–10), answered with a tap and recorded through `POST
   /v1/ratings` with no model turn; asked at most once in a conversation.
@@ -340,12 +340,12 @@ a card number, a CVV, an IBAN or an ID.
 **Added**
 
 - `Rendel.registerRoute(name, title:, description:, params:, open:)`: a
-  screen of your app the copilot may open. Routes ride in the manifest beside
+  screen of your app the assistant may open. Routes ride in the manifest beside
   your actions; the server checks every one before an answer offers it, and a
   param marked `RendelRouteParam(..., fromActions: true)` must equal something
   one of your actions returned.
 - The `screens` block: cards that open those screens, the first also lit
-  beside the microphone. A tap calls your route's `open`, and the copilot
+  beside the microphone. A tap calls your route's `open`, and the assistant
   shrinks into a bubble in the corner that brings the answer back as it was.
   `RendelConfig.bubbleOffset` (default 104) keeps the bubble above your own
   bottom bar.
@@ -354,7 +354,7 @@ a card number, a CVV, an IBAN or an ID.
 
 - `NavigateAction` joins `UIAction`: a `switch` over it with no default case
   needs a case for it.
-- `Rendel.open()` while the copilot is up no longer stacks a second sheet; it
+- `Rendel.open()` while the assistant is up no longer stacks a second sheet; it
   returns the one there, or restores it from the bubble.
 
 ## 0.37.0
@@ -499,7 +499,7 @@ a card number, a CVV, an IBAN or an ID.
 
 **Changed**
 
-- No arrows in the header on an answer page. A copilot's header is three
+- No arrows in the header on an answer page. An assistant's header is three
   controls wide, and two of them pointing at a history nobody asked for
   crowded the one that closes it. What a question clears is gone from the
   screen; it is still recorded, and the console's Conversations shows the
@@ -573,14 +573,14 @@ a card number, a CVV, an IBAN or an ID.
   shows a code like `K7Q2-M9XD`; pass what the developer types into your
   build's own pairing screen, and the console watches this device's
   conversation for the next two hours. It only watches: nothing about the
-  copilot changes once paired. Test keys only, and a code works once, for ten
+  assistant changes once paired. Test keys only, and a code works once, for ten
   minutes. It never throws: the `NCPairResult` it returns is `ok` with
   `endsAt`, or carries an `NCPairFailure` reason (`testOnly`, `notFound`,
   `rateLimited`, `failed`) and a sentence the screen can show as it is. Safe
   to call before `init`, which it waits for briefly. Each outcome is logged
   under a stable code: `paired`, `pair_test_only`, `pair_not_found`,
   `pair_rate_limited`, `pair_failed`.
-- Blocks replace themselves. The copilot can name something that will change
+- Blocks replace themselves. The assistant can name something that will change
   (a cart, an order, a set of slots) and draw it again as it changes; the
   new drawing takes the old one's place, where the conversation now is,
   instead of a second cart appearing beside the first. A size or slot the
@@ -597,14 +597,14 @@ a card number, a CVV, an IBAN or an ID.
 
 **Added**
 
-- Forms update in place. When the copilot redraws a form the person has not
+- Forms update in place. When the assistant redraws a form the person has not
   sent yet — "make it a refund to my card" — the new form takes the old
   one's place instead of appearing beside it, and keeps every answer the
   person gave for a field that is still there; a field they changed
-  themselves keeps their value whatever the copilot now proposes. If they
+  themselves keeps their value whatever the assistant now proposes. If they
   were typing in a field, they carry on typing in the same field of the new
   form. A form that was sent is never replaced. Each message also tells the
-  copilot what is in the open forms (up to three), so it answers knowing
+  assistant what is in the open forms (up to three), so it answers knowing
   what was already chosen. Nothing to wire: the SDK declares this to the
   server as `form_update`.
 
@@ -614,8 +614,8 @@ a card number, a CVV, an IBAN or an ID.
 
 - Confirmation cards for console actions that change something — "book me
   in on Tuesday", "cancel my order" — when the endpoint is set to *the
-  signed-in user's token*. The copilot asks the person first, as it does for
-  your own write actions; once they confirm, Neon Copilot makes the call
+  signed-in user's token*. The assistant asks the person first, as it does for
+  your own write actions; once they confirm, Neon Assistant makes the call
   itself, as them, and answers with what happened. There is no handler to
   register and nothing to wire: it needs only `NCConfig.userToken` (0.26.0).
   Without a token the person is told they are not signed in, and nothing
@@ -626,7 +626,7 @@ a card number, a CVV, an IBAN or an ID.
 **Added**
 
 - `NCConfig.userToken`: the signed-in person's current token from your own
-  sign-in. The copilot can then answer from your API as the person asking —
+  sign-in. The assistant can then answer from your API as the person asking —
   "my order", "my routine" — with no API key to issue: set those endpoints
   to *the signed-in user's token* in the console. It is asked for before
   every question, so return the current one (your auth library refreshes
@@ -664,7 +664,7 @@ a card number, a CVV, an IBAN or an ID.
   the bottom and swells with the speaker's voice, and the words are written
   in the middle as they are heard. When the speaker stops, the question is
   sent on its own, and the microphone becomes a dark pill saying what the
-  copilot is doing until its answer starts. The pill stops listening and
+  assistant is doing until its answer starts. The pill stops listening and
   sends; a tap anywhere else lets the question go unsent. Nothing to change
   in your code; a recogniser of your own (`NCConfig.onDictate`) gets the
   same voice mode, without the glow following the voice.
@@ -703,7 +703,7 @@ a card number, a CVV, an IBAN or an ID.
 
 - `identify` no longer takes `name`, `email`, `avatarUrl` or `gender`, and
   `NCGender` is gone: 0.21.0 added them for a console page that no longer
-  shows them. If you passed them, pass what the copilot should know in
+  shows them. If you passed them, pass what the assistant should know in
   `traits` instead, for example `traits: {'name': user.name}`.
 
 ## 0.21.0
@@ -712,7 +712,7 @@ a card number, a CVV, an IBAN or an ID.
 
 - `identify` takes `name`, `email`, `avatarUrl` and `gender` (`NCGender`).
   They are how the person shows on the console's Users page — a photo, or a
-  woman's or a man's figure when there is none — and what the copilot may
+  woman's or a man's figure when there is none — and what the assistant may
   call them. All optional, and nothing changes for a call with only
   `userId`. They travel as traits under the names the console reads; an
   email with no `@` or a photo that is not https is left out and logged.
@@ -836,7 +836,7 @@ a card number, a CVV, an IBAN or an ID.
 
 **Changed**
 
-- `identify` before `init` is kept and sent once the copilot starts. It used
+- `identify` before `init` is kept and sent once the assistant starts. It used
   to be dropped without a word.
 - `identify` with a different user than the one signed in clears the thread
   on screen, so a host that forgot `reset()` at the logout does not hand one
@@ -856,7 +856,7 @@ a card number, a CVV, an IBAN or an ID.
 - The device id survives a relaunch. It did not: without a
   `NCConfig.deviceIdStore` every cold start minted a new one, so the console's
   Users page showed one "Not signed in" row per launch of the same phone,
-  per-device rate limits reset each time, and what the copilot remembered
+  per-device rate limits reset each time, and what the assistant remembered
   about a person was attached to an id that never came back. `shared_preferences`
   is a dependency now, and both stores — the device id and the config cache —
   default to it. `deviceIdStore` and `configStore` still replace them.
@@ -885,7 +885,7 @@ a card number, a CVV, an IBAN or an ID.
   The SDK shipped neither, on purpose: no forced plugin, no version conflict,
   the app's own permission prompt. The cost was 150 lines copied into every
   host, carrying every subtlety a microphone has, and the first real
-  integration copied them and lost a day to the microphone. A copilot that
+  integration copied them and lost a day to the microphone. An assistant that
   has to be assembled is not the product.
 
   `NCConfig.onPickAttachment` and `onDictate` still replace the built-ins;
@@ -905,7 +905,7 @@ a card number, a CVV, an IBAN or an ID.
 
 **Changed**
 
-- The rest of the SDK's own words move into `NCStrings`, so a copilot in a
+- The rest of the SDK's own words move into `NCStrings`, so an assistant in a
   Turkish app is Turkish to the last label. A form said "Required" beside
   every field and "Sending…" under the answers; a receipt summed to "Total";
   a confirmation card resolved to "Expired" or "Not confirmed"; the header
@@ -1036,7 +1036,7 @@ only honest thumbnail of itself.
   A locale with no model behind it does not degrade — `listen` fails with a
   permanent platform error the instant it starts, so the control opens and
   shuts and looks exactly like a broken microphone. 0.8.2 told hosts to pass
-  the copilot's language without saying to check for it first, which turned a
+  the assistant's language without saying to check for it first, which turned a
   recogniser that worked in the device's own language into one that did not
   work at all. Simulators usually carry a single language; a phone set up in
   one country carries few.
@@ -1149,7 +1149,7 @@ The example app is fixed on both counts and is the shape to copy.
   customer could not write — the sentence under it has been theirs for
   releases.
 
-  Null keeps the SDK's own, translated into whichever language the copilot
+  Null keeps the SDK's own, translated into whichever language the assistant
   answers in. A blank one falls back rather than clearing: unlike the line
   below it, a thread opening on nothing but a subtitle reads as a page that
   failed to load.
@@ -1159,7 +1159,7 @@ The example app is fixed on both counts and is the shape to copy.
 **Fixed**
 
 - The empty thread's headline and its default subtitle were English literals in
-  the widget rather than strings, so a copilot answering in Turkish still
+  the widget rather than strings, so an assistant answering in Turkish still
   opened with "Ask anything about this app." — on the one screen where the SDK
   speaks before the user does. They are `NCStrings.emptyTitle` and
   `emptyBody` now, translated with the rest.
@@ -1234,13 +1234,13 @@ one language a host with its own picker wants this turn answered in. This is
 the set that setting is chosen from.
 
 Empty — the default — hands the choice to the list published from the console
-under **Experience → Persona**, and absent that the copilot answers in whatever
+under **Experience → Persona**, and absent that the assistant answers in whatever
 it is addressed in, which is what it has always done. Nothing changes for an
 app that sets neither.
 
 ## 0.4.0
 
-Two things a user can hand the copilot, and one thing the package stopped
+Two things a user can hand the assistant, and one thing the package stopped
 carrying on everyone's behalf.
 
 **Added**
@@ -1281,7 +1281,7 @@ shape with `image_picker`.
 
 **Changed**
 
-- The copilot's own prose is drawn in a bubble, mirroring the user's. Catalog
+- The assistant's own prose is drawn in a bubble, mirroring the user's. Catalog
   components are not: a chart or an order tracker carries its own ground, and a
   bubble around it reads as a panel inside a panel. The bubble derives from
   `surfaceRaised`, so a published palette gets one with no new control in

@@ -67,10 +67,10 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Lets you speak to the copilot instead of typing.</string>
+	<string>Lets you speak to the assistant instead of typing.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Turns what you say into text for the copilot.</string>
+	<string>Turns what you say into text for the assistant.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Lets you take a photo to show the copilot.</string>
+	<string>Lets you take a photo to show the assistant.</string>
 </dict>
 </plist>

@@ -6,7 +6,7 @@ import 'package:rendel/rendel.dart';
 
 import 'gallery.dart';
 
-/// Neon Kicks — the scripted demo & e2e testbed for the copilot.
+/// Neon Kicks — the scripted demo & e2e testbed for the assistant.
 /// All state is in-memory; the five registered actions exercise every risk
 /// level: search (read), order status (read), add to cart (write), promo
 /// (write), cancel order (destructive).
@@ -64,14 +64,14 @@ void main() async {
           defaultValue: 'http://localhost:3200',
         ),
       ),
-      assistantName: 'Kicks Copilot',
+      assistantName: 'Kicks',
       launcherLabel: 'Ask',
-      // A host with no store still gets the right copilot on every launch; it
+      // A host with no store still gets the right assistant on every launch; it
       // just re-fetches on each cold start instead of painting from a cache.
       // This is the file-backed one so the example demonstrates the whole
       // path, including the offline launch.
       configStore: KicksConfigStore(),
-      // This app draws only a light theme, so the copilot does too, even on a
+      // This app draws only a light theme, so the assistant does too, even on a
       // phone in dark mode. An app with a dark theme leaves this out.
       themeMode: RendelThemeMode.light,
 
@@ -88,18 +88,18 @@ void main() async {
         'Cancel order 1039',
       ],
     ),
-    actions: KicksStore.instance.copilotActions(),
+    actions: KicksStore.instance.assistantActions(),
   );
   Rendel.addContextProvider('cart', () async => KicksStore.instance.cartSnapshot());
   registerKicksRoutes();
   runApp(const NeonKicksApp());
 }
 
-/// The app's own navigator, so a screen the copilot offers is pushed where
+/// The app's own navigator, so a screen the assistant offers is pushed where
 /// the app pushes its screens.
 final kicksNavigator = GlobalKey<NavigatorState>();
 
-/// The screens the copilot may open from an answer (design/NAVIGATE.md):
+/// The screens the assistant may open from an answer (design/NAVIGATE.md):
 /// each main screen of the app, under the name the app itself gives it. This
 /// is the shape the AI setup playbook writes for a host, and its eval reads
 /// this file as the reference.
@@ -209,7 +209,7 @@ class KicksStore extends ChangeNotifier {
   /// Who is signed in. The demo has one account and no password.
   String? shopper;
 
-  /// The app's own sign-in, and the one line the copilot needs from it:
+  /// The app's own sign-in, and the one line the assistant needs from it:
   /// `identify`, so every turn from here is this shopper's, across relaunches.
   Future<void> signIn() async {
     shopper = 'kicks-shopper-1042';
@@ -235,7 +235,7 @@ class KicksStore extends ChangeNotifier {
         if (promo != null) 'promo': promo,
       };
 
-  List<RendelAction> copilotActions() => [
+  List<RendelAction> assistantActions() => [
         RendelAction(
           name: 'search_products',
           description: 'Search the sneaker catalog by name and optional maximum price.',
@@ -467,7 +467,7 @@ class ShopScreen extends StatelessWidget {
   }
 }
 
-/// One sneaker. The copilot opens it as `product_detail`.
+/// One sneaker. The assistant opens it as `product_detail`.
 class ProductScreen extends StatelessWidget {
   const ProductScreen({super.key, required this.product});
 
@@ -507,7 +507,7 @@ class ProductScreen extends StatelessWidget {
   }
 }
 
-/// The cart. The copilot opens it as `cart`.
+/// The cart. The assistant opens it as `cart`.
 class CartScreen extends StatelessWidget {
   const CartScreen({super.key});
 
@@ -539,7 +539,7 @@ class CartScreen extends StatelessWidget {
   }
 }
 
-/// Every order. The copilot opens it as `orders`.
+/// Every order. The assistant opens it as `orders`.
 class OrdersScreen extends StatelessWidget {
   const OrdersScreen({super.key});
 
@@ -569,7 +569,7 @@ class OrdersScreen extends StatelessWidget {
   }
 }
 
-/// One order. The copilot opens it as `order_detail`.
+/// One order. The assistant opens it as `order_detail`.
 class OrderScreen extends StatelessWidget {
   const OrderScreen({super.key, required this.order});
 

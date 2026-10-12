@@ -1,8 +1,10 @@
 # rendel
 
-Embed an AI copilot in your Flutter app. It answers with your own native
-widgets rather than a wall of text, and it runs the functions you register
-rather than describing what it would do.
+Rendel is a Generative UI SDK for Flutter and web apps, made by Neon Apps. It
+turns what users say, type and tap into native screens in your app: it answers
+with your own native widgets rather than a wall of text, and it runs the
+functions you register rather than describing what it would do, while your
+team controls every action.
 
 It does not chat about your app. It operates it.
 
@@ -14,13 +16,13 @@ dependencies:
       ref: v0.48.0
 ```
 
-## Three lines to a running copilot
+## Three lines to a running assistant
 
 ```dart
 await Rendel.init(
   // Your app's key: Rendel console → Settings → API keys → Copy.
   appKey: 'rd_pk_test_...',
-  // The languages the copilot answers in: ['tr'] is Turkish only,
+  // The languages Rendel answers in: ['tr'] is Turkish only,
   // ['tr', 'en'] Turkish or English. Leave out config for any language.
   config: RendelConfig(languages: ['tr']),
 );
@@ -40,12 +42,12 @@ Rendel.registerAction(RendelAction(
 const RendelLauncher();
 ```
 
-Ask "where is my order 1042?" and the copilot calls your handler, then renders
+Ask "where is my order 1042?" and Rendel calls your handler, then renders
 the answer as an `order_tracker` component in your own colours and type.
 
 ## Reaching your API as the person asking
 
-If people sign in to your app, give the SDK their current token. The copilot
+If people sign in to your app, give the SDK their current token. Rendel
 then calls your own endpoints — "my routine", "my orders" — as that person,
 with no API key for you to issue:
 
@@ -100,7 +102,7 @@ there yourself, inside `<manifest>` above `<application>`, changes nothing.
 **Maps.** The `map` component draws with
 [`maplibre_gl`](https://pub.dev/packages/maplibre_gl) 0.27, over
 OpenFreeMap's open map data (no key, no account). It asks for no permission
-and no Info.plist or manifest line: the copilot never asks where the user is.
+and no Info.plist or manifest line: Rendel never asks where the user is.
 What it does need from your build:
 
 - **iOS**: a deployment target of 13.0 or later, which the SDK already needs.
@@ -128,11 +130,11 @@ before it runs:
 
 | Risk | Behaviour |
 | --- | --- |
-| `read` | Runs when the copilot asks. Order status, balances, availability. |
+| `read` | Runs when Rendel asks. Order status, balances, availability. |
 | `write` | Proposed. Our servers build a confirmation card from your `confirmTemplate` and the parameters they validated, and your handler runs only after the user says yes. |
 | `destructive` | The same, with an irreversible warning and nothing pre-selected. |
 
-The confirmation card is never model output, and the copilot holds no
+The confirmation card is never model output, and Rendel holds no
 privileges of its own: your handler executes inside your app, on the user's
 own session, against your own backend.
 
@@ -158,7 +160,7 @@ await Rendel.init(
     accent: const Color(0xFF2F6BFF),
     onAccent: const Color(0xFFFFFFFF),
   ),
-  config: const RendelConfig(assistantName: 'Kicks Copilot'),
+  config: const RendelConfig(assistantName: 'Kicks'),
 );
 ```
 

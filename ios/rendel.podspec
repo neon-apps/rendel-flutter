@@ -7,7 +7,7 @@ Pod::Spec.new do |s|
   s.version          = '0.29.0'
   s.summary          = 'Rendel for Flutter: the iOS half.'
   s.description      = <<-DESC
-Checks the host app's Info.plist for the usage strings the copilot's microphone needs.
+Checks the host app's Info.plist for the usage strings the assistant's microphone needs.
                        DESC
   s.homepage         = 'https://rendel.ai'
   s.license          = { :file => '../LICENSE' }

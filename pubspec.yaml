@@ -1,7 +1,8 @@
 name: rendel
 description: >-
-  Embed an AI copilot that answers with native UI components and safely
-  executes registered app actions. "Your entire app, one sentence away."
+  A Generative UI SDK for Flutter, made by Neon Apps: turns what users say,
+  type and tap into native screens in your app, while your team controls
+  every action.
 version: 0.48.0
 homepage: https://rendel.ai
 repository: https://github.com/neon-apps/rendel-flutter
@@ -39,7 +40,7 @@ dev_dependencies:
   url_launcher_platform_interface: ^2.3.0
 
 # A plugin rather than a plain package, for two files the host would
-# otherwise have to write: the Android manifest that declares the copilot's
+# otherwise have to write: the Android manifest that declares the assistant's
 # permissions, and the iOS check that hides the microphone when Info.plist
 # lacks its usage strings instead of letting iOS close the app.
 flutter:

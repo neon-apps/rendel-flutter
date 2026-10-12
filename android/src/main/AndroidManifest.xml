@@ -1,11 +1,11 @@
 <!--
-  What the copilot needs on Android, declared here so the host app does not
+  What the assistant needs on Android, declared here so the host app does not
   have to. The manifest merger adds both to the app's own manifest at build
   time.
 
   INTERNET: Flutter's app template grants it only to debug and profile
   builds, so a release build of an app that never needed the network before
-  would ship a copilot that cannot reach its API.
+  would ship an assistant that cannot reach its API.
   RECORD_AUDIO: the composer's built-in microphone. The runtime prompt is
   still the system's; this only makes asking possible.
 
