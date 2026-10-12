@@ -149,6 +149,7 @@ class ConversationController extends ChangeNotifier {
     this.locale,
     this.languages = const [],
     this.onEvent,
+    this.onUnavailable,
     this.user = _nobody,
   });
 
@@ -188,6 +189,14 @@ class ConversationController extends ChangeNotifier {
   /// release and emitted by nothing, so a host that wired analytics to them
   /// recorded silence and had no way to tell that from an unused copilot.
   final void Function(RendelEvent event)? onEvent;
+
+  /// A new conversation was refused because the app is paused (credit spent,
+  /// budget reached, a daily ceiling): the SDK hides its way in and says
+  /// nothing to the user. The argument is for the developer's log.
+  final void Function(String reason)? onUnavailable;
+
+  /// A quiet line over the composer after a turn: "1 question left today".
+  String? hint;
 
   /// How long a context provider has to answer.
   ///
@@ -340,6 +349,7 @@ class ConversationController extends ChangeNotifier {
     if (busy || text.trim().isEmpty || resting) return false;
     errorText = null;
     errorCode = null;
+    hint = null;
     _abandonOpenConfirmCards();
     _detail = detail;
     messages.add(RendelMessage.user(text.trim())
@@ -1123,8 +1133,9 @@ class ConversationController extends ChangeNotifier {
           case ActionExecute():
             _pendingReads[event.invocationId] = event;
             structural = false;
-          case TurnEnd(:final status):
+          case TurnEnd(:final status, :final remainingHint):
             settled = true;
+            if (remainingHint != null) hint = remainingHint;
             if (status == 'error' && errorText == null) {
               // The separate `error` frame usually carries the message; if it
               // was the frame that got lost, this is all we have.
@@ -1133,6 +1144,14 @@ class ConversationController extends ChangeNotifier {
               _lastErrorRetryable = true;
             }
             awaitingReads = status == 'awaiting_tool_results' && _pendingReads.isNotEmpty;
+          case final RendelNotice told when told.kind == 'paused':
+            // The app is paused: no conversation starts, and the user is told
+            // nothing. The question goes with the sheet.
+            settled = true;
+            noticed = true;
+            final asked = messages.lastIndexOf(_openAssistant!) - 1;
+            if (asked >= 0 && messages[asked].role == 'user') messages.removeAt(asked);
+            onUnavailable?.call(told.kind);
           case final RendelNotice told:
             settled = true;
             noticed = true;

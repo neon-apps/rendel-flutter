@@ -513,9 +513,11 @@ sealed class RendelWireEvent {
           timeoutMs: _int(data['timeout_ms']) ?? 15000,
         );
       case 'turn.end':
+        final remaining = data['remaining'];
         return TurnEnd(
           status: _text(data['status']) ?? 'completed',
           pending: (data['pending'] as List?)?.whereType<String>().toList() ?? const [],
+          remainingHint: remaining is Map ? _text(remaining['hint']) : null,
         );
       case 'error':
         return RendelError(
@@ -604,9 +606,12 @@ class ActionExecute extends RendelWireEvent {
 }
 
 class TurnEnd extends RendelWireEvent {
-  const TurnEnd({required this.status, required this.pending});
+  const TurnEnd({required this.status, required this.pending, this.remainingHint});
   final String status;
   final List<String> pending;
+
+  /// "1 question left today", once one is left under the app's usage limit.
+  final String? remainingHint;
 }
 
 class RendelError extends RendelWireEvent {

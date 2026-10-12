@@ -5,6 +5,20 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.48.0
+
+**Added**
+
+- `Rendel.available`, a `ValueListenable<bool>`: false while the
+  organization's usage is paused (credit spent, budget reached, a daily
+  ceiling). The launcher hides itself; an app with its own entry point
+  listens here. Read from `available` on the published config, re-read every
+  five minutes and on resume while false.
+- A `paused` notice no longer draws anything: the question is dropped, an
+  open sheet closes, and the launcher hides. Open conversations finish.
+- `ConversationController.hint` and a quiet line over the composer when one
+  question is left under the app's usage limit (`turn.end.remaining`).
+
 ## 0.47.0
 
 **Added**

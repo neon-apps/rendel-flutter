@@ -90,6 +90,21 @@ class Rendel {
   /// `app_not_live` or `app_suspended` while the server refuses this app its
   /// copilot (design/AI-SETUP.md §2.6); null otherwise.
   static String? _refusal;
+
+  /// Why a new conversation cannot start now (the organization's credit
+  /// spent, its budget paused, a daily ceiling), or null. Tuna, 2026-10-12:
+  /// "yarım kalan sohbetler için devam eder, diğerleri için asistan butonu
+  /// kalkar". The launcher goes, an open sheet closes, and the user is told
+  /// nothing; it comes back when the server says so, asked again every few
+  /// minutes and when the app comes back to the foreground.
+  static String? _unavailable;
+  static Timer? _recheck;
+  static AppLifecycleListener? _lifecycle;
+
+  /// Whether a new conversation can start now. False while the
+  /// organization's usage is paused: the launcher is hidden, and an app with
+  /// its own way in should hide it too, listening here.
+  static final ValueNotifier<bool> available = ValueNotifier<bool>(true);
   static RendelConfigStore _store = RendelMemoryConfigStore();
   static String? _configEtag;
 
@@ -137,7 +152,7 @@ class Rendel {
   /// published a kill switch, or when the server refuses this app its
   /// copilot — a live key before the app has gone live, or a suspended app.
   /// [RendelLauncher] draws nothing and [open] returns without presenting.
-  static bool get isEnabled => _config.enabled && _refusal == null;
+  static bool get isEnabled => _config.enabled && _refusal == null && _unavailable == null;
   static bool get isInitialized => _api != null;
 
   /// Starts the copilot. [darkTheme] is drawn while the device is in dark mode (see
@@ -428,6 +443,7 @@ class Rendel {
       locale: _config.locale,
       languages: _config.languages,
       onEvent: _events.add,
+      onUnavailable: (reason) => _setAvailable(false, reason),
       user: () => _user,
     )..manifestHash = _currentManifestHash();
     _events.add(RendelEvent.opened);
@@ -616,6 +632,14 @@ class Rendel {
     // A 304, or a refusal: nothing to apply.
     final body = answer.body;
     if (body == null) return;
+    try {
+      final said = jsonDecode(body);
+      if (said is Map) {
+        _setAvailable(said['available'] != false, said['unavailable_reason'] is String ? said['unavailable_reason'] as String : null);
+      }
+    } catch (_) {
+      // Unreadable is handled below; availability stays as it was.
+    }
     final parsed = RendelRemoteConfig.tryParse(body, etag: answer.etag);
     if (parsed == null) {
       RendelLog.warn('config_unreadable', 'published config was unreadable; ignoring it');
@@ -641,6 +665,27 @@ class Rendel {
   /// gets one line saying what to do, at warning rather than debug so a sink
   /// that drops debug still shows it. Once a later answer is a 200 or a 304
   /// the app is live and the launcher comes back.
+  static void _setAvailable(bool yes, [String? reason]) {
+    final next = yes ? null : (reason ?? 'unavailable');
+    if (next == _unavailable) return;
+    _unavailable = next;
+    _recheck?.cancel();
+    _recheck = null;
+    if (next != null) {
+      RendelLog.warn(
+        'unavailable',
+        'New conversations are paused ($next), so Rendel is hidden until they can start again.',
+      );
+      _recheck = Timer.periodic(const Duration(minutes: 5), (_) => unawaited(_refreshConfig()));
+      _lifecycle ??= AppLifecycleListener(onResume: () {
+        if (_unavailable != null) unawaited(_refreshConfig());
+      });
+      _presentation?.dismiss();
+    }
+    available.value = next == null;
+    configRevision.value++;
+  }
+
   static void _refuse(String? code) {
     if (code == _refusal) return;
     _refusal = code;

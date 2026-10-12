@@ -561,6 +561,26 @@ class _ThreadScreenState extends State<ThreadScreen> {
                                     ? controller.retry
                                     : null,
                           ),
+                          // "1 question left today": quiet, over the composer,
+                          // until the next question is sent.
+                          if (controller.hint != null &&
+                              !controller.busy &&
+                              controller.errorText == null &&
+                              !controller.resting)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Semantics(
+                                liveRegion: true,
+                                child: Text(
+                                  controller.hint!,
+                                  textAlign: TextAlign.center,
+                                  style: theme.text.prose.copyWith(
+                                    fontSize: 13,
+                                    color: theme.colors.onSurfaceSoft,
+                                  ),
+                                ),
+                              ),
+                            ),
                           // Under a notice the composer rests: its place says
                           // when the assistant is back, and there is nothing to
                           // press until then.

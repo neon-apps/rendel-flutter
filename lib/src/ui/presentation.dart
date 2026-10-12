@@ -205,6 +205,13 @@ class RendelPresentation extends ChangeNotifier {
     return openRoute(action);
   }
 
+  /// The app is paused (credit spent, budget reached): an open sheet closes,
+  /// with nothing said; conversations cannot start until it is back.
+  void dismiss() {
+    final sheet = _sheet;
+    if (_phase == _Phase.sheet && sheet != null && sheet.mounted) Navigator.of(sheet).maybePop();
+  }
+
   /// The bubble tapped, or the app's own launcher pressed while it is up.
   void restore() {
     if (_phase != _Phase.bubble) return;

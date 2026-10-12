@@ -14,7 +14,8 @@ import 'package:rendel/src/ui/thread_screen.dart';
 void main() {
   String sse(List<(String, String)> frames) => frames.map((f) => 'event: ${f.$1}\ndata: ${f.$2}\n\n').join();
 
-  ConversationController controller(String body) => ConversationController(
+  ConversationController controller(String body, {void Function(String)? onUnavailable}) => ConversationController(
+        onUnavailable: onUnavailable,
         api: RendelApiClient(
           appKey: 'nc_pk_test_x',
           deviceId: 'd',
@@ -66,5 +67,36 @@ void main() {
     expect(find.text('See plans'), findsOneWidget);
     expect(find.text('Back tomorrow'), findsOneWidget);
     expect(find.byType(TextField), findsNothing);
+  });
+
+  testWidgets('a paused app closes quietly: no error, no answer, the question gone', (tester) async {
+    String? told;
+    final c = controller(
+      sse([
+        ('turn.start', '{"v":1,"seq":0,"type":"turn.start","conversation_id":"c1","message_id":"m1"}'),
+        ('notice', '{"v":1,"seq":1,"type":"notice","kind":"paused","message":"The assistant is taking a break.","hint":"Paused for now","until":null,"action":null}'),
+        ('turn.end', '{"v":1,"seq":2,"type":"turn.end","status":"completed","pending":[]}'),
+      ]),
+      onUnavailable: (reason) => told = reason,
+    );
+    await tester.runAsync(() => c.send('hello?'));
+    expect(told, 'paused');
+    expect(c.errorText, isNull);
+    expect(c.messages, isEmpty);
+  });
+
+  testWidgets('says when one question is left, until the next is sent', (tester) async {
+    final c = controller(sse([
+      ('turn.start', '{"v":1,"seq":0,"type":"turn.start","conversation_id":"c1","message_id":"m1"}'),
+      ('block.ready', '{"v":1,"seq":1,"type":"block.ready","index":0,"block":{"id":"b1","type":"text","fallback_text":"In stock.","props":{"markdown":"In stock."}}}'),
+      ('turn.end', '{"v":1,"seq":2,"type":"turn.end","status":"completed","pending":[],"remaining":{"count":1,"hint":"1 question left today"}}'),
+    ]));
+    await tester.runAsync(() => c.send('44?'));
+    expect(c.hint, '1 question left today');
+    await tester.pumpWidget(MaterialApp(
+      home: RendelThemeScope(theme: RendelTheme.paper(), child: Scaffold(body: ThreadScreen(controller: c))),
+    ));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.text('1 question left today'), findsOneWidget);
   });
 }
