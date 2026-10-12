@@ -183,6 +183,9 @@ class ComponentRegistry {
     if (!block.ready && block.type != 'text') {
       return buildSkeleton(context, block.type);
     }
+    // The SDK's own block for a `notice` (a usage limit, a paused budget):
+    // never one the model is offered, so it is not a registered component.
+    if (block.type == 'notice') return buildNotice(context, block, dispatch);
     final builder = _builders[block.type];
     if (builder == null) return buildFallback(context, block);
     // A kind of card the theme sets apart is drawn in its own theme: the same

@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.47.0
+
+**Added**
+
+- `notices` capability and the `notice` event: when the assistant will not
+  answer on purpose (a person's usage limit, the app's budget or credit
+  paused), the thread draws the notice where the answer goes, a quiet plate
+  with a clock, the sentence and the app's own link when it set one, and the
+  composer rests with the server's short reason ("Back tomorrow") until the
+  notice lapses. `ConversationController.notice` and `resting` say so; `send`
+  returns false while it rests. Never the error bar or a retry.
+
 ## 0.46.6
 
 **Changed**

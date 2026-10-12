@@ -1937,6 +1937,65 @@ class RendelSwap extends StatelessWidget {
 
 // ————————————————————————— notices & readouts —————————————————————————
 
+/// The assistant will not answer for now, on purpose: the person's usage
+/// limit, or the app's budget or credit paused (`notices`). It is the answer,
+/// not a failure, so it never takes an error's colour or icon: a quiet plate,
+/// a clock, the sentence, and the app's own way on when it set one.
+Widget buildNotice(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
+  final theme = RendelThemeScope.of(context);
+  final message = _str(block.props['message']) ?? block.fallbackText;
+  final action = block.props['action'];
+  final label = action is Map ? _str(action['label']) : null;
+  final url = action is Map ? _str(action['url']) : null;
+  // The app's own page (its plans), in the system browser: it needs nothing from the host.
+  final open = label != null && url != null ? OpenUrlAction(url, external: true) : null;
+  return Semantics(
+    liveRegion: true,
+    child: Container(
+      width: double.infinity,
+      padding: const EdgeInsetsDirectional.fromSTEB(18, 16, 18, 16),
+      decoration: BoxDecoration(
+        color: theme.colors.surfaceSunk,
+        borderRadius: BorderRadius.circular(theme.plateRadius),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: theme.colors.surfaceRaised,
+              shape: BoxShape.circle,
+              border: Border.all(color: theme.colors.line),
+            ),
+            child: Icon(Icons.schedule_rounded, size: 18, color: theme.colors.onSurfaceSoft),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 7),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    message,
+                    style: theme.text.prose.copyWith(fontSize: 15, height: 1.5, color: theme.colors.onSurface),
+                  ),
+                  if (open != null && dispatch.canHandle(open)) ...[
+                    const SizedBox(height: 12),
+                    RendelActionButton(label: label!, quiet: true, onTap: () => dispatch.onAction(open)),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 Widget buildStatusBanner(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
   final theme = RendelThemeScope.of(context);
   final tone = _str(block.props['tone']) ?? 'info';

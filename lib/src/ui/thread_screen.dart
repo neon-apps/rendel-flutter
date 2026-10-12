@@ -561,6 +561,12 @@ class _ThreadScreenState extends State<ThreadScreen> {
                                     ? controller.retry
                                     : null,
                           ),
+                          // Under a notice the composer rests: its place says
+                          // when the assistant is back, and there is nothing to
+                          // press until then.
+                          if (controller.resting)
+                            _Resting(hint: controller.notice!.hint)
+                          else
                           _Composer(
                             input: _input,
                             busy: controller.busy,
@@ -1480,6 +1486,50 @@ class _ErrorSlot extends StatelessWidget {
               retryLabel: retryLabel,
               onRetry: onRetry,
             ),
+    );
+  }
+}
+
+/// The composer resting under a notice (`notices`): a quiet pill where the
+/// controls were, saying when the assistant is back. Not the error strip.
+class _Resting extends StatelessWidget {
+  const _Resting({required this.hint});
+
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
+      child: Center(
+        child: Semantics(
+          liveRegion: true,
+          child: Container(
+            height: 52,
+            padding: const EdgeInsetsDirectional.fromSTEB(16, 0, 20, 0),
+            decoration: BoxDecoration(
+              color: theme.colors.surfaceSunk,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.schedule_rounded, size: 17, color: theme.colors.onSurfaceSoft),
+                const SizedBox(width: 9),
+                Text(
+                  hint,
+                  style: theme.text.prose.copyWith(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w500,
+                    color: theme.colors.onSurfaceSoft,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -262,6 +262,32 @@ class ConversationController extends ChangeNotifier {
   RendelDetail? _detail;
   String? errorText;
 
+  /// The assistant said, on purpose, that it will not answer for now (a
+  /// usage limit, a paused budget): drawn as the answer, with the composer
+  /// resting and saying its hint until it lapses.
+  RendelNotice? notice;
+  Timer? _noticeTimer;
+
+  /// A notice is in force: nothing is sent until it lapses.
+  bool get resting {
+    final until = notice?.until;
+    return notice != null && (until == null || DateTime.now().isBefore(until));
+  }
+
+  void _rest(RendelNotice next) {
+    notice = next;
+    _noticeTimer?.cancel();
+    _noticeTimer = null;
+    final until = next.until;
+    if (until != null) {
+      final wait = until.difference(DateTime.now()) + const Duration(milliseconds: 500);
+      // The composer comes back on its own, on a screen left open.
+      if (!wait.isNegative && wait < const Duration(days: 40)) {
+        _noticeTimer = Timer(wait, () => _notify());
+      }
+    }
+  }
+
   /// Which error [errorText] is, for the thread to say in its own language.
   ///
   /// The wire code for one the server sent, whose message already arrives in
@@ -311,7 +337,7 @@ class ConversationController extends ChangeNotifier {
     RendelDetail? detail,
     Uint8List? image,
   }) async {
-    if (busy || text.trim().isEmpty) return false;
+    if (busy || text.trim().isEmpty || resting) return false;
     errorText = null;
     errorCode = null;
     _abandonOpenConfirmCards();
@@ -883,6 +909,9 @@ class ConversationController extends ChangeNotifier {
     turnStatus = null;
     errorText = null;
     errorCode = null;
+    notice = null;
+    _noticeTimer?.cancel();
+    _noticeTimer = null;
     _notify();
   }
 
@@ -1003,6 +1032,8 @@ class ConversationController extends ChangeNotifier {
     // half an answer was presented as a whole one: no error bar, no retry, and
     // any action the turn had announced was never run.
     var settled = false;
+    // The answer is a notice: not a failure, and not "no answer".
+    var noticed = false;
     // A turn whose only blocks were older drawings of something already on
     // screen did answer; there is just nothing new to show for it.
     var droppedStale = false;
@@ -1102,6 +1133,21 @@ class ConversationController extends ChangeNotifier {
               _lastErrorRetryable = true;
             }
             awaitingReads = status == 'awaiting_tool_results' && _pendingReads.isNotEmpty;
+          case final RendelNotice told:
+            settled = true;
+            noticed = true;
+            _openAssistant!.blocks.add(WireBlock(
+              id: 'notice',
+              type: 'notice',
+              fallbackText: told.message,
+              props: {
+                'kind': told.kind,
+                'message': told.message,
+                if (told.actionLabel != null && told.actionUrl != null)
+                  'action': {'label': told.actionLabel, 'url': told.actionUrl},
+              },
+            )..ready = true);
+            _rest(told);
           case RendelError(:final code, :final message, :final retryable):
             settled = true;
             errorText = message;
@@ -1192,7 +1238,7 @@ class ConversationController extends ChangeNotifier {
       _lastErrorRetryable = true;
     }
 
-    final produced = _turnBlocks.isNotEmpty || droppedStale;
+    final produced = _turnBlocks.isNotEmpty || droppedStale || noticed;
 
     _pruneEmptyAssistant();
 

@@ -71,11 +71,17 @@ const List<String> supportedComponents = [
 ///
 /// `detail_pages`: on a page, a product card or a list item opens over it and
 /// asks for its detail, carrying `message.detail_of`.
+///
+/// `notices`: when the assistant will not answer on purpose (the person's
+/// usage limit, the app's budget or credit paused), the server sends a
+/// `notice`, drawn as a calm answer with the composer resting, instead of an
+/// `error`.
 const List<String> clientCapabilities = [
   'form_update',
   'surface_update',
   'answer_pages',
   'detail_pages',
+  'notices',
 ];
 
 /// The kinds of action this build carries out when a control is tapped,
@@ -517,6 +523,19 @@ sealed class RendelWireEvent {
           message: _text(data['message']) ?? '',
           retryable: data['retryable'] == true,
         );
+      case 'notice':
+        final message = _text(data['message']);
+        final hint = _text(data['hint']);
+        if (message == null || hint == null) return null;
+        final action = data['action'];
+        return RendelNotice(
+          kind: _text(data['kind']) ?? 'paused',
+          message: message,
+          hint: hint,
+          until: DateTime.tryParse(_text(data['until']) ?? ''),
+          actionLabel: action is Map ? _text(action['label']) : null,
+          actionUrl: action is Map ? _text(action['url']) : null,
+        );
       case 'ping':
         return const Ping();
     }
@@ -595,6 +614,27 @@ class RendelError extends RendelWireEvent {
   final String code;
   final String message;
   final bool retryable;
+}
+
+/// The assistant is not answering, on purpose (`notices`): the person's own
+/// usage limit (`limit`), or the app's budget or credit paused (`paused`).
+/// Drawn where the answer goes; the composer rests, saying [hint], until
+/// [until].
+class RendelNotice extends RendelWireEvent {
+  const RendelNotice({
+    required this.kind,
+    required this.message,
+    required this.hint,
+    required this.until,
+    this.actionLabel,
+    this.actionUrl,
+  });
+  final String kind;
+  final String message;
+  final String hint;
+  final DateTime? until;
+  final String? actionLabel;
+  final String? actionUrl;
 }
 
 class Ping extends RendelWireEvent {
