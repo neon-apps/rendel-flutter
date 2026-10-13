@@ -7,8 +7,9 @@ import 'theme.dart';
 /// The entry point button. You place it: a `floatingActionButton`, a row in a
 /// settings list, anywhere the affordance belongs in your own layout. The SDK
 /// positions nothing of its own but the bubble it shrinks into while a screen
-/// it opened is in front, and pressing this then brings the copilot back
-/// from it.
+/// it opened is in front; this hides itself while the bubble is up, so one
+/// way in is on screen. A button of your own should do the same, listening
+/// to [Rendel.minimised].
 ///
 /// It presses like every other control in the SDK, because it is the same
 /// control: an [RendelPressable], not a Material ripple.
@@ -31,7 +32,12 @@ class RendelLauncher extends StatelessWidget {
     // once per fetch, so this costs nothing per frame.
     return ValueListenableBuilder<int>(
       valueListenable: Rendel.configRevision,
-      builder: (context, _, __) => _build(context),
+      // Hidden while the bubble is up: it is the way back then, and one way
+      // in is all a screen shows (Tuna, 2026-10-13).
+      builder: (context, _, __) => ValueListenableBuilder<bool>(
+        valueListenable: Rendel.minimised,
+        builder: (context, minimised, _) => minimised ? const SizedBox.shrink() : _build(context),
+      ),
     );
   }
 

@@ -514,6 +514,20 @@ void main() {
       expect(bubble.bottom, 844 - 104);
     });
 
+    testWidgets('says it is minimised while the bubble is up, so a host button can hide (one way in)',
+        (tester) async {
+      await host(tester);
+      expect(Rendel.minimised.value, isFalse);
+      await scrollToCard(tester);
+      await go(tester, card());
+      expect(_bubble, findsOneWidget);
+      expect(Rendel.minimised.value, isTrue);
+
+      await tester.tap(_bubble);
+      await settle(tester);
+      expect(Rendel.minimised.value, isFalse);
+    });
+
     testWidgets('tapping the bubble restores the panel with the same page and scroll',
         (tester) async {
       await host(tester);

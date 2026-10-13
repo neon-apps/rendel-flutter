@@ -247,6 +247,21 @@ void main() {
       expect(launcherFill(tester), RendelTheme.paper().colors.accent);
     });
 
+    testWidgets('the launcher steps aside while the bubble is the way back', (tester) async {
+      await start();
+      await tester.pumpWidget(const MaterialApp(
+        home: Scaffold(floatingActionButton: RendelLauncher()),
+      ));
+      expect(find.text(Rendel.config.launcherLabel), findsOneWidget);
+      Rendel.minimised.value = true;
+      addTearDown(() => Rendel.minimised.value = false);
+      await tester.pump();
+      expect(find.text(Rendel.config.launcherLabel), findsNothing);
+      Rendel.minimised.value = false;
+      await tester.pump();
+      expect(find.text(Rendel.config.launcherLabel), findsOneWidget);
+    });
+
     testWidgets('a host that is always light stays light', (tester) async {
       await start(mode: RendelThemeMode.light);
       addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);

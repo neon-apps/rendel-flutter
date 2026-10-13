@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.49.3
+
+**Added**
+
+- `Rendel.minimised`, a `ValueListenable<bool>`: true while the thread is
+  shrunk into its bubble for a screen it opened. A host with its own button
+  hides it while this is true, so one way in is on screen.
+
+**Changed**
+
+- `RendelLauncher` hides itself while the bubble is up.
+
 ## 0.49.2
 
 **Changed**

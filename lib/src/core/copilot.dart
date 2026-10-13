@@ -105,6 +105,12 @@ class Rendel {
   /// organization's usage is paused: the launcher is hidden, and an app with
   /// its own way in should hide it too, listening here.
   static final ValueNotifier<bool> available = ValueNotifier<bool>(true);
+
+  /// Whether the thread is shrunk into its bubble while a screen it opened is
+  /// in front. The bubble is then the way back, so there is one entry point
+  /// on screen (Tuna, 2026-10-13): [RendelLauncher] hides itself, and an app
+  /// with its own button should hide it too, listening here.
+  static final ValueNotifier<bool> minimised = ValueNotifier<bool>(false);
   static RendelConfigStore _store = RendelMemoryConfigStore();
   static String? _configEtag;
 
@@ -511,6 +517,8 @@ class Rendel {
         ),
       ),
     );
+    void syncMinimised() => minimised.value = presentation.minimised;
+    presentation.addListener(syncMinimised);
     _presenting++;
     try {
       // Until it is closed, not until it shrinks into the bubble: the thread
@@ -518,6 +526,8 @@ class Rendel {
       await presentation.done;
     } finally {
       _presenting--;
+      presentation.removeListener(syncMinimised);
+      minimised.value = false;
       if (identical(_presentation, presentation)) _presentation = null;
       // In the finally, so a sheet that throws on present does not leak an
       // `opened` with no `closed` into whatever the host wired this stream to.
@@ -584,6 +594,7 @@ class Rendel {
     _controller = null;
     _presenting = 0;
     _presentation = null;
+    minimised.value = false;
     RendelPlatform.resetForTest();
     _api = null;
     _handOverClient(null);
