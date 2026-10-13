@@ -152,7 +152,22 @@ class ConversationController extends ChangeNotifier {
     this.onEvent,
     this.onUnavailable,
     this.user = _nobody,
+    this.cardSources = const {},
   });
+
+  /// The text a full-text action replaces, per action (`Rendel.setCardSource`),
+  /// for the card's "Changes".
+  final Map<String, Future<String?> Function(Map<String, dynamic> params)> cardSources;
+
+  /// The current text for [action]'s full-text card, or null when the app
+  /// gave none (or the action did not ask for it with `fullText.current`).
+  /// Resolves null when the app's source failed.
+  Future<String?>? currentTextFor(String action, Map<String, dynamic> params) {
+    if (actions[action]?.fullText?.current != true) return null;
+    final source = cardSources[action];
+    if (source == null) return null;
+    return source(params).then<String?>((text) => text, onError: (Object _) => null);
+  }
 
   static Map<String, String>? _nobody() => null;
 
@@ -677,7 +692,7 @@ class ConversationController extends ChangeNotifier {
     return false;
   }
 
-  Future<bool> confirmInvocation(String invocationId) async {
+  Future<bool> confirmInvocation(String invocationId, {String? typed}) async {
     // Every other entry point guards on `busy`; these two did not, and the
     // outgoing button row stays hit-testable for the length of the card's
     // resolution animation. A double tap on "Yes, do it" ran the destructive
@@ -735,7 +750,23 @@ class ConversationController extends ChangeNotifier {
     // network blip on this call must not cost the user the action they just
     // authorised. The server is the one that decides whether the record was
     // required.
-    final recorded = await api.recordDecision(invocationId, confirm: true);
+    final recorded = await api.recordDecision(invocationId, confirm: true, typed: typed);
+    if (recorded == 'typed_mismatch') {
+      // Not what the card asked for: open again, with the reason under the field.
+      for (final message in messages) {
+        for (final block in message.blocks) {
+          if (block.type == 'confirm_card' && block.props['invocation_id'] == invocationId) {
+            block.props.remove(RendelLocalKeys.resolved);
+            block.props[RendelLocalKeys.mismatch] = true;
+            message.touch();
+          }
+        }
+      }
+      busy = false;
+      phase = RendelPhase.idle;
+      _notify();
+      return false;
+    }
     if (recorded == 'expired') {
       // The card outlived its ten minutes while it sat on screen. Running the
       // handler now would perform an action the server is about to refuse to
@@ -850,8 +881,8 @@ class ConversationController extends ChangeNotifier {
     switch (action) {
       case ReplyAction(:final text):
         return send(text);
-      case ConfirmAction(:final invocationId):
-        return confirmInvocation(invocationId);
+      case ConfirmAction(:final invocationId, :final typed):
+        return confirmInvocation(invocationId, typed: typed);
       case CancelAction(:final invocationId):
         return declineInvocation(invocationId);
       case OpenUrlAction(:final url, external: true):

@@ -5,6 +5,27 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.50.0
+
+**Added**
+
+- `RendelAction.typeToConfirm`: a parameter the user types back before the
+  confirm button arms. The typed value goes to the confirm endpoint, and a
+  `typed_mismatch` reopens the card with the reason.
+- `RendelAction.fullText` (`RendelFullText(param, current: …)`): a string
+  parameter the card shows whole, with a 400-character preview and "Read
+  all"; the button arms once it was read. With `current: true`,
+  `Rendel.setCardSource(action, (params) async => …)` supplies the text it
+  replaces and the card shows the lines that change.
+- `RendelAction.confirmLabel` and `confirmLabels`: the confirm button's words.
+- `title` and `titles` on `RendelSchema.string`, `number`, `integer`,
+  `boolean`, `enumOf` and `list`: the parameter's name on the card, per
+  language.
+- The card's "Suggested after reading …" line, for a card drawn after
+  reading what a customer or a third party wrote, and `RendelStrings` for all
+  of the above.
+- Uploads send the file's name (`X-Rendel-Filename`).
+
 ## 0.49.3
 
 **Added**

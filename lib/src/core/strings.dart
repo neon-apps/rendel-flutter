@@ -153,6 +153,13 @@ class RendelStrings {
     this.thumbsUp = 'Good',
     this.thumbsDown = 'Not good',
     this.helpful = 'Helpful?',
+    this.typeToConfirm = 'Type {value} to confirm',
+    this.typedMismatch = 'That doesn\'t match. Type it exactly as shown.',
+    this.readAll = 'Read all ({n} characters)',
+    this.readToConfirm = 'Read it all to confirm',
+    this.changes = 'Changes',
+    this.currentUnavailable = 'The current text could not be loaded.',
+    this.suggestedAfter = 'Suggested after reading {source}',
     this.expand = 'Show',
     this.collapse = 'Hide',
     this.directions = 'Directions',
@@ -465,6 +472,17 @@ class RendelStrings {
 
   /// The answer page's thumbs (analytics-roi T1): the question beside them.
   final String helpful;
+
+  /// A confirmation card that asks the user to type a value back ({value}),
+  /// carries a long text ({n} characters) with what changes, or was drawn
+  /// after reading what someone else wrote ({source}).
+  final String typeToConfirm;
+  final String typedMismatch;
+  final String readAll;
+  final String readToConfirm;
+  final String changes;
+  final String currentUnavailable;
+  final String suggestedAfter;
   final String expand;
   final String collapse;
 
@@ -495,6 +513,9 @@ class RendelStrings {
   String formFailedWith(String submit) => formFailed.replaceAll('{submit}', submit);
   String removeFileNamed(String name) => removeFile.replaceAll('{name}', name);
   String detailAskAbout(String title) => detailAsk.replaceAll('{title}', title);
+  String typeToConfirmFor(String value) => typeToConfirm.replaceAll('{value}', value);
+  String readAllOf(String count) => readAll.replaceAll('{n}', count);
+  String suggestedAfterFrom(String source) => suggestedAfter.replaceAll('{source}', source);
   String stepOfCount(int step, int count) =>
       stepOf.replaceAll('{step}', '$step').replaceAll('{count}', '$count');
   /// [now] for a label that is itself a when ("Today"): no "in" before it.
@@ -676,6 +697,13 @@ class RendelStrings {
     String? thumbsUp,
     String? thumbsDown,
     String? helpful,
+    String? typeToConfirm,
+    String? typedMismatch,
+    String? readAll,
+    String? readToConfirm,
+    String? changes,
+    String? currentUnavailable,
+    String? suggestedAfter,
     String? expand,
     String? collapse,
     String? directions,
@@ -811,6 +839,13 @@ class RendelStrings {
       thumbsUp: thumbsUp ?? this.thumbsUp,
       thumbsDown: thumbsDown ?? this.thumbsDown,
       helpful: helpful ?? this.helpful,
+      typeToConfirm: typeToConfirm ?? this.typeToConfirm,
+      typedMismatch: typedMismatch ?? this.typedMismatch,
+      readAll: readAll ?? this.readAll,
+      readToConfirm: readToConfirm ?? this.readToConfirm,
+      changes: changes ?? this.changes,
+      currentUnavailable: currentUnavailable ?? this.currentUnavailable,
+      suggestedAfter: suggestedAfter ?? this.suggestedAfter,
       expand: expand ?? this.expand,
       collapse: collapse ?? this.collapse,
       directions: directions ?? this.directions,
@@ -963,6 +998,13 @@ const Map<String, RendelStrings> _byLocale = {
     thumbsUp: 'İyi',
     thumbsDown: 'İyi değil',
     helpful: 'Faydalı mı?',
+    typeToConfirm: 'Onaylamak için aşağıdaki alana tam olarak şunu yazın: {value}',
+    typedMismatch: 'Girilen metin eşleşmedi. Gösterilen ifadeyi harfi harfine yazın.',
+    readAll: 'Tamamını oku ({n} karakter)',
+    readToConfirm: 'Onaylamak için metnin tamamını okuyun.',
+    changes: 'Değişiklikler',
+    currentUnavailable: 'Mevcut metin yüklenemedi.',
+    suggestedAfter: 'İncelendikten sonra önerildi: {source}',
     expand: 'Göster',
     collapse: 'Gizle',
     directions: 'Yol tarifi',
@@ -1104,6 +1146,13 @@ const Map<String, RendelStrings> _byLocale = {
     thumbsUp: 'Gut',
     thumbsDown: 'Nicht gut',
     helpful: 'Hilfreich?',
+    typeToConfirm: 'Geben Sie {value} ein, um zu bestätigen',
+    typedMismatch: 'Das stimmt nicht überein. Geben Sie es genau so ein.',
+    readAll: 'Alles lesen ({n} Zeichen)',
+    readToConfirm: 'Lesen Sie alles, um zu bestätigen',
+    changes: 'Änderungen',
+    currentUnavailable: 'Der aktuelle Text konnte nicht geladen werden.',
+    suggestedAfter: 'Vorgeschlagen nach dem Lesen von {source}',
     expand: 'Anzeigen',
     collapse: 'Ausblenden',
     directions: 'Route',
@@ -1244,6 +1293,13 @@ const Map<String, RendelStrings> _byLocale = {
     thumbsUp: 'Bien',
     thumbsDown: 'Pas bien',
     helpful: 'Utile ?',
+    typeToConfirm: 'Saisissez {value} pour confirmer',
+    typedMismatch: 'Ce n’est pas identique. Saisissez-le exactement comme indiqué.',
+    readAll: 'Tout lire ({n} caractères)',
+    readToConfirm: 'Lisez tout pour confirmer',
+    changes: 'Modifications',
+    currentUnavailable: 'Le texte actuel n’a pas pu être chargé.',
+    suggestedAfter: 'Suggéré après la lecture de {source}',
     expand: 'Afficher',
     collapse: 'Masquer',
     directions: 'Itinéraire',
@@ -1383,6 +1439,13 @@ const Map<String, RendelStrings> _byLocale = {
     thumbsUp: 'Bien',
     thumbsDown: 'Mal',
     helpful: '¿Te ha servido?',
+    typeToConfirm: 'Escribe {value} para confirmar',
+    typedMismatch: 'No coincide. Escríbelo exactamente como se muestra.',
+    readAll: 'Leer todo ({n} caracteres)',
+    readToConfirm: 'Léelo todo para confirmar',
+    changes: 'Cambios',
+    currentUnavailable: 'No se pudo cargar el texto actual.',
+    suggestedAfter: 'Sugerido después de leer {source}',
     expand: 'Mostrar',
     collapse: 'Ocultar',
     directions: 'Cómo llegar',
@@ -1521,6 +1584,13 @@ const Map<String, RendelStrings> _byLocale = {
     thumbsUp: 'جيد',
     thumbsDown: 'غير جيد',
     helpful: 'هل كان هذا مفيدًا؟',
+    typeToConfirm: 'اكتب {value} للتأكيد',
+    typedMismatch: 'لا يتطابق. اكتبه تمامًا كما هو معروض.',
+    readAll: 'اقرأ الكل ({n} حرفًا)',
+    readToConfirm: 'اقرأه كله للتأكيد',
+    changes: 'التغييرات',
+    currentUnavailable: 'تعذّر تحميل النص الحالي.',
+    suggestedAfter: 'مقترح بعد قراءة {source}',
     expand: 'إظهار',
     collapse: 'إخفاء',
     directions: 'الاتجاهات',

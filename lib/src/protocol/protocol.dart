@@ -168,6 +168,17 @@ class RendelLocalKeys {
   /// beside it for the thumbnails, so a form scrolled away and back still
   /// shows what was attached, and an upload still in flight still lands.
   static const String files = '_files';
+
+  /// `confirm_card` with `type_to_confirm`: what the user typed, and true
+  /// once the server found it did not match (cleared by typing again).
+  static const String typed = '_typed';
+  static const String mismatch = '_mismatch';
+
+  /// `confirm_card` with `full_text`: true once the whole text was opened,
+  /// and the text it replaces from `Rendel.setCardSource` (null when that
+  /// could not be had, absent when the app gave none).
+  static const String read = '_read';
+  static const String current = '_current';
 }
 
 /// The keys a form field's value is kept and sent under: its name, or for a
@@ -327,8 +338,11 @@ class AppActionRef extends UIAction {
 }
 
 class ConfirmAction extends UIAction {
-  const ConfirmAction(this.invocationId);
+  const ConfirmAction(this.invocationId, {this.typed});
   final String invocationId;
+
+  /// What the user typed on a card that asks for it (`type_to_confirm`).
+  final String? typed;
 }
 
 class CancelAction extends UIAction {
@@ -701,6 +715,10 @@ Map<String, dynamic> buildManifest(
             // this flag keeps the hash it had.
             if (a.undoable) 'undoable': true,
             if (a.editable.isNotEmpty) 'editable': a.editable,
+            if (a.typeToConfirm != null) 'typeToConfirm': a.typeToConfirm,
+            if (a.fullText != null) 'fullText': a.fullText!.toJson(),
+            if (a.confirmLabel != null) 'confirmLabel': a.confirmLabel,
+            if (a.confirmLabels != null && a.confirmLabels!.isNotEmpty) 'confirmLabels': a.confirmLabels,
           },
         },
     ],

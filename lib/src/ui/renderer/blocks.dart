@@ -1332,18 +1332,264 @@ Widget buildConfirmCard(BuildContext context, WireBlock block, RendelDispatcher 
     at: DateTime.tryParse(_str(block.props['expires_at']) ?? ''),
     builder: (context, expired) {
       final open = !expired && _str(block.props[RendelLocalKeys.resolved]) == null;
+      // A value typed back and a long text read whole (P0.2): held by
+      // `_ConfirmExtras` while the card waits.
+      final asks = _typedValueOf(block) != null || _fullTextOf(block) != null;
+      Widget card(_CardEditsState? edits) => asks
+          ? _ConfirmExtras(
+              block: block,
+              dispatch: dispatch,
+              open: open,
+              builder: (context, extras) => _confirmCard(context, block, dispatch, expired, edits, extras),
+            )
+          : _confirmCard(context, block, dispatch, expired, edits, null);
       // Values the user may change here, while the card waits for an answer
       // and something can send the change (`_CardEdits`).
       if (!open || dispatch.onEditCard == null || _maps(block.props['editable']).isEmpty) {
-        return _confirmCard(context, block, dispatch, expired, null);
+        return card(null);
       }
       return _CardEdits(
         block: block,
         dispatch: dispatch,
-        builder: (context, edits) => _confirmCard(context, block, dispatch, expired, edits),
+        builder: (context, edits) => card(edits),
       );
     },
   );
+}
+
+// ——— typed confirmation and full text (rendel-in-console P0.2) ———
+
+/// How much of a long text a card shows before "Read all".
+const int fullTextPreview = 400;
+
+/// The "Suggested after reading …" line on a card drawn after reading what
+/// a customer or a third party wrote.
+const bool showSuggestedAfter = true;
+
+String? _typedValueOf(WireBlock block) {
+  final ask = block.props['type_to_confirm'];
+  final value = ask is Map ? ask['value'] : null;
+  return value is String && value.trim().isNotEmpty ? value : null;
+}
+
+String? _fullTextOf(WireBlock block) {
+  final full = block.props['full_text'];
+  final value = full is Map ? full['value'] : null;
+  return value is String ? value : null;
+}
+
+/// A value the card asks the user to type back, and a long text it carries
+/// whole, with what changes. The button arms on an exact match (spaces
+/// trimmed) and once all of the text was opened. Kept in the block's props,
+/// so a redraw keeps what was typed and read.
+class _ConfirmExtras extends StatefulWidget {
+  const _ConfirmExtras({required this.block, required this.dispatch, required this.open, required this.builder});
+
+  final WireBlock block;
+  final RendelDispatcher dispatch;
+  final bool open;
+  final Widget Function(BuildContext context, _ConfirmExtrasState extras) builder;
+
+  @override
+  State<_ConfirmExtras> createState() => _ConfirmExtrasState();
+}
+
+class _ConfirmExtrasState extends State<_ConfirmExtras> {
+  Map<String, dynamic> get _props => widget.block.props;
+  late final TextEditingController _typed = TextEditingController(text: _props[RendelLocalKeys.typed] as String? ?? '');
+
+  String? get _expected => _typedValueOf(widget.block);
+  String? get _full => _fullTextOf(widget.block);
+  bool get read => _full == null || _full!.length <= fullTextPreview || _props[RendelLocalKeys.read] == true;
+  bool get matches => _expected == null || _typed.text.trim() == _expected!.trim();
+  bool get armed => matches && read;
+
+  /// What goes with the confirm when the card asks for a typed value.
+  String? get typedValue => _expected == null ? null : _typed.text.trim();
+
+  @override
+  void initState() {
+    super.initState();
+    final full = _full;
+    final source = widget.dispatch.cardSource;
+    if (full != null && widget.open && source != null && !_props.containsKey(RendelLocalKeys.current)) {
+      final params = _props['params'] is Map ? Map<String, dynamic>.from(_props['params'] as Map) : <String, dynamic>{};
+      final pending = source(_str(_props['action_name']) ?? '', params);
+      if (pending != null) {
+        unawaited(pending.then((text) {
+          if (!mounted) return;
+          setState(() => _props[RendelLocalKeys.current] = text);
+        }));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _typed.dispose();
+    super.dispose();
+  }
+
+  List<Widget> parts(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final full = _full;
+    final expected = _expected;
+    return [
+      if (full != null) ...[
+        SizedBox(height: theme.space.md),
+        Container(
+          width: double.infinity,
+          constraints: BoxConstraints(maxHeight: read ? 360 : double.infinity),
+          padding: EdgeInsets.symmetric(horizontal: theme.space.md, vertical: theme.space.sm),
+          decoration: BoxDecoration(color: theme.colors.surfaceHigh, borderRadius: BorderRadius.circular(14)),
+          child: read
+              ? SingleChildScrollView(child: Text(full, style: theme.text.body))
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${full.substring(0, fullTextPreview).trimRight()}…', style: theme.text.body),
+                    SizedBox(height: theme.space.xs),
+                    RendelActionButton(
+                      label: strings.readAllOf('${full.length}'),
+                      quiet: true,
+                      onTap: () => setState(() => _props[RendelLocalKeys.read] = true),
+                    ),
+                  ],
+                ),
+        ),
+        if (_props.containsKey(RendelLocalKeys.current)) ...[
+          SizedBox(height: theme.space.sm),
+          if (_props[RendelLocalKeys.current] is String)
+            _Diff(before: _props[RendelLocalKeys.current] as String, after: full, title: strings.changes)
+          else
+            Text(strings.currentUnavailable, style: theme.text.caption),
+        ],
+      ],
+      if (expected != null && widget.open) ...[
+        SizedBox(height: theme.space.md),
+        Text(strings.typeToConfirmFor(expected), style: theme.text.caption),
+        SizedBox(height: theme.space.xs),
+        TextField(
+          controller: _typed,
+          autocorrect: false,
+          enableSuggestions: false,
+          style: theme.text.body.copyWith(fontFamily: 'monospace', color: theme.colors.onSurface),
+          onChanged: (text) => setState(() {
+            _props[RendelLocalKeys.typed] = text;
+            _props.remove(RendelLocalKeys.mismatch);
+          }),
+          decoration: InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: theme.space.sm, vertical: theme.space.xs + 2),
+            filled: true,
+            fillColor: theme.colors.surfaceHigh,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.hairline)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.hairline)),
+          ),
+        ),
+        if (_props[RendelLocalKeys.mismatch] == true) ...[
+          SizedBox(height: theme.space.xs),
+          Semantics(
+            liveRegion: true,
+            child: Text(strings.typedMismatch, style: theme.text.caption.copyWith(color: theme.danger)),
+          ),
+        ],
+      ],
+      if (!read && widget.open) ...[
+        SizedBox(height: theme.space.sm),
+        Text(strings.readToConfirm, style: theme.text.caption.copyWith(color: theme.colors.onSurfaceFaint)),
+      ],
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(context, this);
+}
+
+/// The lines that change from [before] to [after], under [title].
+class _Diff extends StatelessWidget {
+  const _Diff({required this.before, required this.after, required this.title});
+
+  final String before;
+  final String after;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final mono = theme.text.caption.copyWith(fontFamily: 'monospace', height: 1.45);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: theme.text.labelStrong),
+        SizedBox(height: theme.space.xs),
+        for (final (kind, line) in lineDiff(before, after))
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+            decoration: BoxDecoration(
+              color: switch (kind) {
+                'add' => theme.colors.accent.withValues(alpha: 0.14),
+                'del' => theme.danger.withValues(alpha: 0.12),
+                _ => null,
+              },
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '${switch (kind) { 'add' => '+', 'del' => '−', _ => ' ' }} $line',
+              style: kind == 'del' ? mono.copyWith(decoration: TextDecoration.lineThrough) : mono,
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// The lines that change from [before] to [after] (`add`, `del`, `same`),
+/// unchanged lines far from a change folded away, as the web SDK does.
+List<(String, String)> lineDiff(String before, String after) {
+  final a = before.split('\n');
+  final b = after.split('\n');
+  if (a.length * b.length > 400000) {
+    final kept = a.toSet();
+    final now = b.toSet();
+    return [for (final l in a) if (!now.contains(l)) ('del', l), for (final l in b) if (!kept.contains(l)) ('add', l)];
+  }
+  final lcs = List.generate(a.length + 1, (_) => List.filled(b.length + 1, 0));
+  for (var i = a.length - 1; i >= 0; i--) {
+    for (var j = b.length - 1; j >= 0; j--) {
+      lcs[i][j] = a[i] == b[j] ? lcs[i + 1][j + 1] + 1 : (lcs[i + 1][j] >= lcs[i][j + 1] ? lcs[i + 1][j] : lcs[i][j + 1]);
+    }
+  }
+  final out = <(String, String)>[];
+  var i = 0;
+  var j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] == b[j]) {
+      out.add(('same', a[i]));
+      i++;
+      j++;
+    } else if (lcs[i + 1][j] >= lcs[i][j + 1]) {
+      out.add(('del', a[i++]));
+    } else {
+      out.add(('add', b[j++]));
+    }
+  }
+  while (i < a.length) {
+    out.add(('del', a[i++]));
+  }
+  while (j < b.length) {
+    out.add(('add', b[j++]));
+  }
+  bool near(int k) {
+    for (var x = k - 2; x <= k + 2; x++) {
+      if (x >= 0 && x < out.length && out[x].$1 != 'same') return true;
+    }
+    return false;
+  }
+
+  return [for (var k = 0; k < out.length; k++) if (out[k].$1 != 'same' || near(k)) out[k]];
 }
 
 /// What the user changed on a confirmation card, not yet redrawn by the
@@ -1626,6 +1872,7 @@ Widget _confirmCard(
   RendelDispatcher dispatch,
   bool expired,
   _CardEditsState? edits,
+  _ConfirmExtrasState? extras,
 ) {
   final theme = RendelThemeScope.of(context);
   final resolved = _str(block.props[RendelLocalKeys.resolved]);
@@ -1667,6 +1914,13 @@ Widget _confirmCard(
         // and two buttons answer it, so a label reading CONFIRM above a button
         // reading Confirm is decoration. The destructive card gets the one
         // thing the buttons cannot say.
+        if (showSuggestedAfter ? _str(block.props['suggested_after']) : null case final source?) ...[
+          Text(
+            RendelStringsScope.of(context).suggestedAfterFrom(source),
+            style: theme.text.caption.copyWith(color: theme.colors.onSurfaceFaint),
+          ),
+          SizedBox(height: theme.space.xs),
+        ],
         if (destructive) ...[
           // In the one colour that means "this cannot be taken back". It was
           // full ink, which is the same weight the card's title carries, so
@@ -1710,6 +1964,7 @@ Widget _confirmCard(
                 style: theme.text.caption.copyWith(color: theme.danger)),
           ],
         ],
+        if (extras != null) ...extras.parts(context),
         SizedBox(height: theme.space.lg),
         // Resolving a confirm card is the highest-stakes state change in the
         // catalog and it used to happen in one frame, collapsing the card by
@@ -1758,9 +2013,17 @@ Widget _confirmCard(
                     label: confirmLabel,
                     expand: true,
                     danger: destructive,
-                    // Not while a change is waiting for the server: the card
-                    // confirmed is the one it drew last.
-                    onTap: edits?.blocked == true ? null : _tap(dispatch, block.props['confirm']),
+                    // Not while a change is waiting for the server (the card
+                    // confirmed is the one it drew last), nor before the
+                    // value is typed back and the text read.
+                    onTap: edits?.blocked == true || extras?.armed == false
+                        ? null
+                        : extras?.typedValue != null
+                            ? () => dispatch.onAction(ConfirmAction(
+                                  _str(block.props['invocation_id']) ?? '',
+                                  typed: extras!.typedValue,
+                                ))
+                            : _tap(dispatch, block.props['confirm']),
                     part: 'confirm',
                   ),
                   cancel: RendelActionButton(

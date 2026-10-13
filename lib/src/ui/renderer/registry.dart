@@ -31,7 +31,12 @@ class RendelDispatcher {
     this.onUpload,
     this.onEditCard,
     this.onContactOpen,
+    this.cardSource,
   });
+
+  /// The current text a full-text card's action replaces, from the app
+  /// (`Rendel.setCardSource`): null when the app gave none.
+  final Future<String?>? Function(String action, Map<String, dynamic> params)? cardSource;
 
   /// A channel of a `contact` block was tapped: [channel] is its kind
   /// (`call`, `email`, `url`), never its address (analytics-roi T3). Counted

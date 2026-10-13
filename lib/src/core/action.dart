@@ -65,6 +65,10 @@ class RendelAction {
     this.sandboxResult,
     this.undoable = false,
     this.editable = const [],
+    this.typeToConfirm,
+    this.fullText,
+    this.confirmLabel,
+    this.confirmLabels,
   })  : assert(
           handler != null || onInvoke != null,
           'RendelAction needs a handler or an onInvoke.',
@@ -139,6 +143,21 @@ class RendelAction {
   /// ```
   final List<String> editable;
 
+  /// A parameter the user types back before the confirm button arms ("type
+  /// the app's name to delete it"). Only on an action that changes
+  /// something, and never one in [editable]; the server checks it again.
+  final String? typeToConfirm;
+
+  /// A string parameter the card shows whole rather than as a short row (a
+  /// page of text). With [RendelFullText.current] the card also shows what
+  /// changes, from the text `Rendel.setCardSource` hands it.
+  final RendelFullText? fullText;
+
+  /// The confirm button's words ("Delete app"), up to 32 characters, and the
+  /// same per language, matched like [confirmTemplates].
+  final String? confirmLabel;
+  final Map<String, String>? confirmLabels;
+
   /// How long the platform waits for this action before giving up on it.
   final Duration timeout;
 
@@ -152,4 +171,16 @@ class RendelAction {
   /// Canned data returned instead of running [handler] when sandbox mode is
   /// active and this is set — for demos and tests without real side effects.
   final Map<String, dynamic>? sandboxResult;
+}
+
+/// A parameter a confirmation card carries in full (see [RendelAction.fullText]).
+class RendelFullText {
+  const RendelFullText(this.param, {this.current = false});
+
+  final String param;
+
+  /// Show what changes, from the text `Rendel.setCardSource` returns for the action.
+  final bool current;
+
+  Map<String, dynamic> toJson() => {'param': param, if (current) 'current': true};
 }

@@ -5,7 +5,7 @@ library;
 export 'src/deprecated.dart';
 
 export 'src/core/action.dart'
-    show RendelAction, RendelInvocation, RendelInvocationHandler, RendelHandler, RendelResult, RendelRisk;
+    show RendelAction, RendelFullText, RendelInvocation, RendelInvocationHandler, RendelHandler, RendelResult, RendelRisk;
 export 'src/core/log.dart' show RendelLog, RendelLogLevel, RendelLogRecord;
 export 'src/core/route.dart' show RendelRouteParam, RendelRouteOpener;
 export 'src/core/config.dart'

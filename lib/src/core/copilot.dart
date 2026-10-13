@@ -42,6 +42,7 @@ class Rendel {
   static RendelTheme _theme = RendelTheme.paper();
   static RendelConfig _config = const RendelConfig();
   static final Map<String, RendelAction> _actions = {};
+  static final Map<String, Future<String?> Function(Map<String, dynamic> params)> _cardSources = {};
   static final Map<String, RendelRoute> _routes = {};
   static final Map<String, Future<Map<String, dynamic>> Function()> _providers = {};
   static final StreamController<RendelEvent> _events = StreamController.broadcast();
@@ -251,6 +252,17 @@ class Rendel {
   /// lifecycle observer in someone else's app is a surprise.
   static Future<void> refreshConfig() => _refreshConfig();
 
+  /// The text an action's [RendelAction.fullText] parameter replaces, for the
+  /// card to show what changes; called with the card's parameters. Null
+  /// removes it.
+  static void setCardSource(String action, Future<String?> Function(Map<String, dynamic> params)? source) {
+    if (source == null) {
+      _cardSources.remove(action);
+    } else {
+      _cardSources[action] = source;
+    }
+  }
+
   static void registerAction(RendelAction action) {
     _actions[action.name] = action;
     _manifestSynced = false;
@@ -443,6 +455,7 @@ class Rendel {
     _controller ??= ConversationController(
       api: api,
       actions: _actions,
+      cardSources: _cardSources,
       routes: _routes,
       sdkVersion: _config.sdkVersion,
       contextProviders: _providers,

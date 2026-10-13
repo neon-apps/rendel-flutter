@@ -232,7 +232,8 @@ class RendelApiClient {
   /// token could leave. It also makes a failed upload something the composer
   /// can say out loud and the user can retry, instead of a turn that failed
   /// for a reason nobody can see.
-  Future<String> upload(Uint8List bytes, String mediaType) async {
+  Future<String> upload(Uint8List bytes, String mediaType, {String? fileName}) async {
+    final name = fileNameHeader(fileName);
     final response = await _http
         .post(
           Uri.parse('${config.apiBaseUrl}/v1/uploads'),
@@ -240,6 +241,7 @@ class RendelApiClient {
             'Content-Type': mediaType,
             'X-Rendel-Key': appKey,
             'X-Rendel-Device': deviceId,
+            if (name != null) 'X-Rendel-Filename': name,
           },
           body: bytes,
         )
@@ -323,15 +325,24 @@ class RendelApiClient {
   /// be made at all. Null is not the same as a refusal: a customer who has not
   /// turned server-mediated confirmation on is served exactly as before, so a
   /// network blip here must not cost the user their tap.
-  Future<String?> recordDecision(String invocationId, {required bool confirm}) async {
+  Future<String?> recordDecision(String invocationId, {required bool confirm, String? typed}) async {
     try {
       final response = await _http
           .post(
             Uri.parse('${config.apiBaseUrl}/v1/invocations/$invocationId/confirm'),
             headers: _headers,
-            body: jsonEncode({'decision': confirm ? 'confirm' : 'decline'}),
+            body: jsonEncode({
+              'decision': confirm ? 'confirm' : 'decline',
+              if (confirm && typed != null) 'typed': typed,
+            }),
           )
           .timeout(config.requestTimeout);
+      // What the user typed did not match the stored value: the card stays open.
+      if (response.statusCode == 422) {
+        final refused = jsonDecode(response.body);
+        final code = refused is Map ? (refused['error'] is Map ? refused['error']['code'] : refused['code']) : null;
+        if (code == 'typed_mismatch') return 'typed_mismatch';
+      }
       if (response.statusCode != 200) return null;
       final parsed = jsonDecode(response.body) as Map<String, dynamic>;
       return parsed['status'] as String?;
@@ -552,4 +563,15 @@ class RendelUploadFailure implements Exception {
 
   @override
   String toString() => message ?? 'upload failed';
+}
+
+/// The file's own name for the card that shows it ("name · TYPE · size"):
+/// URL-encoded, at most 200 characters, cut before the encoding would split
+/// a character. Null when there is none.
+String? fileNameHeader(String? name) {
+  var cut = name?.trim() ?? '';
+  while (cut.isNotEmpty && Uri.encodeComponent(cut).length > 200) {
+    cut = String.fromCharCodes(cut.runes.toList()..removeLast());
+  }
+  return cut.isEmpty ? null : Uri.encodeComponent(cut);
 }

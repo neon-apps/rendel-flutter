@@ -11,23 +11,34 @@ class RendelSchema {
 
   Map<String, dynamic> toJson() => _schema;
 
-  static RendelSchema string({String? description}) =>
-      RendelSchema._({'type': 'string', if (description != null) 'description': description});
+  /// [title] names the parameter on the confirmation card, and [titles] per
+  /// language (`{'tr': 'Ad'}`); the server picks one by the device's locale.
+  static RendelSchema string({String? description, String? title, Map<String, String>? titles}) =>
+      RendelSchema._({'type': 'string', if (description != null) 'description': description, ..._titled(title, titles)});
 
-  static RendelSchema number({String? description}) =>
-      RendelSchema._({'type': 'number', if (description != null) 'description': description});
+  static RendelSchema number({String? description, String? title, Map<String, String>? titles}) =>
+      RendelSchema._({'type': 'number', if (description != null) 'description': description, ..._titled(title, titles)});
 
-  static RendelSchema integer({String? description}) =>
-      RendelSchema._({'type': 'integer', if (description != null) 'description': description});
+  static RendelSchema integer({String? description, String? title, Map<String, String>? titles}) =>
+      RendelSchema._({'type': 'integer', if (description != null) 'description': description, ..._titled(title, titles)});
 
-  static RendelSchema boolean({String? description}) =>
-      RendelSchema._({'type': 'boolean', if (description != null) 'description': description});
+  static RendelSchema boolean({String? description, String? title, Map<String, String>? titles}) =>
+      RendelSchema._({'type': 'boolean', if (description != null) 'description': description, ..._titled(title, titles)});
 
-  static RendelSchema enumOf(List<String> values, {String? description}) => RendelSchema._({
+  static RendelSchema enumOf(List<String> values, {String? description, String? title, Map<String, String>? titles}) =>
+      RendelSchema._({
         'type': 'string',
         'enum': values,
         if (description != null) 'description': description,
+        ..._titled(title, titles),
       });
+
+  /// The card's name for a parameter, only when given: a manifest without
+  /// them keeps the hash it had.
+  static Map<String, dynamic> _titled(String? title, Map<String, String>? titles) => {
+        if (title != null) 'title': title,
+        if (titles != null && titles.isNotEmpty) 'titles': titles,
+      };
 
   /// A list of [items], e.g. `RendelSchema.list(RendelSchema.string())`.
   ///
@@ -39,6 +50,8 @@ class RendelSchema {
     String? description,
     int? minItems,
     int? maxItems,
+    String? title,
+    Map<String, String>? titles,
   }) =>
       RendelSchema._({
         'type': 'array',
@@ -46,6 +59,7 @@ class RendelSchema {
         if (minItems != null) 'minItems': minItems,
         if (maxItems != null) 'maxItems': maxItems,
         if (description != null) 'description': description,
+        ..._titled(title, titles),
       });
 
   /// An escape hatch: any JSON Schema this builder does not model.

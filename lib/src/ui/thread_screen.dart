@@ -172,6 +172,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
       onRate: (block, score, {comment}) => widget.controller.rate(block, score, comment: comment),
       onEditCard: widget.controller.editCard,
       onContactOpen: widget.controller.contactOpened,
+      cardSource: widget.controller.currentTextFor,
       routeTitle: _routeTitle,
       // A form's upload field picks and uploads the way the composer does,
       // so a photo of the damage costs the host no second picker or path.
@@ -197,6 +198,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
       onRate: (block, score, {comment}) => widget.controller.rate(block, score, comment: comment),
       onEditCard: widget.controller.editCard,
       onContactOpen: widget.controller.contactOpened,
+      cardSource: widget.controller.currentTextFor,
       routeTitle: _routeTitle,
       onPickFile: widget.onPickAttachment,
       fileSources: widget.attachSources,
@@ -226,7 +228,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
   String? _routeTitle(String route) => widget.controller.routes[route]?.title;
 
   Future<String> _upload(RendelAttachment file) =>
-      widget.controller.api.upload(file.bytes, file.mediaType);
+      widget.controller.api.upload(file.bytes, file.mediaType, fileName: file.name);
 
   @override
   void dispose() {
@@ -276,7 +278,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
     });
     try {
       final id = await widget.controller.api
-          .upload(waiting.bytes, waiting.mediaType);
+          .upload(waiting.bytes, waiting.mediaType, fileName: waiting.name);
       if (!mounted) return;
       setState(() {
         final at = _attachments.indexOf(waiting);
