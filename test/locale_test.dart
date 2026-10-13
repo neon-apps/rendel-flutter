@@ -115,7 +115,7 @@ void main() {
   group('the SDK speaks the same language as the answer', () {
     test('a shipped language replaces the English defaults', () {
       expect(RendelStrings.forLocale('tr').confirm, 'Onayla');
-      expect(RendelStrings.forLocale('tr').goBack, 'Vazgeç');
+      expect(RendelStrings.forLocale('tr').goBack, 'Geri');
       expect(RendelStrings.forLocale('de').confirm, 'Bestätigen');
       expect(RendelStrings.forLocale('ar').confirm, 'تأكيد');
     });
@@ -166,8 +166,8 @@ void main() {
       final custom =
           RendelStrings.forLocale('tr').copyWith(confirm: 'Transferi onayla');
       expect(custom.confirm, 'Transferi onayla');
-      expect(custom.goBack, 'Vazgeç', reason: 'the rest is still Turkish');
-      expect(custom.irreversible, 'Bu geri alınamaz');
+      expect(custom.goBack, 'Geri', reason: 'the rest is still Turkish');
+      expect(custom.irreversible, 'Bu işlem geri alınamaz');
     });
 
     /// Null means "answer in the language you are answering in", and an

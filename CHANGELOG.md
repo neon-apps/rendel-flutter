@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.49.2
+
+**Changed**
+
+- Turkish strings: `helpful` is "Faydalı mı?" (it was empty, so the thumbs
+  stood alone), `goBack` is "Geri" (was "Vazgeç") and `irreversible` is
+  "Bu işlem geri alınamaz" (was "Bu geri alınamaz"). `confirm` stays
+  "Onayla".
+
 ## 0.49.1
 
 **Changed**

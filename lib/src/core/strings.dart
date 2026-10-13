@@ -856,8 +856,8 @@ const Map<String, RendelStrings> _byLocale = {
     emptyTitle: 'Bu uygulamayla ilgili ne isterseniz sorun.',
     emptyBody: 'Kendi cümlelerinizle sorun. Bir cümle yeterli.',
     confirm: 'Onayla',
-    goBack: 'Vazgeç',
-    irreversible: 'Bu geri alınamaz',
+    goBack: 'Geri',
+    irreversible: 'Bu işlem geri alınamaz',
     composerHint: 'Ne isterseniz sorun',
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
@@ -962,9 +962,7 @@ const Map<String, RendelStrings> _byLocale = {
     ratingStars: '5 üzerinden {n}',
     thumbsUp: 'İyi',
     thumbsDown: 'İyi değil',
-    // Not written yet: Turkish copy comes only from the Gemini loop. Empty
-    // draws the thumbs alone.
-    helpful: '',
+    helpful: 'Faydalı mı?',
     expand: 'Göster',
     collapse: 'Gizle',
     directions: 'Yol tarifi',
