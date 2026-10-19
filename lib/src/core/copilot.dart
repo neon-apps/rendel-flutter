@@ -200,8 +200,14 @@ class Rendel {
     _codeConfig = config;
     _config = config;
     if (theme != null) _theme = theme;
+    /* The host's family, under whatever the console publishes: a font fetched
+       at runtime is registered under a name only the app's own font object
+       can give (`RendelConfig.fontFamily`). Applied to the base so the first
+       frame is already in it, rather than the frame after the config fetch. */
+    _theme = _theme.withFont(config.fontFamily, display: config.displayFontFamily);
     _codeTheme = _theme;
-    _darkTheme = _codeDarkTheme = darkTheme ?? RendelTheme.darkFrom(_theme);
+    _darkTheme = _codeDarkTheme = (darkTheme ?? RendelTheme.darkFrom(_theme))
+        .withFont(config.fontFamily, display: config.displayFontFamily);
     _themeMode = config.themeMode;
     // The SDK's own storage unless the host brought one — see `batteries.dart`.
     _store = config.configStore ?? _defaultStore('nc_config');

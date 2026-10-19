@@ -5,6 +5,21 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.50.2
+
+**Added**
+
+- `RendelConfig.fontFamily` and `RendelConfig.displayFontFamily`: the family
+  Rendel is set in, for an app whose font is fetched at runtime rather
+  than bundled. `google_fonts` registers each family as `Family_variant`
+  (`BaiJamjuree_regular`), so the plain name resolves to nothing and Flutter
+  falls back to the system face without saying so; your own font object knows
+  the registered name — `RendelConfig(fontFamily: GoogleFonts.baiJamjuree().fontFamily)`.
+  Only the typeface: colours and corners stay in the console, and a family
+  published there wins over this one.
+- `RendelTheme.withFont(family, display: …)`: the same theme in another
+  family, which is how the config's reaches the base theme.
+
 ## 0.50.1
 
 **Fixed**

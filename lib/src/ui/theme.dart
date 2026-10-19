@@ -1205,6 +1205,36 @@ class RendelTheme {
   @Deprecated('Use RendelTheme.deep(). Renamed in 0.32.0.')
   factory RendelTheme.neonDeep() => RendelTheme.deep();
 
+  /// The same theme in another family.
+  ///
+  /// The one part of a look a host knows better than the console. A font the
+  /// app bundles has the name it is bundled under, and the console can carry
+  /// it; a font `google_fonts` fetches is registered as `Family_variant`
+  /// (`BaiJamjuree_regular`), which only the app's own font object can give —
+  /// name it by hand and Flutter falls back to the system face without a
+  /// word. So `RendelConfig.fontFamily` comes through here, under whatever
+  /// the console publishes.
+  RendelTheme withFont(String? family, {String? display}) =>
+      family == null && display == null
+          ? this
+          : RendelTheme(
+              colors: colors,
+              radius: radius,
+              type: type,
+              space: space,
+              motion: motion,
+              size: size,
+              elevation: elevation,
+              style: style,
+              cards: cards,
+              parts: parts,
+              fontFamily: family ?? fontFamily,
+              displayFontFamily: display ?? displayFontFamily,
+              accentText: _accentText,
+              accentEdge: _accentEdge,
+              danger: _danger,
+            );
+
   /// A host maps four colours and the whole catalog follows. The surfaces
   /// that carry depth are derived from the ground, moving away from the ink
   /// for a raised surface and toward it for a well, so a brand that maps a

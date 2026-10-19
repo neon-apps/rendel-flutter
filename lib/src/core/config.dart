@@ -134,6 +134,8 @@ class RendelConfig {
     this.httpClient,
     this.userToken,
     this.themeMode = RendelThemeMode.system,
+    this.fontFamily,
+    this.displayFontFamily,
   });
 
   final String apiBaseUrl;
@@ -151,6 +153,31 @@ class RendelConfig {
   /// The two themes are `Rendel.init`'s `theme` and `darkTheme`, with
   /// whatever the console publishes for each layered over them.
   final RendelThemeMode themeMode;
+
+  /// The family the copilot is set in, where your app's font is fetched at
+  /// runtime rather than bundled.
+  ///
+  /// A font declared under `fonts:` in your pubspec has the name it is
+  /// declared under, and the console carries it like every other part of the
+  /// look. A font `google_fonts` fetches does not: that package registers
+  /// each family as `Family_variant` — `BaiJamjuree_regular` — and the plain
+  /// name resolves to nothing, so Flutter falls back to the system face
+  /// without saying so.
+  ///
+  /// Your own font object knows the registered name, so hand it over:
+  ///
+  /// ```dart
+  /// RendelConfig(fontFamily: GoogleFonts.baiJamjuree().fontFamily)
+  /// ```
+  ///
+  /// Only the typeface. Colours, corners and the rest stay in the console,
+  /// where changing them does not cost a release. Whatever the console
+  /// publishes for `fontFamily` wins over this, so a customer who sets one
+  /// there still gets it.
+  final String? fontFamily;
+
+  /// The same, for a second family used on headings alone.
+  final String? displayFontFamily;
 
   /// The signed-in person's token, from your own sign-in — what lets the
   /// copilot reach your API as them, with no API key.

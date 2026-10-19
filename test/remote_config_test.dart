@@ -14,6 +14,35 @@ RendelTheme _base() => RendelTheme.paper();
 RendelRemoteConfig? _parse(String source) => RendelRemoteConfig.tryParse(source);
 
 void main() {
+  // A font the app fetches at runtime is registered under a name only the
+  // app's own font object can give (`google_fonts`: `BaiJamjuree_regular`),
+  // so the host hands it over and the console's answer still wins where the
+  // console has one.
+  group('a family handed over in code', () {
+    test('is the one the theme is set in', () {
+      final theme = RendelTheme.paper().withFont('BaiJamjuree_regular');
+      expect(theme.fontFamily, 'BaiJamjuree_regular');
+      expect(theme.colors.surface, RendelTheme.paper().colors.surface);
+    });
+
+    test('gives way to the one the console publishes', () {
+      final base = RendelTheme.paper().withFont('BaiJamjuree_regular');
+      final theme = _parse('{"config":{"theme":{"fontFamily":"Inter"}}}')!.applyTo(base);
+      expect(theme.fontFamily, 'Inter');
+    });
+
+    test('stands where the console publishes none', () {
+      final base = RendelTheme.paper().withFont('BaiJamjuree_regular');
+      final theme = _parse('{"config":{"theme":{"radius":{"card":8}}}}')!.applyTo(base);
+      expect(theme.fontFamily, 'BaiJamjuree_regular');
+    });
+
+    test('changes nothing when it is not given', () {
+      final base = RendelTheme.paper();
+      expect(identical(base.withFont(null), base), isTrue);
+    });
+  });
+
   const code = RendelConfig(
     assistantName: 'Kicks Copilot',
     launcherLabel: 'Ask',
