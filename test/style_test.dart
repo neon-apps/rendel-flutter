@@ -113,14 +113,30 @@ void main() {
     testWidgets('photo puts the picture across the top', (tester) async {
       final theme = _styled({'product': 'photo'});
       await pump(tester, theme, 'product_cards', products);
-      // No image_url, so each card draws the placeholder at full height.
-      final placeholder = find.byIcon(Icons.image_not_supported_outlined).first;
-      final box = find.ancestor(of: placeholder, matching: find.byType(Container)).first;
+      // No image_url, so each card draws the empty plate at full height —
+      // the plate alone, not the torn icon, which is reserved for a picture
+      // that was there and failed.
+      final box = find.byKey(const ValueKey('image:none')).first;
+      expect(find.byIcon(Icons.image_not_supported_outlined), findsNothing);
       expect(tester.getSize(box).height, theme.size.cardPhotoHeight);
       expect(
         tester.getTopLeft(find.text('Aero Glide 2')).dy,
         greaterThan(tester.getBottomLeft(box).dy),
       );
+    });
+
+    testWidgets('a picture that fails keeps the torn icon', (tester) async {
+      // The other half of the rule above. In a widget test every network
+      // image fails, which is the case we want: the plate that HAD a picture
+      // says so, and the one that never had one stays quiet.
+      await pump(tester, _styled({'product': 'photo'}), 'product_cards', {
+        'items': [
+          {'title': 'Aero Glide 2', 'image_url': 'https://example.com/a.png', 'action': tap},
+        ],
+      });
+      await tester.pump();
+      expect(find.byKey(const ValueKey('image:broken')), findsOneWidget);
+      expect(find.byKey(const ValueKey('image:none')), findsNothing);
     });
   });
 

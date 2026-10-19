@@ -7841,6 +7841,9 @@ class _Thumbnail extends StatelessWidget {
     final still = MediaQuery.disableAnimationsOf(context);
 
     Widget placeholder({bool broken = true}) => Container(
+          // The plate keeps a handle whether or not it draws the torn icon:
+          // it is the only thing on screen when an image is absent.
+          key: ValueKey(broken ? 'image:broken' : 'image:none'),
           width: width,
           height: height,
           // Never an empty grey box: a pale wash from the accent's own hue.
@@ -7858,7 +7861,12 @@ class _Thumbnail extends StatelessWidget {
               : null,
         );
 
-    if (url == null) return placeholder();
+    // No picture to draw is not a broken picture. Both used to render the
+    // same torn-image icon, so a card whose image the server took off (an
+    // untrusted host: `url-guard.ts`) looked exactly like one whose photo
+    // failed to load, and neither the customer nor we could tell which from
+    // the screen. An absent image is the plate alone from here.
+    if (url == null) return placeholder(broken: false);
 
     // Decode at the size actually drawn, on whichever axis `cover` will be
     // driven by. A 2000px product shot decoded for a 40pt row is most of a

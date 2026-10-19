@@ -83,6 +83,13 @@ void main() {
     expect(told, 'paused');
     expect(c.errorText, isNull);
     expect(c.messages, isEmpty);
+    // Nothing on screen still thinks: the sheet is back to its empty state.
+    expect(c.busy, isFalse);
+    await tester.pumpWidget(MaterialApp(
+      home: RendelThemeScope(theme: RendelTheme.paper(), child: Scaffold(body: ThreadScreen(controller: c))),
+    ));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.textContaining('Thinking'), findsNothing);
   });
 
   testWidgets('says when one question is left, until the next is sent', (tester) async {

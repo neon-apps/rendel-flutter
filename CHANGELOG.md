@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.50.1
+
+**Fixed**
+
+- A card with no picture draws the empty plate alone. It used to draw the same
+  torn-image icon as a picture that failed to load, so an image the server had
+  taken off the block (an address outside the app's own action results and
+  allowed domains) was indistinguishable on screen from a broken one. The torn
+  icon now means the picture was there and did not arrive.
+
 ## 0.50.0
 
 **Added**
