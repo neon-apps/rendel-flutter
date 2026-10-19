@@ -5,6 +5,26 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.51.0
+
+**Changed**
+
+- Context providers and device reads run side by side, up to four at once,
+  instead of one after another. Each provider keeps its 300 ms budget and each
+  handler its own `timeout`; `app_state` keeps the providers' order and the
+  results keep the order the server asked in, each under its own invocation.
+  A turn that reads twice now waits for the slower read, not for both added up.
+  The server can put an app back to one at a time without a release
+  (`parallel_reads: false` on the app config); `RendelRemoteConfig.parallelReads`
+  says which is in force.
+
+**Fixed**
+
+- A handler that returns more than 16,384 characters of JSON is reported as a
+  failed action (`result was … bytes, over the 16384 byte limit`, logged as
+  `result_too_large`), as the web SDK does. The server refuses a turn carrying
+  a larger result, so one big list used to end the whole turn.
+
 ## 0.50.2
 
 **Added**

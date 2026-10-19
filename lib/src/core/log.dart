@@ -30,6 +30,9 @@ class RendelLogRecord {
   ///   example's placeholder, or the server does not know it
   /// * `handler_failed` — an action handler threw
   /// * `handler_timeout` — a handler passed its `timeout`
+  /// * `result_too_large` — a handler returned more than 16,384 characters
+  ///   of JSON, so the action is reported as failed (the web SDK logs the
+  ///   same code)
   /// * `context_provider_timeout` — a provider missed its 300 ms budget
   /// * `context_provider_failed` — a provider threw
   /// * `manifest_sync_failed` — the server rejected the manifest; the message

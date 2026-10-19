@@ -58,7 +58,13 @@ class RendelRemoteConfig {
     required this.copilot,
     required this.etag,
     this.themeDark = const {},
+    this.parallelReads = true,
   });
+
+  /// False while the server has parallel reads off (`parallel_reads: false`):
+  /// context providers and device reads then run one after another. Its
+  /// switch for the parallel path, kept in the cache so a 304 keeps it too.
+  final bool parallelReads;
 
   /// 'published' for a live key, 'draft' for a test key.
   final String channel;
@@ -96,6 +102,7 @@ class RendelRemoteConfig {
         // A cached envelope carries its own etag; a fresh one is handed the
         // header's.
         etag: etag ?? (map['_etag'] as String?),
+        parallelReads: map['parallel_reads'] != false,
       );
     } catch (_) {
       return null;
@@ -108,6 +115,7 @@ class RendelRemoteConfig {
         'channel': channel,
         'version': version,
         if (etag != null) '_etag': etag,
+        if (!parallelReads) 'parallel_reads': false,
         'config': {
           if (theme.isNotEmpty) 'theme': theme,
           if (themeDark.isNotEmpty) 'themeDark': themeDark,

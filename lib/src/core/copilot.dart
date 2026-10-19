@@ -102,6 +102,10 @@ class Rendel {
   static Timer? _recheck;
   static AppLifecycleListener? _lifecycle;
 
+  /// False while the app config says `parallel_reads: false`: the server's
+  /// switch for running context providers and device reads side by side.
+  static bool _parallelReads = true;
+
   /// Whether a new conversation can start now. False while the
   /// organization's usage is paused: the launcher is hidden, and an app with
   /// its own way in should hide it too, listening here.
@@ -473,6 +477,7 @@ class Rendel {
       onEvent: _events.add,
       onUnavailable: (reason) => _setAvailable(false, reason),
       user: () => _user,
+      parallelReads: () => _parallelReads,
     )..manifestHash = _currentManifestHash();
     _events.add(RendelEvent.opened);
     // One recogniser per presentation, for the built-in dictation; it listens
@@ -632,6 +637,7 @@ class Rendel {
     _themeMode = RendelThemeMode.system;
     _refusal = null;
     _appliedSignature = null;
+    _parallelReads = true;
     _config = const RendelConfig();
     _logoAssetId = null;
     _codeConfig = _config;
@@ -755,6 +761,9 @@ class Rendel {
   /// applied one, and audits the result the same way `init()` audits a
   /// hand-mapped theme.
   static void _apply(RendelRemoteConfig remote) {
+    // Before the empty check: an app that published no look can still be
+    // switched to one read at a time.
+    _parallelReads = remote.parallelReads;
     if (remote.isEmpty) return;
     // Compared by PAYLOAD, not by object identity. `copyWith` always
     // allocates, so an identity check never held and the launcher rebuilt on

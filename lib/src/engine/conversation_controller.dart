@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
@@ -153,7 +154,16 @@ class ConversationController extends ChangeNotifier {
     this.onUnavailable,
     this.user = _nobody,
     this.cardSources = const {},
+    this.parallelReads = _always,
   });
+
+  static bool _always() => true;
+
+  /// Whether context providers and device reads run side by side, up to four
+  /// at once, rather than one after another. On unless the app config says
+  /// `parallel_reads: false`: the server's switch, so a fault in the parallel
+  /// path is turned off without waiting for a release.
+  final bool Function() parallelReads;
 
   /// The text a full-text action replaces, per action (`Rendel.setCardSource`),
   /// for the card's "Changes".
@@ -228,6 +238,16 @@ class ConversationController extends ChangeNotifier {
   /// even built, so every millisecond here is a millisecond the user spends
   /// watching a composer that has already accepted their message.
   static const _contextProviderBudget = Duration(milliseconds: 300);
+
+  /// At most this many providers or reads at once: one app's handlers share
+  /// its network.
+  static const _parallel = 4;
+
+  /// The largest result the server accepts, as JSON characters
+  /// (`packages/protocol/src/chat.ts`). It refuses the whole turn over one
+  /// that is larger, so a handler that returns a big list ended the turn
+  /// rather than reporting a failed action the model can talk about.
+  static const _maxResultChars = 16384;
 
   final List<RendelMessage> messages = [];
 
@@ -1021,10 +1041,14 @@ class ConversationController extends ChangeNotifier {
     // form's values, and a tool result is the device answering, not the user.
     final openForms = asks ? _openForms() : const <Map<String, dynamic>>[];
 
-    final context = <String, dynamic>{};
-    for (final entry in contextProviders.entries) {
+    // Each provider keeps its own budget. Side by side, the turn waits for
+    // the slowest of them rather than for all of them added up, and the keys
+    // keep the providers' order whichever answers first.
+    final providers = contextProviders.entries.toList();
+    final answers = await _pooled<Map<String, dynamic>?>(providers.length, (i) async {
+      final entry = providers[i];
       try {
-        context[entry.key] = await entry.value().timeout(_contextProviderBudget);
+        return await entry.value().timeout(_contextProviderBudget);
       } catch (err) {
         // A slow provider never blocks the turn — but it used to disappear
         // entirely. `context_provider_timeout` was named in `RendelLogRecord`'s
@@ -1039,8 +1063,13 @@ class ConversationController extends ChangeNotifier {
               'this turn runs without it',
           error: err,
         );
+        return null;
       }
-    }
+    });
+    final context = <String, dynamic>{
+      for (var i = 0; i < providers.length; i++)
+        if (answers[i] != null) providers[i].key: answers[i],
+    };
 
     final body = {
       ...payload,
@@ -1423,33 +1452,54 @@ class ConversationController extends ChangeNotifier {
   Future<void> _runPendingReads(int generation) async {
     phase = RendelPhase.runningAction;
     _notify();
-    final results = <Map<String, dynamic>>[];
     // A snapshot: `reset()` clears `_pendingReads`, and clearing a map being
     // iterated across an await throws a ConcurrentModificationError out of
     // `_runPendingReads` — which is called outside `_run`'s try, so it escaped
     // `send()` entirely and landed as an unhandled zone error.
-    for (final pending in _pendingReads.values.toList()) {
-      if (generation != _generation) return;
-      final action = actions[pending.name];
+    //
+    // Side by side, up to four at once. Each result names its invocation, and
+    // the list keeps the order the server asked in.
+    final pending = _pendingReads.values.toList();
+    final results = await _pooled<Map<String, dynamic>?>(pending.length, (i) async {
+      final read = pending[i];
+      // Logged out while reads run: nothing more starts, and nothing is sent.
+      if (generation != _generation) return null;
+      final action = actions[read.name];
       if (action == null) {
-        results.add({
-          'invocation_id': pending.invocationId,
+        return {
+          'invocation_id': read.invocationId,
           'status': 'error',
           'error': 'action not registered on this device',
-        });
-        continue;
+        };
       }
-      final result = await _execute(action, pending.params, invocationId: pending.invocationId);
-      results.add({
-        'invocation_id': pending.invocationId,
+      final result = await _execute(action, read.params, invocationId: read.invocationId);
+      return {
+        'invocation_id': read.invocationId,
         'status': result.ok ? 'success' : 'error',
         if (result.ok) 'data': result.data,
         if (!result.ok) 'error': result.error,
-      });
-    }
+      };
+    });
     if (generation != _generation) return;
     _pendingReads.clear();
     await _run({'tool_results': results}, generation);
+  }
+
+  /// `run(0)` to `run(count - 1)`, up to four at a time, or one at a time
+  /// while the server has parallel reads off; each result stays at its index.
+  Future<List<T>> _pooled<T>(int count, Future<T> Function(int i) run) async {
+    final results = List<T?>.filled(count, null);
+    final width = parallelReads() ? _parallel : 1;
+    var next = 0;
+    Future<void> worker() async {
+      while (next < count) {
+        final i = next++;
+        results[i] = await run(i);
+      }
+    }
+
+    await Future.wait([for (var w = 0; w < min(width, count); w++) worker()]);
+    return results.cast<T>();
   }
 
   Future<RendelResult> _execute(
@@ -1470,7 +1520,7 @@ class ConversationController extends ChangeNotifier {
           ))
           .timeout(action.timeout);
       onEvent?.call(RendelEvent.actionExecuted);
-      return outcome;
+      return _capped(action, outcome);
     } on TimeoutException {
       // Logged as well as returned. A handler that quietly exceeds its budget
       // is one of the failures a developer cannot see from the device: the
@@ -1486,6 +1536,28 @@ class ConversationController extends ChangeNotifier {
           error: err, stackTrace: stack);
       return RendelResult.fail(err.toString());
     }
+  }
+
+  /// [outcome], or a failure in its place when its data is larger than the
+  /// server accepts, worded as the web SDK words it. The result would also
+  /// ride in the next thirty turns' history if it were let through.
+  RendelResult _capped(RendelAction action, RendelResult outcome) {
+    final data = outcome.data;
+    if (!outcome.ok || data == null) return outcome;
+    final int length;
+    try {
+      length = jsonEncode(data).length;
+    } catch (_) {
+      // Not JSON at all: left to fail where it always has.
+      return outcome;
+    }
+    if (length <= _maxResultChars) return outcome;
+    RendelLog.warn(
+      'result_too_large',
+      '"${action.name}" returned $length bytes; the limit is $_maxResultChars. '
+          'Return only the fields Rendel needs.',
+    );
+    return RendelResult.fail('result was $length bytes, over the $_maxResultChars byte limit');
   }
 
   WireBlock? _cardFor(String invocationId) {
