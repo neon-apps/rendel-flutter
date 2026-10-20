@@ -21,7 +21,6 @@ import 'renderer/blocks.dart'
         RendelPage,
         RendelPhoto,
         RendelPressable,
-        RendelOverline,
         RendelPulse,
         RendelSwap,
         balancedWidth,
@@ -481,9 +480,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
       // sheet's corner has to cut them.
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        // A page sits on the raised ground, as a sheet of paper does — or on
-        // the host's own gradient, where its screens are painted with one.
-        color: theme.colors.surfaceRaised,
+        // A page sits on the app's own background (`surface`), as the
+        // console's phone draws it — or on the host's own gradient, where its
+        // screens are painted with one. Cards stay raised on it.
+        color: theme.colors.surface,
         gradient: theme.backdrop?.gradient,
         // The sheet's own corner is the largest radius in the system: it is
         // the boundary between the host's app and the copilot, and a 14pt
@@ -509,7 +509,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                   Positioned.fill(
                     child: _Wash(
                       on: _asked != null,
-                      ground: theme.colors.surfaceRaised,
+                      ground: theme.colors.surface,
                       backdrop: theme.backdrop,
                     ),
                   ),
@@ -904,7 +904,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
   /// What floats over a page: the fades into its ground at both ends, the
   /// header with back and forward, and the question while it is asked.
   List<Widget> _pageChrome(RendelTheme theme, ConversationController controller) {
-    final ground = theme.colors.surfaceRaised;
+    final ground = theme.colors.surface;
     final asking = _asked != null;
     final still = MediaQuery.disableAnimationsOf(context);
     // Back and forward wait for the turn: the page it is drawing is the one
@@ -1447,7 +1447,18 @@ class _Header extends StatelessWidget {
             ),
             SizedBox(width: theme.space.sm),
           ],
-          Expanded(child: fresh ? const SizedBox.shrink() : RendelOverline(title, maxLines: 1)),
+          // The name in the heading style, as the console's phone and the web
+          // SDK's header set it.
+          Expanded(
+            child: fresh
+                ? const SizedBox.shrink()
+                : Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.text.heading,
+                  ),
+          ),
           if (onReset != null)
             RendelPressable(
               semanticLabel: RendelStringsScope.of(context).newConversation,

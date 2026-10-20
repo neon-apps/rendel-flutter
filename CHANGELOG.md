@@ -5,6 +5,20 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.52.1
+
+**Changed**
+
+- The page's plain ground is `surface` (the console's Background), not
+  `surfaceRaised`: the console's Appearance phone draws it so, and the phone
+  now matches it. Cards stay on `surfaceRaised`. A published backdrop still
+  wins.
+- The assistant's name in the header is `theme.text.heading`, as the
+  console's phone and the web SDK set it, instead of an overline.
+
+An SVG logo now reaches the header too: the API serves it as a PNG, since
+`Image.network` draws no SVG. No change needed.
+
 ## 0.52.0
 
 **Added**
