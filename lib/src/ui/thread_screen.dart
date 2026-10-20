@@ -481,8 +481,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
       // sheet's corner has to cut them.
       clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
-        // A page sits on the raised ground, as a sheet of paper does.
+        // A page sits on the raised ground, as a sheet of paper does — or on
+        // the host's own gradient, where its screens are painted with one.
         color: theme.colors.surfaceRaised,
+        gradient: theme.backdrop?.gradient,
         // The sheet's own corner is the largest radius in the system: it is
         // the boundary between the host's app and the copilot, and a 14pt
         // corner on a full-height sheet reads as a rendering accident.
@@ -508,6 +510,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                     child: _Wash(
                       on: _asked != null,
                       ground: theme.colors.surfaceRaised,
+                      backdrop: theme.backdrop,
                     ),
                   ),
                   Positioned.fill(child: _body(theme, controller)),
@@ -910,6 +913,24 @@ class _ThreadScreenState extends State<ThreadScreen> {
     return [
       // The page fades under the header and above the composer, so neither
       // sits on a line of text. Hidden while the page is dissolved.
+      if (theme.backdrop case final backdrop?)
+        Positioned.fill(
+          child: IgnorePointer(
+            child: AnimatedOpacity(
+              opacity: asking ? 0 : 1,
+              duration: still ? Duration.zero : theme.motion.settle,
+              child: ValueListenableBuilder<double>(
+                valueListenable: _head,
+                builder: (context, head, _) => _BackdropFades(
+                  backdrop: backdrop,
+                  top: _topFade(head),
+                  solid: head - theme.space.md,
+                ),
+              ),
+            ),
+          ),
+        ),
+      if (theme.backdrop == null)
       Positioned(
         top: 0,
         left: 0,
@@ -934,6 +955,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
           ),
         ),
       ),
+      if (theme.backdrop == null)
       Positioned(
         bottom: 0,
         left: 0,
@@ -1492,6 +1514,12 @@ class _PageSteps extends StatelessWidget {
     final theme = RendelThemeScope.of(context);
     final strings = RendelStringsScope.of(context);
     final rtl = Directionality.of(context) == TextDirection.rtl;
+    // In the family the host's own navigation uses.
+    final (back, forward) = switch (theme.style.arrows) {
+      RendelArrowStyle.chevron => (Icons.chevron_left_rounded, Icons.chevron_right_rounded),
+      RendelArrowStyle.arrow => (Icons.arrow_back_rounded, Icons.arrow_forward_rounded),
+      RendelArrowStyle.ios => (Icons.arrow_back_ios_new_rounded, Icons.arrow_forward_ios_rounded),
+    };
     final shape = BorderRadius.circular(theme.radius.control);
     // No drop shadow, for the reason `_Glass` gives: under a translucent
     // fill Flutter paints it through the glass as a smudge.
@@ -1511,12 +1539,12 @@ class _PageSteps extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 _PageStep(
-                  icon: rtl ? Icons.chevron_right_rounded : Icons.chevron_left_rounded,
+                  icon: rtl ? forward : back,
                   label: strings.previousPage,
                   onTap: onBack,
                 ),
                 _PageStep(
-                  icon: rtl ? Icons.chevron_left_rounded : Icons.chevron_right_rounded,
+                  icon: rtl ? back : forward,
                   label: strings.nextPage,
                   onTap: onForward,
                 ),
@@ -3509,6 +3537,52 @@ class _Dissolve extends StatelessWidget {
   }
 }
 
+/// [_Fade] for a page on the host's gradient: the backdrop itself, drawn
+/// over the whole page and let through only where the two fades are, so the
+/// band under the header and above the composer is the gradient at that very
+/// place rather than one colour laid across it.
+class _BackdropFades extends StatelessWidget {
+  const _BackdropFades({required this.backdrop, required this.top, required this.solid});
+
+  final RendelBackdrop backdrop;
+
+  /// The top fade's height, and how far down it is solid.
+  final double top;
+  final double solid;
+
+  /// The bottom fade's, solid from 55% down as [_Fade] is.
+  static const _bottom = 128.0;
+
+  @override
+  Widget build(BuildContext context) {
+    const shown = Color(0xFF000000);
+    const hidden = Color(0x00000000);
+    return ShaderMask(
+      blendMode: BlendMode.dstIn,
+      shaderCallback: (rect) {
+        final height = rect.height;
+        var last = 0.0;
+        // Rising, however short the page: a stop below the last is the last.
+        double at(double y) => last = math.max(last, (y / height).clamp(0.0, 1.0));
+        return LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: const [shown, shown, hidden, hidden, shown, shown],
+          stops: [
+            at(0),
+            at(solid),
+            at(top),
+            at(height - _bottom),
+            at(height - _bottom * 0.45),
+            at(height),
+          ],
+        ).createShader(rect);
+      },
+      child: DecoratedBox(decoration: BoxDecoration(gradient: backdrop.gradient)),
+    );
+  }
+}
+
 /// A page's ground fading in over its edge: solid for the first [solid] of
 /// it at the top, from 55% down at the bottom.
 class _Fade extends StatelessWidget {
@@ -3536,12 +3610,15 @@ class _Fade extends StatelessWidget {
 
 /// The ambient wash behind a question: three soft lights, yellow, lavender
 /// and peach, over the page's ground, drifting slowly while it shows. On a
-/// deep ground the same hues at 18%.
+/// deep ground the same hues at 18%. Over a [backdrop], the lights are its
+/// own colours leaning toward the accent, so the wash is the host's palette
+/// and not ours.
 class _Wash extends StatefulWidget {
-  const _Wash({required this.on, required this.ground});
+  const _Wash({required this.on, required this.ground, this.backdrop});
 
   final bool on;
   final Color ground;
+  final RendelBackdrop? backdrop;
 
   @override
   State<_Wash> createState() => _WashState();
@@ -3597,6 +3674,8 @@ class _WashState extends State<_Wash> with SingleTickerProviderStateMixin {
           builder: (context, _) => CustomPaint(
             painter: _WashPainter(
               ground: widget.ground,
+              backdrop: widget.backdrop,
+              accent: theme.colors.accent,
               deep: deep,
               at: Curves.easeInOut.transform(_drift.value),
             ),
@@ -3608,9 +3687,17 @@ class _WashState extends State<_Wash> with SingleTickerProviderStateMixin {
 }
 
 class _WashPainter extends CustomPainter {
-  _WashPainter({required this.ground, required this.deep, required this.at});
+  _WashPainter({
+    required this.ground,
+    required this.backdrop,
+    required this.accent,
+    required this.deep,
+    required this.at,
+  });
 
   final Color ground;
+  final RendelBackdrop? backdrop;
+  final Color accent;
   final bool deep;
 
   /// Where the drift is, 0 to 1.
@@ -3619,7 +3706,13 @@ class _WashPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     canvas.clipRect(Offset.zero & size);
-    canvas.drawRect(Offset.zero & size, Paint()..color = ground);
+    final backdrop = this.backdrop;
+    canvas.drawRect(
+      Offset.zero & size,
+      backdrop == null
+          ? (Paint()..color = ground)
+          : (Paint()..shader = backdrop.gradient.createShader(Offset.zero & size)),
+    );
     // The lights are laid out on a field 160% of the screen that slides
     // across it, as a CSS background of that size moving from 0% to 100%.
     final field = size * 1.6;
@@ -3646,14 +3739,24 @@ class _WashPainter extends CustomPainter {
     }
 
     // Bottom layer first: the first light the brief names is the one on top.
-    light(0.25, 0.88, 0.70, 0.50, const Color(0xFFFAD0C0), 0.85);
-    light(0.90, 0.50, 0.65, 0.50, const Color(0xFFD0C8F6), 0.90);
-    light(0.15, 0.25, 0.70, 0.45, const Color(0xFFFEF7AF), 0.95);
+    final hues = backdrop == null
+        ? const [Color(0xFFFAD0C0), Color(0xFFD0C8F6), Color(0xFFFEF7AF)]
+        : [
+            for (var i = 0; i < 3; i++)
+              Color.lerp(backdrop.colors[(i + 1) % backdrop.colors.length], accent, 0.3)!,
+          ];
+    light(0.25, 0.88, 0.70, 0.50, hues[0], 0.85);
+    light(0.90, 0.50, 0.65, 0.50, hues[1], 0.90);
+    light(0.15, 0.25, 0.70, 0.45, hues[2], 0.95);
   }
 
   @override
   bool shouldRepaint(_WashPainter old) =>
-      old.at != at || old.ground != ground || old.deep != deep;
+      old.at != at ||
+      old.ground != ground ||
+      old.backdrop != backdrop ||
+      old.accent != accent ||
+      old.deep != deep;
 }
 
 // ——— a card opened over its page (`design/DETAIL.md`) ———

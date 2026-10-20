@@ -251,6 +251,7 @@ class RendelRemoteConfig {
     ..._colourKeys,
     'bubble',
     'onBubble',
+    'backdrop',
     'cards',
     'logoAssetId',
   };
@@ -407,7 +408,55 @@ class RendelRemoteConfig {
     final fontFamily = _font(theme['fontFamily']) ?? base.fontFamily;
     final displayFontFamily =
         _font(theme['displayFontFamily']) ?? base.displayFontFamily;
+    RendelTheme build(RendelBackdrop? backdrop) => _built(
+          base,
+          surface: surface,
+          onSurface: onSurface,
+          accent: accent,
+          onAccent: onAccent,
+          touchesColour: touchesColour,
+          radius: radius,
+          type: type,
+          style: style,
+          cards: cards,
+          fontFamily: fontFamily,
+          displayFontFamily: displayFontFamily,
+          backdrop: backdrop,
+        );
+    if (!theme.containsKey('backdrop')) return build(base.backdrop);
+    final backdrop = _backdrop(theme['backdrop']);
+    if (backdrop != null) {
+      final built = build(backdrop);
+      // The ink is solved on the backdrop's colours along with the plates, so
+      // this holds for every backdrop that has a solution at all; the one
+      // that does not is dropped, and only it — the rest of the theme stands.
+      if (_readsOn(built, backdrop.colors)) return built;
+    }
+    if (kDebugMode) {
+      debugPrint(
+        '[rendel] the published backdrop is not a gradient the page can be '
+        'read on; drawing the plain ground.',
+      );
+    }
+    return build(null);
+  }
 
+  /// [_build]'s theme before its backdrop is weighed.
+  RendelTheme _built(
+    RendelTheme base, {
+    required Color surface,
+    required Color onSurface,
+    required Color accent,
+    required Color onAccent,
+    required bool touchesColour,
+    required RendelRadiusScale radius,
+    required RendelTypeScale type,
+    required RendelStyle style,
+    required Map<String, RendelCardLook> cards,
+    required String? fontFamily,
+    required String? displayFontFamily,
+    required RendelBackdrop? backdrop,
+  }) {
     if (!touchesColour) {
       // The accent roles come across too.
       //
@@ -435,6 +484,7 @@ class RendelRemoteConfig {
         cards: cards,
         fontFamily: fontFamily,
         displayFontFamily: displayFontFamily,
+        backdrop: backdrop,
         accentText: base.accentText,
         accentEdge: base.accentEdge,
       );
@@ -463,8 +513,69 @@ class RendelRemoteConfig {
       cards: cards,
       fontFamily: fontFamily,
       displayFontFamily: displayFontFamily,
+      backdrop: backdrop,
     );
   }
+
+  /// Whether the page's ink, its two quiet steps and the accent's words clear
+  /// 4.5:1 on every colour of a backdrop, as [_isLegible] holds them on every
+  /// surface.
+  static bool _readsOn(RendelTheme theme, List<Color> grounds) {
+    for (final ground in grounds) {
+      for (final ink in [
+        theme.colors.onSurface,
+        theme.colors.onSurfaceSoft,
+        theme.colors.onSurfaceFaint,
+        theme.accentText,
+      ]) {
+        if (contrastRatio(ink, ground) < 4.5) return false;
+      }
+    }
+    return true;
+  }
+
+  /// `theme.backdrop`: two to four opaque colours, a direction from the
+  /// closed set, and stops that rise from 0 to 1, one per colour. Anything
+  /// else is no backdrop at all rather than half of one.
+  static RendelBackdrop? _backdrop(Object? value) {
+    final map = _submap(value);
+    final raw = map['colors'];
+    if (raw is! List || raw.length < 2 || raw.length > 4) return null;
+    final colors = <Color>[];
+    for (final entry in raw) {
+      final color = _color(entry);
+      if (color == null) return null;
+      colors.add(color);
+    }
+    final direction = map['direction'] ?? 'to-bottom';
+    final ends = _directions[direction];
+    if (ends == null) return null;
+    List<double>? stops;
+    final rawStops = map['stops'];
+    if (rawStops != null) {
+      if (rawStops is! List || rawStops.length != colors.length) return null;
+      stops = [];
+      for (final entry in rawStops) {
+        final stop = _size(entry, 0, 1);
+        if (stop == null || (stops.isNotEmpty && stop < stops.last)) return null;
+        stops.add(stop);
+      }
+    }
+    return RendelBackdrop(colors: colors, begin: ends.$1, end: ends.$2, stops: stops);
+  }
+
+  /// Where each named direction starts and ends: CSS's `to bottom right` is
+  /// Flutter's top-left to bottom-right.
+  static const _directions = {
+    'to-bottom': (Alignment.topCenter, Alignment.bottomCenter),
+    'to-top': (Alignment.bottomCenter, Alignment.topCenter),
+    'to-right': (Alignment.centerLeft, Alignment.centerRight),
+    'to-left': (Alignment.centerRight, Alignment.centerLeft),
+    'to-bottom-right': (Alignment.topLeft, Alignment.bottomRight),
+    'to-bottom-left': (Alignment.topRight, Alignment.bottomLeft),
+    'to-top-right': (Alignment.bottomLeft, Alignment.topRight),
+    'to-top-left': (Alignment.bottomRight, Alignment.topLeft),
+  };
 
   /// The host's `RendelConfig` with the published opening surface layered over it.
   RendelConfig applyToConfig(RendelConfig base) {
@@ -593,6 +704,7 @@ class RendelRemoteConfig {
       button: _choice(RendelButtonStyle.values, map['button']) ?? base.button,
       product: _choice(RendelProductStyle.values, map['product']) ?? base.product,
       tracker: _choice(RendelTrackerStyle.values, map['tracker']) ?? base.tracker,
+      arrows: _choice(RendelArrowStyle.values, map['arrows']) ?? base.arrows,
     );
   }
 }

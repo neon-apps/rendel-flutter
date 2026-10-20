@@ -497,6 +497,19 @@ enum RendelTrackerStyle {
   bar,
 }
 
+/// The glyph on the page's back and forward steps, in the family the host's
+/// own navigation uses.
+enum RendelArrowStyle {
+  /// A chevron: ‹ ›.
+  chevron,
+
+  /// An arrow with a shaft: ← →.
+  arrow,
+
+  /// The thin iOS back chevron.
+  ios,
+}
+
 /// How the parts are built, not only what colour they are: `theme.style` on
 /// the wire. Each is a closed set. Since 0.31 a card is flat unless a style
 /// asks otherwise: flat and filled are the one look (v6, design/BLOCKS-v6.md);
@@ -507,12 +520,39 @@ class RendelStyle {
     this.button = RendelButtonStyle.filled,
     this.product = RendelProductStyle.tile,
     this.tracker = RendelTrackerStyle.vertical,
+    this.arrows = RendelArrowStyle.chevron,
   });
 
   final RendelCardStyle card;
   final RendelButtonStyle button;
   final RendelProductStyle product;
   final RendelTrackerStyle tracker;
+  final RendelArrowStyle arrows;
+}
+
+/// The page's ground as the host's own screens paint theirs: a gradient of
+/// two to four opaque colours, where a single colour would leave every app
+/// on a plain white sheet. `theme.backdrop` on the wire.
+///
+/// A colour, so it belongs to one brightness: a light theme's backdrop is
+/// never carried to the dark one.
+class RendelBackdrop {
+  const RendelBackdrop({
+    required this.colors,
+    this.begin = Alignment.topCenter,
+    this.end = Alignment.bottomCenter,
+    this.stops,
+  });
+
+  final List<Color> colors;
+  final Alignment begin;
+  final Alignment end;
+
+  /// One per colour, 0 to 1, rising. Null spreads them evenly.
+  final List<double>? stops;
+
+  LinearGradient get gradient =>
+      LinearGradient(begin: begin, end: end, colors: colors, stops: stops);
 }
 
 /// One kind of card set apart from the rest: `theme.cards` in the console.
@@ -749,6 +789,7 @@ class RendelTheme {
     this.parts = const {},
     this.fontFamily,
     this.displayFontFamily,
+    this.backdrop,
     Color? accentText,
     Color? accentEdge,
     Color? danger,
@@ -771,6 +812,10 @@ class RendelTheme {
   final RendelSizeScale size;
   final RendelElevationScale elevation;
   final RendelStyle style;
+
+  /// The page's ground, where the host paints its screens with a gradient.
+  /// Null is the plain [RendelColors.surfaceRaised] it has always been.
+  final RendelBackdrop? backdrop;
 
   /// Kinds of card set apart from the rest, by catalog type
   /// (`product_cards`, `info_card`, …). See [forCard].
@@ -816,9 +861,16 @@ class RendelTheme {
       elevation: elevation,
       style: look.style == null
           ? style
-          : RendelStyle(card: look.style!, button: style.button, product: style.product, tracker: style.tracker),
+          : RendelStyle(
+              card: look.style!,
+              button: style.button,
+              product: style.product,
+              tracker: style.tracker,
+              arrows: style.arrows,
+            ),
       fontFamily: fontFamily,
       displayFontFamily: displayFontFamily,
+      backdrop: backdrop,
       // A literal accent pair stays; a derived one is derived again against
       // this card's plate, so an outlined button's word still reads on it.
       parts: look.parts,
@@ -1108,6 +1160,8 @@ class RendelTheme {
           colors.surfaceRaised,
           colors.surfaceSunk,
           colors.surfaceHigh,
+          // The page's words sit on every colour of its backdrop too.
+          ...?backdrop?.colors,
         ],
         minimum,
       );
@@ -1230,6 +1284,7 @@ class RendelTheme {
               parts: parts,
               fontFamily: family ?? fontFamily,
               displayFontFamily: display ?? displayFontFamily,
+              backdrop: backdrop,
               accentText: _accentText,
               accentEdge: _accentEdge,
               danger: _danger,
@@ -1263,6 +1318,7 @@ class RendelTheme {
     Map<String, RendelCardLook> cards = const {},
     String? fontFamily,
     String? displayFontFamily,
+    RendelBackdrop? backdrop,
   }) {
     Color blend(Color a, Color b, double t) => Color.lerp(a, b, t)!;
     const white = Color(0xFFFFFFFF);
@@ -1285,7 +1341,9 @@ class RendelTheme {
     final raised = surfaceRaised ?? blend(surface, white, light ? 0.42 : 0.05);
     final sunk = surfaceSunk ?? blend(surface, black, light ? 0.055 : 0.3);
     final high = surfaceHigh ?? blend(surface, white, light ? 0.68 : 0.09);
-    final grounds = [surface, raised, sunk, high];
+    // A backdrop's colours are grounds the page's words are read on, so the
+    // ink and its quiet steps are solved on them as on the plates.
+    final grounds = [surface, raised, sunk, high, ...?backdrop?.colors];
 
     // A label on a filled control is small text, so it is held to 4.5:1. A
     // host that maps white onto a mid-value brand orange gets 3.3:1, and the
@@ -1403,6 +1461,7 @@ class RendelTheme {
       cards: cards,
       fontFamily: fontFamily,
       displayFontFamily: displayFontFamily,
+      backdrop: backdrop,
     );
   }
 

@@ -5,6 +5,24 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.52.0
+
+**Added**
+
+- `RendelBackdrop` and `RendelTheme.backdrop`: the page's ground as the app's
+  own gradient (two to four colours, a direction, optional stops), published
+  from the console as `theme.backdrop` and drawn under the thread, its fades
+  and the wash a question is asked over, whose lights take the gradient's
+  colours. The ink, its quiet steps and the accent's words are solved on the
+  backdrop's colours as on the surfaces; a published backdrop no ink can be
+  read on is dropped and the page keeps its plain ground. A light theme's
+  backdrop is never used in the dark one.
+- `RendelArrowStyle` and `RendelStyle.arrows`: the page's back and forward
+  steps as chevrons (default), arrows or the iOS chevron, published as
+  `theme.style.arrows`.
+
+No change needed: without either, everything draws as before.
+
 ## 0.51.0
 
 **Changed**
