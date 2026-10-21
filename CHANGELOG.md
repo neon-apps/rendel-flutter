@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.54.0
+
+**Added**
+
+- `info_card` draws the picture of the product or item it is about
+  (`image_url`) in the icon's place: "Added to your cart" now shows which
+  product. The server keeps only a picture one of the app's own actions
+  returned. No change needed.
+
 ## 0.53.0
 
 **Added**

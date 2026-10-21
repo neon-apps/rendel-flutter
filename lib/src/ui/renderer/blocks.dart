@@ -649,14 +649,23 @@ Widget buildInfoCard(BuildContext context, WireBlock block, RendelDispatcher dis
   // a lit button over three quiet ones is two answers to one question.
   final actions = _maps(block.props['actions']).take(3).toList();
   final avatar = _str(block.props['avatar_url']);
+  final picture = _str(block.props['image_url']);
   final file = _str(block.props['file_type']);
-  // A person is their picture, round; a document its type. Either takes the
-  // icon's place.
+  // A person is their picture, round; a product its photograph, whole; a
+  // document its type. Each takes the icon's place.
   final Widget? lead = avatar != null
       ? _Thumbnail(url: avatar, width: 44, height: 44, radius: 22)
-      : file != null && _fileTypes.contains(file)
-          ? _FileBadge(type: file, size: 34)
-          : null;
+      : picture != null
+          ? _Thumbnail(
+              url: picture,
+              width: theme.size.cardRowImage,
+              height: theme.size.cardRowImage,
+              radius: theme.radius.sm,
+              fit: BoxFit.contain,
+            )
+          : file != null && _fileTypes.contains(file)
+              ? _FileBadge(type: file, size: 34)
+              : null;
   return _Plate(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -637,6 +637,26 @@ void main() {
       expect(find.text('Track'), findsNothing, reason: 'actions replace the CTA');
     });
 
+    testWidgets('a product is its picture, in the icon\'s place', (tester) async {
+      await pump(tester, [
+        _wire('info_card', {
+          'icon': 'check',
+          'title': 'Added to your cart',
+          'image_url': 'https://example.com/whey.jpg',
+        }),
+      ]);
+      expect(
+        find.byWidgetPredicate((w) {
+          if (w is! Image) return false;
+          final provider = w.image;
+          final inner = provider is ResizeImage ? provider.imageProvider : provider;
+          return inner is NetworkImage && inner.url == 'https://example.com/whey.jpg';
+        }),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.check_circle_outlined), findsNothing, reason: 'the picture is the icon');
+    });
+
     testWidgets('a document is its type, and its CTA stays without actions', (tester) async {
       await pump(tester, [_statement]);
       expect(find.text('PDF'), findsOneWidget);
