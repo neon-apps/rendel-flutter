@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.53.0
+
+**Added**
+
+- A confirmation card shows the picture of the product it acts on, beside its
+  question, when the server sends one (`image_url` on `confirm_card`): "Add to
+  cart?" now shows which product. The server sends only a picture one of the
+  app's own actions returned. No change needed.
+
 ## 0.52.1
 
 **Changed**

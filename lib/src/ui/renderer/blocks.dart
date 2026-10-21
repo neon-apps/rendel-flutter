@@ -1929,10 +1929,32 @@ Widget _confirmCard(
               color: theme.danger, part: 'warning'),
           SizedBox(height: theme.space.sm),
         ],
-        Text(
-          _str(block.props['summary']) ?? block.fallbackText,
-          style: theme.part('summary', theme.text.prose),
-        ),
+        // The product it acts on, beside the question, when a result gave its
+        // picture: a person adding a whey to the cart should see which one.
+        if (_str(block.props['image_url']) case final picture?)
+          Row(
+            children: [
+              _Thumbnail(
+                url: picture,
+                width: theme.size.cardRowImage,
+                height: theme.size.cardRowImage,
+                radius: theme.radius.sm,
+                fit: BoxFit.contain,
+              ),
+              SizedBox(width: theme.space.md),
+              Expanded(
+                child: Text(
+                  _str(block.props['summary']) ?? block.fallbackText,
+                  style: theme.part('summary', theme.text.prose),
+                ),
+              ),
+            ],
+          )
+        else
+          Text(
+            _str(block.props['summary']) ?? block.fallbackText,
+            style: theme.part('summary', theme.text.prose),
+          ),
         if (display.isNotEmpty || controls.isNotEmpty) ...[
           SizedBox(height: theme.space.md),
           _KvPanel(children: [
