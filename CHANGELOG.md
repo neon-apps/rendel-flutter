@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.56.0
+
+**Changed**
+
+- The soft lights behind a question are the app's own colours: its accent,
+  its composer where that has a hue of its own, and the accent's neighbours,
+  each lifted to a pastel. A black, white or grey brand keeps the yellow,
+  lavender and peach. Each question also lays the lights out afresh, so the
+  accent's light rises from a different place each time and drifts a way of
+  its own. No change needed.
+
 ## 0.55.0
 
 **Added**

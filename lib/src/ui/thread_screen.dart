@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, ValueListenable, defaultTargetPlatform;
+    show TargetPlatform, ValueListenable, defaultTargetPlatform, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -3698,11 +3698,14 @@ class _Fade extends StatelessWidget {
   }
 }
 
-/// The ambient wash behind a question: three soft lights, yellow, lavender
-/// and peach, over the page's ground, drifting slowly while it shows. On a
-/// deep ground the same hues at 18%. Over a [backdrop], the lights are its
-/// own colours leaning toward the accent, so the wash is the host's palette
-/// and not ours.
+/// The ambient wash behind a question: three soft lights in the app's own
+/// colours ([brandLights]; yellow, lavender and peach for a brand without a
+/// hue) over the page's ground, drifting slowly while it shows. On a deep
+/// ground the same hues at 18%. Over a [backdrop], the lights are its own
+/// colours leaning toward the accent, so the wash is the host's palette and
+/// not ours. Each question lays them out afresh: the accent's light rises
+/// from a different place than the last one did, and the drift runs a way of
+/// its own (Tuna 2026-10-22).
 class _Wash extends StatefulWidget {
   const _Wash({required this.on, required this.ground, this.backdrop});
 
@@ -3729,8 +3732,14 @@ class _WashState extends State<_Wash> with SingleTickerProviderStateMixin {
   @override
   void didUpdateWidget(_Wash oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (widget.on && !oldWidget.on) _layout = _layout.next(_dice);
     _sync();
   }
+
+  final _dice = math.Random();
+
+  /// Where each light sits, bottom layer first, and which way the drift runs.
+  _WashLayout _layout = _WashLayout.first;
 
   /// Drifting only while it shows, and never under reduced motion.
   void _sync() {
@@ -3766,6 +3775,8 @@ class _WashState extends State<_Wash> with SingleTickerProviderStateMixin {
               ground: widget.ground,
               backdrop: widget.backdrop,
               accent: theme.colors.accent,
+              lights: brandLights(theme.colors),
+              layout: _layout,
               deep: deep,
               at: Curves.easeInOut.transform(_drift.value),
             ),
@@ -3776,11 +3787,50 @@ class _WashState extends State<_Wash> with SingleTickerProviderStateMixin {
   }
 }
 
+/// Where a question's three lights sit and which way they drift. The spots
+/// are on the 160% field the lights slide across, the first of them where
+/// the yellow light always rose; mirrored in the web SDK's `panel.ts`.
+class _WashLayout {
+  const _WashLayout(this.spots, this.flipX, this.flipY);
+
+  final List<Offset> spots;
+  final bool flipX;
+  final bool flipY;
+
+  static const _all = [
+    Offset(0.15, 0.25),
+    Offset(0.50, 0.12),
+    Offset(0.85, 0.20),
+    Offset(0.90, 0.50),
+    Offset(0.80, 0.85),
+    Offset(0.50, 0.90),
+    Offset(0.25, 0.88),
+    Offset(0.10, 0.55),
+  ];
+
+  /// The layout every build drew before this one, until a question rolls one.
+  static const first =
+      _WashLayout([Offset(0.25, 0.88), Offset(0.90, 0.50), Offset(0.15, 0.25)], false, false);
+
+  /// Three spots apart, the accent's (the last) never where it just was.
+  _WashLayout next(math.Random dice) {
+    final spots = [..._all]..shuffle(dice);
+    if (spots.first == this.spots.last) spots.add(spots.removeAt(0));
+    return _WashLayout(
+      [spots[2], spots[1], spots[0]],
+      dice.nextBool(),
+      dice.nextBool(),
+    );
+  }
+}
+
 class _WashPainter extends CustomPainter {
   _WashPainter({
     required this.ground,
     required this.backdrop,
     required this.accent,
+    required this.lights,
+    required this.layout,
     required this.deep,
     required this.at,
   });
@@ -3788,6 +3838,10 @@ class _WashPainter extends CustomPainter {
   final Color ground;
   final RendelBackdrop? backdrop;
   final Color accent;
+
+  /// The app's own lights, bottom layer first; null keeps the pastels.
+  final List<Color>? lights;
+  final _WashLayout layout;
   final bool deep;
 
   /// Where the drift is, 0 to 1.
@@ -3807,8 +3861,8 @@ class _WashPainter extends CustomPainter {
     // across it, as a CSS background of that size moving from 0% to 100%.
     final field = size * 1.6;
     final origin = Offset(
-      -(field.width - size.width) * at,
-      -(field.height - size.height) * at,
+      -(field.width - size.width) * (layout.flipX ? 1 - at : at),
+      -(field.height - size.height) * (layout.flipY ? 1 - at : at),
     );
     void light(double x, double y, double rx, double ry, Color color, double alpha) {
       final tone = color.withValues(alpha: deep ? 0.18 : alpha);
@@ -3830,14 +3884,15 @@ class _WashPainter extends CustomPainter {
 
     // Bottom layer first: the first light the brief names is the one on top.
     final hues = backdrop == null
-        ? const [Color(0xFFFAD0C0), Color(0xFFD0C8F6), Color(0xFFFEF7AF)]
+        ? lights ?? const [Color(0xFFFAD0C0), Color(0xFFD0C8F6), Color(0xFFFEF7AF)]
         : [
             for (var i = 0; i < 3; i++)
               Color.lerp(backdrop.colors[(i + 1) % backdrop.colors.length], accent, 0.3)!,
           ];
-    light(0.25, 0.88, 0.70, 0.50, hues[0], 0.85);
-    light(0.90, 0.50, 0.65, 0.50, hues[1], 0.90);
-    light(0.15, 0.25, 0.70, 0.45, hues[2], 0.95);
+    final spots = layout.spots;
+    light(spots[0].dx, spots[0].dy, 0.70, 0.50, hues[0], 0.85);
+    light(spots[1].dx, spots[1].dy, 0.65, 0.50, hues[1], 0.90);
+    light(spots[2].dx, spots[2].dy, 0.70, 0.45, hues[2], 0.95);
   }
 
   @override
@@ -3846,6 +3901,8 @@ class _WashPainter extends CustomPainter {
       old.ground != ground ||
       old.backdrop != backdrop ||
       old.accent != accent ||
+      !listEquals(old.lights, lights) ||
+      old.layout != layout ||
       old.deep != deep;
 }
 

@@ -1768,6 +1768,43 @@ Color voiceGlow(Color surface, Color ink) {
   return surface;
 }
 
+/// The three soft lights behind a question, in the app's own colours.
+/// Mirrors `brandLights` in the web SDK's `config.ts`.
+///
+/// The accent leads; the composer joins it where the brand gave it a hue of
+/// its own, and the accent's hue turned 40° either way stands in for the
+/// lights it does not fill. Each is lifted to a pastel so it glows rather than
+/// paints. Null where none of them has a hue — a black, white or grey brand —
+/// and the wash keeps its own yellow, lavender and peach. Bottom layer first:
+/// the last is the accent (Tuna 2026-10-22, Protein Ocean).
+List<Color>? brandLights(RendelColors colors) {
+  final hues = <HSLColor>[];
+  for (final color in [
+    colors.accent,
+    if (colors.composerIsMapped) colors.composer,
+  ]) {
+    final hsl = HSLColor.fromColor(color);
+    if (hsl.saturation < 0.25 || hsl.lightness < 0.05 || hsl.lightness > 0.95) {
+      continue;
+    }
+    // A composer in the accent's own blue is not a second colour.
+    final apart = hues.every((h) {
+      final gap = (h.hue - hsl.hue).abs() % 360;
+      return math.min(gap, 360 - gap) >= 20;
+    });
+    if (apart) hues.add(hsl);
+  }
+  if (hues.isEmpty) return null;
+  final main = hues.first;
+  HSLColor nth(int i, double turn) =>
+      i < hues.length ? hues[i] : main.withHue((main.hue + turn) % 360);
+  Color pastel(HSLColor hsl) => hsl
+      .withSaturation(hsl.saturation.clamp(0.55, 0.85))
+      .withLightness(0.80)
+      .toColor();
+  return [pastel(nth(2, -40)), pastel(nth(1, 40)), pastel(main)];
+}
+
 Color _flatten(Color foreground, Color background) {
   if (foreground.a >= 1) return foreground;
   return Color.lerp(background, foreground.withValues(alpha: 1), foreground.a)!;
