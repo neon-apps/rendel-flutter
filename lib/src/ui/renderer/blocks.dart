@@ -5801,6 +5801,7 @@ class _Field extends StatelessWidget {
                     style: numeric ? valueStyle.tabular : valueStyle,
                     onChanged: onChanged,
                     decoration: InputDecoration(
+                      filled: false,
                       isDense: true,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,
@@ -6188,6 +6189,7 @@ class _OptionListState extends State<_OptionList> {
                 },
                 style: textStyle,
                 decoration: InputDecoration(
+                  filled: false,
                   isDense: true,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
@@ -10236,6 +10238,7 @@ class _ChoiceWrite extends StatelessWidget {
                   style: style,
                   cursorColor: theme.colors.onSurface,
                   decoration: InputDecoration(
+                    filled: false,
                     isDense: true,
                     border: InputBorder.none,
                     enabledBorder: InputBorder.none,
@@ -11312,6 +11315,7 @@ class _RatingState extends State<_Rating> {
                     style: fieldStyle,
                     cursorColor: theme.colors.onSurface,
                     decoration: InputDecoration(
+                      filled: false,
                       isDense: true,
                       border: InputBorder.none,
                       enabledBorder: InputBorder.none,

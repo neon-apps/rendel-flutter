@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.56.2
+
+**Fixed**
+
+- The message box no longer takes the host app's filled text fields. An app
+  whose theme sets `inputDecorationTheme` with `filled: true` saw its fill
+  colour as a white plate inside the glass composer; the box's field, and the
+  borderless fields on cards, now ask for no fill whatever the theme says.
+  No change needed.
+
 ## 0.56.1
 
 **Fixed**

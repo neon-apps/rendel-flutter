@@ -2444,6 +2444,9 @@ class _ComposerState extends State<_Composer> {
                       enabledBorder: InputBorder.none,
                       focusedBorder: InputBorder.none,
                       disabledBorder: InputBorder.none,
+                      // A host theme with filled fields painted its fill
+                      // here, a white plate inside the glass.
+                      filled: false,
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(
                         vertical: theme.space.sm,

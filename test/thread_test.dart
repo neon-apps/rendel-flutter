@@ -819,6 +819,38 @@ void main() {
     expect(last, rest);
   });
 
+  testWidgets("the message box ignores a host theme's filled fields",
+      (tester) async {
+    // Protein Ocean and Cilt365 both ask for filled fields in their theme:
+    // inherited, it was a white plate inside the glass.
+    final c = controller();
+    addTearDown(c.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(
+          inputDecorationTheme: const InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+          ),
+        ),
+        home: RendelThemeScope(
+          theme: RendelTheme.paper(),
+          child: Scaffold(body: ThreadScreen(controller: c, onDictate: (_) async => null)),
+        ),
+      ),
+    );
+    await tester.tap(find.bySemanticsLabel('Type a message'));
+    await tester.pumpAndSettle();
+    final decorator = tester.widget<InputDecorator>(
+      find.descendant(of: find.byType(TextField), matching: find.byType(InputDecorator)),
+    );
+    final theme = Theme.of(tester.element(find.byType(TextField)));
+    expect(
+      decorator.decoration.applyDefaults(theme.inputDecorationTheme).filled,
+      isFalse,
+    );
+  });
+
   group('the attachment remove control', () {
     testWidgets('is a small circle on a full-size target', (tester) async {
       final c = ConversationController(
