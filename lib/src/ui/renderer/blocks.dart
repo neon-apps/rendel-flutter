@@ -2576,6 +2576,11 @@ Widget buildOrderTracker(BuildContext context, WireBlock block, RendelDispatcher
   final hasPill = pill != null && pill.isNotEmpty;
   final arrives = _arrival(context, block.props);
   final reference = _map(block.props['reference']);
+  // What the order holds, as a row of photographs between its head and its steps.
+  final pictures = [
+    for (final url in (block.props['images'] is List ? block.props['images'] as List : const []).take(4))
+      if (_str(url) case final picture?) picture,
+  ];
 
   return _Plate(
     child: Column(
@@ -2610,6 +2615,23 @@ Widget buildOrderTracker(BuildContext context, WireBlock block, RendelDispatcher
               ],
             ),
             style: theme.text.labelTabular.copyWith(fontWeight: FontWeight.w500),
+          ),
+          SizedBox(height: theme.space.md),
+        ],
+        if (pictures.isNotEmpty) ...[
+          Row(
+            children: [
+              for (var i = 0; i < pictures.length; i++) ...[
+                if (i > 0) SizedBox(width: theme.space.sm),
+                _Thumbnail(
+                  url: pictures[i],
+                  width: theme.size.cardRowImage,
+                  height: theme.size.cardRowImage,
+                  radius: theme.radius.sm,
+                  fit: BoxFit.contain,
+                ),
+              ],
+            ],
           ),
           SizedBox(height: theme.space.md),
         ],
@@ -3178,18 +3200,21 @@ Widget buildReceipt(BuildContext context, WireBlock block, RendelDispatcher disp
           SizedBox(height: theme.space.md),
         ],
         for (final line in lines)
-          if (_str(line['note']) != null || _str(line['delta']) != null)
-            _ReceiptLine(
-              label: _str(line['label']) ?? '',
-              amount: _str(line['amount']) ?? '',
-              note: _str(line['note']),
-              delta: _str(line['delta']),
-            )
-          else
-            _KeyValueRow(
-              label: _str(line['label']) ?? '',
-              value: _str(line['amount']) ?? '',
-            ),
+          _withPicture(
+            context,
+            _str(line['image_url']),
+            _str(line['note']) != null || _str(line['delta']) != null
+                ? _ReceiptLine(
+                    label: _str(line['label']) ?? '',
+                    amount: _str(line['amount']) ?? '',
+                    note: _str(line['note']),
+                    delta: _str(line['delta']),
+                  )
+                : _KeyValueRow(
+                    label: _str(line['label']) ?? '',
+                    value: _str(line['amount']) ?? '',
+                  ),
+          ),
         if (subtotal != null || tax != null) ...[
           const _Rule(strong: false),
           if (subtotal != null)
@@ -3202,6 +3227,19 @@ Widget buildReceipt(BuildContext context, WireBlock block, RendelDispatcher disp
         ],
       ],
     ),
+  );
+}
+
+/// [line] with the product's photograph before it, when it has one.
+Widget _withPicture(BuildContext context, String? picture, Widget line) {
+  if (picture == null) return line;
+  final theme = RendelThemeScope.of(context);
+  return Row(
+    children: [
+      _Thumbnail(url: picture, width: 40, height: 40, radius: theme.radius.sm, fit: BoxFit.contain),
+      SizedBox(width: theme.space.sm),
+      Expanded(child: line),
+    ],
   );
 }
 
@@ -9450,12 +9488,35 @@ Widget buildKeyValue(BuildContext context, WireBlock block, RendelDispatcher dis
   final rows = _maps(block.props['rows']);
   if (rows.isEmpty) return _EmptyPlate(message: block.fallbackText);
   final cta = _map(block.props['cta']);
+  // The one product the rows describe: its photograph, whole, beside the title.
+  final picture = _str(block.props['image_url']);
+  final title = _str(block.props['title']);
 
   return _Plate(
     child: Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _BlockTitle(block.props['title']),
+        if (picture != null)
+          Padding(
+            padding: EdgeInsets.only(bottom: theme.space.md),
+            child: Row(
+              children: [
+                _Thumbnail(
+                  url: picture,
+                  width: theme.size.cardRowImage,
+                  height: theme.size.cardRowImage,
+                  radius: theme.radius.sm,
+                  fit: BoxFit.contain,
+                ),
+                if (title != null && title.isNotEmpty) ...[
+                  SizedBox(width: theme.space.md),
+                  Expanded(child: Text(title, style: theme.text.title)),
+                ],
+              ],
+            ),
+          )
+        else
+          _BlockTitle(title),
         for (final row in rows)
           // On a page, rows across hairlines (`design/DETAIL.md`).
           if (RendelPage.maybeOf(context)?.flat ?? false)

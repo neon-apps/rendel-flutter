@@ -741,6 +741,62 @@ void main() {
     }
   });
 
+  group('a product shows its picture', () {
+    Finder picture(String url) => find.byWidgetPredicate((w) {
+          if (w is! Image) return false;
+          final provider = w.image;
+          final inner = provider is ResizeImage ? provider.imageProvider : provider;
+          return inner is NetworkImage && inner.url == url;
+        });
+
+    testWidgets('key_value: beside the title of the rows about it', (tester) async {
+      await pump(tester, [
+        _wire('key_value', {
+          'title': 'Omega 3',
+          'image_url': 'https://example.com/omega.webp',
+          'rows': [
+            {'label': 'Marka', 'value': 'FLAVA'},
+          ],
+        }),
+      ]);
+      expect(picture('https://example.com/omega.webp'), findsOneWidget);
+      expect(find.text('Omega 3'), findsOneWidget);
+      expect(find.text('FLAVA'), findsOneWidget);
+    });
+
+    testWidgets('receipt: before each product line that has one', (tester) async {
+      await pump(tester, [
+        _wire('receipt', {
+          'lines': [
+            {'label': 'Whey Protein 400g', 'amount': '1.299 TL', 'image_url': 'https://example.com/whey.webp'},
+            {'label': 'Kargo', 'amount': '0 TL'},
+          ],
+          'total': '1.299 TL',
+        }),
+      ]);
+      expect(picture('https://example.com/whey.webp'), findsOneWidget);
+      expect(find.text('Whey Protein 400g'), findsOneWidget);
+      expect(find.text('Kargo'), findsOneWidget);
+    });
+
+    testWidgets('order_tracker: what the order holds, four at most', (tester) async {
+      await pump(tester, [
+        _wire('order_tracker', {
+          'title': 'Siparişin',
+          'images': [for (var i = 1; i <= 5; i++) 'https://example.com/p$i.webp'],
+          'steps': [
+            {'label': 'Hazırlanıyor', 'status': 'current'},
+            {'label': 'Teslim edildi', 'status': 'pending'},
+          ],
+        }),
+      ]);
+      for (var i = 1; i <= 4; i++) {
+        expect(picture('https://example.com/p$i.webp'), findsOneWidget);
+      }
+      expect(picture('https://example.com/p5.webp'), findsNothing);
+    });
+  });
+
   group('the fixtures', () {
     // The gallery's are held in example/test/gallery_test.dart.
     test('parse against the protocol schema', () {

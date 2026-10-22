@@ -101,7 +101,7 @@ enum RendelThemeMode {
 /// [RendelRemoteConfig] for what may be overridden and what never can.
 class RendelConfig {
   const RendelConfig({
-    // Since 0.32.0. The old host, neon-copilot-api.vercel.app, is the same
+    // Since 0.33.0. The old host, neon-copilot-api.vercel.app, is the same
     // deployment and keeps answering for builds that shipped with it.
     this.apiBaseUrl = 'https://api.rendel.ai',
     this.requestTimeout = const Duration(seconds: 30),
