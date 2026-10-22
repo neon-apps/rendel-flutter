@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.56.1
+
+**Fixed**
+
+- The composer follows the keyboard without a stutter. Its distance from the
+  bottom is one sum that moves with the keyboard, so a keyboard on its way
+  down no longer takes the composer below its rest above the home bar and
+  springs it back up. The page is no longer built again on every frame the
+  keyboard moves (only its padding follows), and the composer's blur no
+  longer reaches down behind the keyboard. No change needed.
+
 ## 0.56.0
 
 **Changed**

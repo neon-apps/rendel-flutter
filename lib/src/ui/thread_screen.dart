@@ -531,7 +531,9 @@ class _ThreadScreenState extends State<ThreadScreen> {
                       backdrop: theme.backdrop,
                     ),
                   ),
-                  Positioned.fill(child: _body(theme, controller)),
+                  // A page draws its own opening screen, which only dissolves
+                  // when the first question is asked.
+                  Positioned.fill(child: _pageBody(theme, controller)),
                   ..._pageChrome(theme, controller),
                   // A card opened over the page, under the composer.
                   if (_detail != null)
@@ -685,15 +687,6 @@ class _ThreadScreenState extends State<ThreadScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _body(RendelTheme theme, ConversationController controller) {
-    return ValueListenableBuilder<double>(
-      valueListenable: _dock,
-      // A page draws its own opening screen, which only dissolves when the
-      // first question is asked.
-      builder: (context, dock, _) => _pageBody(theme, controller, dock),
     );
   }
 
@@ -1058,11 +1051,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
   /// solid behind the controls and clear a little under them, which is this.
   static double _topFade(double head) => head + 16;
 
-  Widget _pageBody(
-    RendelTheme theme,
-    ConversationController controller,
-    double dock,
-  ) {
+  Widget _pageBody(RendelTheme theme, ConversationController controller) {
     final pages = controller.pages;
     final at = controller.page;
     final shown = at >= 0 && at < pages.length ? pages[at] : null;
@@ -1070,30 +1059,40 @@ class _ThreadScreenState extends State<ThreadScreen> {
       valueListenable: _head,
       builder: (context, head, _) => _Dissolve(
         on: _asked != null,
-        // The opening screen keeps what it has always had; only the dissolve
-        // is new to it.
-        child: shown == null
-            ? Padding(
-                padding: EdgeInsets.only(top: head, bottom: dock),
-                child: _EmptyState(
+        /* The dock's height changes on every frame a keyboard moves, and only
+           the padding follows it. The page is built once, outside: built
+           inside, every block on it was built again on each of those frames,
+           and the keyboard stuttered on its way up and down. */
+        child: ValueListenableBuilder<double>(
+          valueListenable: _dock,
+          // The opening screen keeps what it has always had; only the
+          // dissolve is new to it.
+          child: shown == null
+              ? _EmptyState(
                   headline: widget.headline,
                   subtitle: widget.subtitle,
                   suggestions: widget.suggestions,
                   onPick: _send,
+                )
+              : _page(controller, [shown], bar: head),
+          builder: (context, dock, page) => shown == null
+              ? Padding(
+                  padding: EdgeInsets.only(top: head, bottom: dock),
+                  child: page,
+                )
+              // Its own list per page, so a new page, and one stepped back
+              // to, opens at the top.
+              : ListView(
+                  key: ObjectKey(shown),
+                  padding: EdgeInsets.fromLTRB(
+                    _pageInset,
+                    head + 8,
+                    _pageInset,
+                    dock + 40,
+                  ),
+                  children: [page!],
                 ),
-              )
-            // Its own list per page, so a new page, and one stepped back to,
-            // opens at the top.
-            : ListView(
-                key: ObjectKey(shown),
-                padding: EdgeInsets.fromLTRB(
-                  _pageInset,
-                  head + 8,
-                  _pageInset,
-                  dock + 40,
-                ),
-                children: [_page(controller, [shown], bar: head)],
-              ),
+        ),
       ),
     );
   }
@@ -1938,12 +1937,21 @@ class _Dock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
+    /* One sum that moves with the keyboard frame by frame. It was the
+       keyboard plus 8 while there was one and the home bar's 34 after: a
+       keyboard on its way down passed under 26 and the composer sank below
+       its rest, then sprang back up once the keyboard was gone.
+       `viewPadding` is the home bar whether a keyboard is up or not;
+       `padding` is zero under one. */
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
-    final bottom = keyboard > 0
-        ? keyboard + theme.space.sm
-        : math.max(MediaQuery.paddingOf(context).bottom, 12.0);
+    final rest = math.max(MediaQuery.viewPaddingOf(context).bottom, 12.0);
+    final lift = math.max(0.0, keyboard + theme.space.sm - rest);
     final ground = theme.colors.surface;
-    return ClipRect(
+    // The keyboard's part is outside the blur: blurring a band the keyboard
+    // covers, a keyboard tall, cost frames on every step of its animation.
+    return Padding(
+      padding: EdgeInsets.only(bottom: lift),
+      child: ClipRect(
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
         child: DecoratedBox(
@@ -1959,7 +1967,7 @@ class _Dock extends StatelessWidget {
             ),
           ),
           child: Padding(
-            padding: EdgeInsets.only(bottom: bottom),
+            padding: EdgeInsets.only(bottom: rest),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1967,6 +1975,7 @@ class _Dock extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

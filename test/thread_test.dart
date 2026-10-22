@@ -770,6 +770,55 @@ void main() {
     );
   });
 
+  /// A keyboard on its way down, a frame at a time, over a home bar.
+  ///
+  /// Before 0.56.1 the box rode the keyboard down past its own rest — 8 over
+  /// a keyboard 10 tall is under a 34pt home bar — and sprang back up once
+  /// the keyboard was gone.
+  testWidgets('the box never sinks below its rest as the keyboard goes',
+      (tester) async {
+    final c = controller();
+    addTearDown(c.dispose);
+    addTearDown(tester.view.reset);
+    tester.view.physicalSize = const Size(1206, 2622);
+    tester.view.devicePixelRatio = 3;
+    tester.view.padding = const FakeViewPadding(bottom: 34 * 3);
+    tester.view.viewPadding = const FakeViewPadding(bottom: 34 * 3);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: RendelThemeScope(
+          theme: RendelTheme.paper(),
+          child: Material(
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: ThreadScreen(
+                controller: c,
+                onDictate: (_) async => null,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.bySemanticsLabel('Type a message'));
+    await tester.pumpAndSettle();
+    final rest = tester.getBottomLeft(find.byType(TextField)).dy;
+
+    var last = 0.0;
+    for (final keyboard in [336.0, 200, 80, 30, 20, 10, 4, 0]) {
+      tester.view.viewInsets = FakeViewPadding(bottom: keyboard * 3);
+      // Under a keyboard the system reports no padding; the home bar stays
+      // in viewPadding.
+      tester.view.padding = FakeViewPadding(bottom: keyboard > 0 ? 0 : 34 * 3);
+      await tester.pump();
+      final at = tester.getBottomLeft(find.byType(TextField)).dy;
+      expect(at, lessThanOrEqualTo(rest), reason: 'keyboard $keyboard');
+      expect(at, greaterThanOrEqualTo(last), reason: 'keyboard $keyboard');
+      last = at;
+    }
+    expect(last, rest);
+  });
+
   group('the attachment remove control', () {
     testWidgets('is a small circle on a full-size target', (tester) async {
       final c = ConversationController(
