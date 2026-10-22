@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.54.1
+
+**Fixed**
+
+- Voice mode's glow follows the theme. It was near-white on every ground, so
+  on a dark theme the words being heard all but vanished; it is now the
+  ground lifted a little, and the words read on it at 4.5:1 at least.
+- A spoken question is written once. The words heard go the moment it is
+  sent, in the place the question is then written, and the pill takes the
+  microphone's place without a fade. No change needed.
+
 ## 0.54.0
 
 **Added**

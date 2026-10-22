@@ -1749,6 +1749,25 @@ double contrastRatio(Color foreground, Color background) {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
+/// The light voice mode rises behind the words it hears. Mirrors `voiceGlow`
+/// in `derive.ts`.
+///
+/// The surface, lifted toward white by its own lightness (the cube root of its
+/// luminance): a light ground glows near-white, as it always did, and a dark
+/// one only a little. Then eased back toward the surface until the ink reads on
+/// it at 4.5:1. It was 88% white on every ground, and white words on a dark
+/// theme vanished into it (Tuna 2026-10-21, Corvo).
+Color voiceGlow(Color surface, Color ink) {
+  const white = Color(0xFFFFFFFF);
+  for (var lift = math.pow(_relativeLuminance(surface), 1 / 3).toDouble();
+      lift > 0;
+      lift -= 0.04) {
+    final glow = Color.lerp(surface, white, lift)!;
+    if (contrastRatio(ink, glow) >= 4.5 + _floorMargin) return glow;
+  }
+  return surface;
+}
+
 Color _flatten(Color foreground, Color background) {
   if (foreground.a >= 1) return foreground;
   return Color.lerp(background, foreground.withValues(alpha: 1), foreground.a)!;

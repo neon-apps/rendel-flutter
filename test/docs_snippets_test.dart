@@ -59,11 +59,12 @@ Future<void> installMain() async {
     // Your app's key: Rendel console → Settings → API keys → Copy.
     // Start on the test key; swap in the live key for release builds.
     appKey: 'rd_pk_test_…',
-    // The languages Rendel answers in. Put yours here:
-    //   ['tr']        Turkish only, whatever the user writes in
-    //   ['tr', 'en']  Turkish or English, whichever the user writes;
-    //                 anything else is answered in the first, Turkish
-    //   ['en']        English only
+    // The language Rendel answers in when a message does not say which
+    // (a "hi", a tap). Someone writing in another language is answered in
+    // theirs. Put yours here:
+    //   ['tr']        Turkish
+    //   ['tr', 'en']  Turkish or English, by the phone's language;
+    //                 any other phone gets the first, Turkish
     // Leave out config and it answers in whatever the user writes.
     config: RendelConfig(
       languages: ['tr'],

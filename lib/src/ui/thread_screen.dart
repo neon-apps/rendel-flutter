@@ -235,6 +235,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
     _input.dispose();
     _dock.dispose();
     _head.dispose();
+    _voiceSent.dispose();
     super.dispose();
   }
 
@@ -314,6 +315,17 @@ class _ThreadScreenState extends State<ThreadScreen> {
   String _heard = '';
   bool _voiceCancelled = false;
 
+  /// Set the moment a spoken question is sent: voice mode's words and pill go
+  /// at once, in the frame the question is written in the words' place, while
+  /// its wash and glow fade under it. A listenable, so the voice mode that is
+  /// fading out (the one the switcher kept) hears it.
+  final _voiceSent = ValueNotifier<bool>(false);
+
+  /// For the frame a spoken question is sent in: the composer, hidden under
+  /// voice mode, comes back with its pill already in the microphone's place
+  /// rather than fading in over a fading microphone.
+  bool _dockAtOnce = false;
+
   Future<void> _dictate() async {
     // Second press ends it, where the host gave us something to end it with.
     if (_dictating) {
@@ -328,6 +340,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
       if (started!.value && mounted && !_voiceCancelled) setState(() => _voice = true);
     }
 
+    _voiceSent.value = false;
     setState(() {
       _dictating = true;
       _attachError = null;
@@ -362,9 +375,14 @@ class _ThreadScreenState extends State<ThreadScreen> {
       // Already written out live as it was heard, so it is not revealed
       // again word by word.
       _spoken = true;
+      _voiceSent.value = true;
       _send(words);
       _spoken = false;
-      setState(() => _voice = false);
+      setState(() {
+        _voice = false;
+        _dockAtOnce = true;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) => _dockAtOnce = false);
     } on RendelDictationDenied {
       if (!mounted) return;
       // Refused, not broken: say where the switch is (Grove report P1-9).
@@ -528,6 +546,35 @@ class _ThreadScreenState extends State<ThreadScreen> {
                         body: _page(controller, _detail!.answers, detail: true),
                       ),
                     ),
+                  // Voice mode, under the composer and the question: while it
+                  // listens the composer is hidden and there is no question, and
+                  // once a spoken one is sent its wash fades under both.
+                  Positioned.fill(
+                    child: AnimatedSwitcher(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : theme.motion.settle,
+                      // There from its first frame for a screen reader,
+                      // whatever it looks like while it fades in.
+                      transitionBuilder: (child, animation) => FadeTransition(
+                        opacity: animation,
+                        alwaysIncludeSemantics: true,
+                        child: child,
+                      ),
+                      child: !_voice
+                          ? const SizedBox.shrink()
+                          : _VoiceMode(
+                              key: const ValueKey('voice'),
+                              heard: _heard,
+                              dock: _dock,
+                              sent: _voiceSent,
+                              level: widget.dictationLevel,
+                              voiceIcon: widget.voiceIcon,
+                              onStop: widget.onStopDictating,
+                              onCancel: _cancelVoice,
+                            ),
+                    ),
+                  ),
                   /* The composer floats over the page rather than under it.
 
                      The page runs to the bottom edge and scrolls behind the
@@ -547,7 +594,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                       excluding: _voice,
                       child: AnimatedOpacity(
                         opacity: _voice ? 0 : 1,
-                        duration: theme.motion.swap,
+                        duration: _dockAtOnce ? Duration.zero : theme.motion.swap,
                         // There for a screen reader from the frame voice mode
                         // closes; whether it is at all is the exclusion's
                         // business above.
@@ -602,6 +649,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
                             input: _input,
                             busy: controller.busy,
                             status: _status(controller),
+                            atOnce: _dockAtOnce,
                             primary: _primary(controller),
                             onSend: _send,
                             hint: widget.composerHint,
@@ -627,30 +675,10 @@ class _ThreadScreenState extends State<ThreadScreen> {
                       ),
                     ),
                   ),
-                  Positioned.fill(
-                    child: AnimatedSwitcher(
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : theme.motion.settle,
-                      // There from its first frame for a screen reader,
-                      // whatever it looks like while it fades in.
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        alwaysIncludeSemantics: true,
-                        child: child,
-                      ),
-                      child: !_voice
-                          ? const SizedBox.shrink()
-                          : _VoiceMode(
-                              key: const ValueKey('voice'),
-                              heard: _heard,
-                              level: widget.dictationLevel,
-                              voiceIcon: widget.voiceIcon,
-                              onStop: widget.onStopDictating,
-                              onCancel: _cancelVoice,
-                            ),
-                    ),
-                  ),
+                  // The question, written over the screen until the answer
+                  // starts: over voice mode as it fades, so it is crisp from its
+                  // first frame, in the place the words were heard in.
+                  _askedLayer(theme),
                 ],
               ),
             ),
@@ -989,31 +1017,38 @@ class _ThreadScreenState extends State<ThreadScreen> {
           ),
         ),
       ),
-      // The question, written over the screen until the answer starts.
-      Positioned.fill(
-        child: IgnorePointer(
-          child: ValueListenableBuilder<double>(
-            valueListenable: _dock,
-            builder: (context, dock, _) => AnimatedSwitcher(
-              duration: still ? Duration.zero : theme.motion.settle,
-              layoutBuilder: (current, previous) => Stack(
-                children: [...previous, if (current != null) current],
-              ),
-              child: _asked == null
-                  ? const SizedBox.shrink()
-                  : Align(
-                      key: ObjectKey(_question),
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(24, 0, 24, dock + 40),
-                        child: _Asked(text: _asked!, whole: _askedWhole),
-                      ),
-                    ),
+    ];
+  }
+
+  /// The question, written over the screen until the answer starts.
+  Widget _askedLayer(RendelTheme theme) {
+    final still = MediaQuery.disableAnimationsOf(context);
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ValueListenableBuilder<double>(
+          valueListenable: _dock,
+          builder: (context, dock, _) => AnimatedSwitcher(
+            // A spoken question is there at once, in the words' place; it
+            // still fades when its answer starts.
+            duration: still || _askedWhole ? Duration.zero : theme.motion.settle,
+            reverseDuration: still ? Duration.zero : theme.motion.settle,
+            layoutBuilder: (current, previous) => Stack(
+              children: [...previous, if (current != null) current],
             ),
+            child: _asked == null
+                ? const SizedBox.shrink()
+                : Align(
+                    key: ObjectKey(_question),
+                    alignment: Alignment.bottomCenter,
+                    child: Padding(
+                      padding: _askedPadding(dock),
+                      child: _Asked(text: _asked!, whole: _askedWhole),
+                    ),
+                  ),
           ),
         ),
       ),
-    ];
+    );
   }
 
   /// How far the fade under the header reaches: just past the header.
@@ -1992,6 +2027,7 @@ class _Composer extends StatefulWidget {
     required this.input,
     required this.busy,
     this.status,
+    this.atOnce = false,
     this.primary,
     required this.onSend,
     required this.hint,
@@ -2012,6 +2048,10 @@ class _Composer extends StatefulWidget {
   /// What an answer page's turn is doing, said by the pill drawn in the
   /// microphone's place. Null leaves the composer as it always was.
   final String? status;
+
+  /// The pill takes the microphone's place without a fade: the composer was
+  /// hidden under voice mode, and a fade would show both.
+  final bool atOnce;
 
   /// The first action of a card opened over its page, lit beside the
   /// microphone (`design/DETAIL.md`), or the page's first screen of the app
@@ -2162,7 +2202,8 @@ class _ComposerState extends State<_Composer> {
             // place says what the turn is doing.
             Flexible(
               child: AnimatedSwitcher(
-                duration: still ? Duration.zero : theme.motion.settle,
+                duration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
+                reverseDuration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
                 // Said from its first frame, however faint it still is.
                 transitionBuilder: (child, animation) => FadeTransition(
                   opacity: animation,
@@ -2681,6 +2722,8 @@ class _VoiceMode extends StatefulWidget {
   const _VoiceMode({
     super.key,
     required this.heard,
+    required this.dock,
+    required this.sent,
     required this.level,
     required this.voiceIcon,
     required this.onStop,
@@ -2688,6 +2731,13 @@ class _VoiceMode extends StatefulWidget {
   });
 
   final String heard;
+
+  /// The composer's height, which the question's place is measured from.
+  final ValueListenable<double> dock;
+
+  /// True once the question is sent: the words and the pill are gone, and
+  /// only the wash and the glow are left to fade.
+  final ValueListenable<bool> sent;
   final ValueListenable<double>? level;
   final RendelVoiceIcon voiceIcon;
 
@@ -2729,10 +2779,15 @@ class _VoiceModeState extends State<_VoiceMode>
     final theme = RendelThemeScope.of(context);
     final strings = RendelStringsScope.of(context);
     final colors = theme.colors;
-    final glow = Color.lerp(colors.surface, Colors.white, 0.88)!;
+    final glow = voiceGlow(colors.surface, colors.onSurface);
     final lavender = Color.lerp(colors.accent, const Color(0xFF7D8CF2), 0.55)!;
 
-    return LayoutBuilder(
+    // Once sent, nothing here takes a tap: the page under it is back.
+    return ValueListenableBuilder<bool>(
+      valueListenable: widget.sent,
+      builder: (context, sent, _) => IgnorePointer(
+        ignoring: sent,
+        child: LayoutBuilder(
         builder: (context, box) {
           final width = box.maxWidth;
           final height = box.maxHeight;
@@ -2836,37 +2891,52 @@ class _VoiceModeState extends State<_VoiceMode>
                   onTap: widget.onCancel,
                 ),
               ),
-              Positioned.fill(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    // The words.
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: width * 0.09,
-                      ),
-                      child: Semantics(
-                        container: true,
-                        liveRegion: true,
-                        child: Text(
-                          widget.heard.isEmpty
-                              ? '${strings.listening}…'
-                              : widget.heard,
-                          textAlign: TextAlign.center,
-                          style: theme.text.body.copyWith(
-                            fontSize: 17,
-                            height: 1.35,
-                            fontWeight: widget.heard.isEmpty
-                                ? FontWeight.w500
-                                : FontWeight.w600,
-                            color: widget.heard.isEmpty
-                                ? colors.onSurface.withValues(alpha: 0.45)
-                                : colors.onSurface,
+              // The words, in the box the question is written in (`_Asked`'s),
+              // so it takes their place without a move. Gone the moment it is.
+              if (!sent)
+                Positioned.fill(
+                  child: ValueListenableBuilder<double>(
+                    valueListenable: widget.dock,
+                    builder: (context, dock, _) => Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Padding(
+                        padding: _askedPadding(dock),
+                        child: Semantics(
+                          container: true,
+                          liveRegion: true,
+                          child: LayoutBuilder(
+                            builder: (context, box) {
+                              final words = widget.heard.isEmpty
+                                  ? '${strings.listening}…'
+                                  : widget.heard;
+                              final style = widget.heard.isEmpty
+                                  ? _askedStyle(theme).copyWith(
+                                      fontWeight: FontWeight.w500,
+                                      color: colors.onSurface.withValues(alpha: 0.45),
+                                    )
+                                  : _askedStyle(theme).copyWith(color: colors.onSurface);
+                              return SizedBox(
+                                width: balancedWidth(
+                                  words,
+                                  style,
+                                  box.maxWidth,
+                                  MediaQuery.textScalerOf(context),
+                                  Directionality.of(context),
+                                ),
+                                child: Text(words, textAlign: TextAlign.center, style: style),
+                              );
+                            },
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 26),
+                  ),
+                ),
+              if (!sent)
+              Positioned.fill(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
                     Padding(
                       padding: EdgeInsets.only(
                         bottom: math.max(MediaQuery.paddingOf(context).bottom, 18),
@@ -2894,7 +2964,9 @@ class _VoiceModeState extends State<_VoiceMode>
             ],
           );
         },
-      );
+      ),
+      ),
+    );
   }
 }
 
@@ -3412,6 +3484,17 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(_RingPainter old) => old.color != color;
 }
 
+/// The question's type, and the words voice mode hears it in: the same box,
+/// so one takes the other's place without a move.
+TextStyle _askedStyle(RendelTheme theme) => theme.text.title.copyWith(
+      fontSize: 26,
+      height: 1.25,
+      letterSpacing: -0.02 * 26,
+    );
+
+/// Where the question sits: over the composer, [dock] tall.
+EdgeInsets _askedPadding(double dock) => EdgeInsets.fromLTRB(24, 0, 24, dock + 40);
+
 /// The question, written over the screen as it is asked: centred, large, a
 /// word every 150ms coming out of a blur.
 class _Asked extends StatefulWidget {
@@ -3465,11 +3548,7 @@ class _AskedState extends State<_Asked> with SingleTickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
-    final style = theme.text.title.copyWith(
-      fontSize: 26,
-      height: 1.25,
-      letterSpacing: -0.02 * 26,
-    );
+    final style = _askedStyle(theme);
     final words = _words.join(' ');
     return Semantics(
       liveRegion: true,
