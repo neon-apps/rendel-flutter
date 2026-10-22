@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.56.3
+
+**Fixed**
+
+- The built-in microphone listens in `RendelConfig.locale`, or the phone's
+  language when that is null, and no longer only in `languages`. A recogniser
+  hears one language, and an app with `languages: ['tr']` turned a Russian
+  speaker into Turkish words; the assistant now answers in the language of what
+  it heard. `languages` still picks the answer's language when a message does
+  not say. No change needed.
+
 ## 0.56.2
 
 **Fixed**

@@ -329,8 +329,10 @@ class RendelConfig {
   /// Turns speech into text.
   ///
   /// Null — the default — uses the SDK's own recogniser, `speech_to_text`
-  /// on the device, listening in the language the copilot answers in when
-  /// the device carries a model for it. The microphone opens voice mode:
+  /// on the device, listening in [locale] — or the phone's language when
+  /// that is null — when the device carries a model for it. [languages] does
+  /// not narrow it: a phone set to Russian is listened to in Russian, and the
+  /// copilot answers in the language of what it heard. The microphone opens voice mode:
   /// what it hears is written over the conversation as it is heard, and sent
   /// on its own when the speaker stops.
   ///

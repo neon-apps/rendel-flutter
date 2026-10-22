@@ -480,11 +480,12 @@ class Rendel {
       parallelReads: () => _parallelReads,
     )..manifestHash = _currentManifestHash();
     _events.add(RendelEvent.opened);
-    // One recogniser per presentation, for the built-in dictation; it listens
-    // in the language the copilot answers in.
-    final speech = RendelSpeech(
-      locale: resolveSpokenLocale(_config.locale, _config.languages),
-    );
+    // One recogniser per presentation, for the built-in dictation. It listens
+    // in the app's locale or the phone's, never narrowed to `languages`: a
+    // recogniser hears one language only, and a Turkish-only app made a
+    // Russian phone's speaker into Turkish nonsense (Tuna 2026-10-22). The
+    // answer follows whatever the words turn out to be.
+    final speech = RendelSpeech(locale: resolveLocale(_config.locale));
     final controller = _controller!;
     late final RendelPresentation presentation;
     presentation = _presentation = RendelPresentation(
