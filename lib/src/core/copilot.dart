@@ -13,6 +13,7 @@ import '../ui/theme.dart';
 import '../ui/thread_screen.dart';
 import 'action.dart';
 import 'batteries.dart';
+import 'read_aloud.dart';
 import 'config.dart';
 import 'device_id.dart';
 import 'events.dart';
@@ -486,6 +487,8 @@ class Rendel {
     // Russian phone's speaker into Turkish nonsense (Tuna 2026-10-22). The
     // answer follows whatever the words turn out to be.
     final speech = RendelSpeech(locale: resolveLocale(_config.locale));
+    // And one voice, reading each answer's opening aloud.
+    final voice = RendelVoice();
     final controller = _controller!;
     late final RendelPresentation presentation;
     presentation = _presentation = RendelPresentation(
@@ -539,6 +542,7 @@ class Rendel {
           dictationLevel: _config.onDictate == null ? speech.level : null,
           dictationStarted: _config.onDictate == null ? speech.started : null,
           onNavigate: (action) => presentation.navigate(action),
+          voice: voice,
         ),
       ),
     );

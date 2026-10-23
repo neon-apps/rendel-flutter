@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.57.0
+
+**Added**
+
+- Each finished answer's opening is read aloud, in the language the answer is
+  written in, by the phone's own speech engine in a woman's voice where the
+  phone names one (`flutter_tts`, a new dependency). A speaker in the thread's
+  header turns it off, and the choice is kept between launches. On iOS it is
+  silenced by the ring/silent switch. Nothing to change in your app.
+
 ## 0.56.3
 
 **Fixed**

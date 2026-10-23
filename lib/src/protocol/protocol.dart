@@ -532,6 +532,7 @@ sealed class RendelWireEvent {
           status: _text(data['status']) ?? 'completed',
           pending: (data['pending'] as List?)?.whereType<String>().toList() ?? const [],
           remainingHint: remaining is Map ? _text(remaining['hint']) : null,
+          lang: _text(data['lang']),
         );
       case 'error':
         return RendelError(
@@ -620,12 +621,16 @@ class ActionExecute extends RendelWireEvent {
 }
 
 class TurnEnd extends RendelWireEvent {
-  const TurnEnd({required this.status, required this.pending, this.remainingHint});
+  const TurnEnd({required this.status, required this.pending, this.remainingHint, this.lang});
   final String status;
   final List<String> pending;
 
   /// "1 question left today", once one is left under the app's usage limit.
   final String? remainingHint;
+
+  /// The language the answer is written in (`tr`, `en`…), for the voice that
+  /// reads it aloud. Null when its words did not say, and from an older server.
+  final String? lang;
 }
 
 class RendelError extends RendelWireEvent {

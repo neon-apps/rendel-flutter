@@ -229,6 +229,11 @@ class ConversationController extends ChangeNotifier {
   /// nothing to the user. The argument is for the developer's log.
   final void Function(String reason)? onUnavailable;
 
+  /// A turn finished with an answer: the message, and the language its words
+  /// are in when the server could tell. The thread on screen sets it, to read
+  /// the answer aloud; a turn finished with no thread open is read by nobody.
+  void Function(RendelMessage answer, String? lang)? onAnswered;
+
   /// A quiet line over the composer after a turn: "1 question left today".
   String? hint;
 
@@ -1133,6 +1138,9 @@ class ConversationController extends ChangeNotifier {
     // A turn whose only blocks were older drawings of something already on
     // screen did answer; there is just nothing new to show for it.
     var droppedStale = false;
+    // `turn.end` said the answer is complete, and in which language.
+    var completed = false;
+    String? answerLang;
 
     try {
       // A stalled stream is indistinguishable from a slow one until it is
@@ -1219,8 +1227,10 @@ class ConversationController extends ChangeNotifier {
           case ActionExecute():
             _pendingReads[event.invocationId] = event;
             structural = false;
-          case TurnEnd(:final status, :final remainingHint):
+          case TurnEnd(:final status, :final remainingHint, :final lang):
             settled = true;
+            completed = status == 'completed';
+            answerLang = lang;
             if (remainingHint != null) hint = remainingHint;
             if (status == 'error' && errorText == null) {
               // The separate `error` frame usually carries the message; if it
@@ -1345,6 +1355,8 @@ class ConversationController extends ChangeNotifier {
 
     final produced = _turnBlocks.isNotEmpty || droppedStale || noticed;
 
+    // Kept past the prune, which lets go of it, for whoever reads it aloud.
+    final answer = open;
     _pruneEmptyAssistant();
 
     if (awaitingReads) {
@@ -1395,6 +1407,10 @@ class ConversationController extends ChangeNotifier {
     // later turn can ever reach. The next move belongs to the card.
     if (phase == RendelPhase.awaitingConfirmation) _lastPayload = null;
     _notify();
+
+    if (completed && errorText == null && answer != null && messages.contains(answer)) {
+      onAnswered?.call(answer, answerLang);
+    }
   }
 
 

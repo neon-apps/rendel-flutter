@@ -51,6 +51,7 @@ class RendelStrings {
     this.composerHint = 'Ask anything',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
+    this.readAloud = 'Read answers aloud',
     this.retry = 'Try again',
     this.streamDropped = 'The connection dropped before the answer finished.',
     this.noAnswer = 'No answer came back. Try again.',
@@ -242,6 +243,10 @@ class RendelStrings {
   /// Screen-reader labels for the two controls with no visible text.
   final String sendMessage;
   final String newConversation;
+
+  /// The header's speaker: whether answers are read aloud. A toggle, so a
+  /// screen reader says on or off with it.
+  final String readAloud;
 
   final String retry;
   final String streamDropped;
@@ -599,6 +604,7 @@ class RendelStrings {
     String? composerHint,
     String? sendMessage,
     String? newConversation,
+    String? readAloud,
     String? retry,
     String? streamDropped,
     String? noAnswer,
@@ -741,6 +747,7 @@ class RendelStrings {
       composerHint: composerHint ?? this.composerHint,
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
+      readAloud: readAloud ?? this.readAloud,
       retry: retry ?? this.retry,
       streamDropped: streamDropped ?? this.streamDropped,
       noAnswer: noAnswer ?? this.noAnswer,
@@ -896,6 +903,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Ne isterseniz sorun',
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
+    readAloud: 'Cevapları sesli oku',
     retry: 'Tekrar dene',
     streamDropped: 'Bağlantı, yanıt tamamlanmadan koptu.',
     noAnswer: 'Yanıt gelmedi. Tekrar deneyin.',
@@ -1042,6 +1050,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Stellen Sie Ihre Frage',
     sendMessage: 'Nachricht senden',
     newConversation: 'Neue Unterhaltung beginnen',
+    readAloud: 'Antworten vorlesen',
     retry: 'Erneut versuchen',
     streamDropped: 'Die Verbindung wurde vor dem Ende der Antwort unterbrochen.',
     noAnswer: 'Es kam keine Antwort. Versuchen Sie es erneut.',
@@ -1190,6 +1199,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Posez votre question',
     sendMessage: 'Envoyer le message',
     newConversation: 'Démarrer une nouvelle conversation',
+    readAloud: 'Lire les réponses à voix haute',
     retry: 'Réessayer',
     streamDropped: 'La connexion a été perdue avant la fin de la réponse.',
     noAnswer: 'Aucune réponse n’est arrivée. Réessayez.',
@@ -1337,6 +1347,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Pregunta lo que quieras',
     sendMessage: 'Enviar mensaje',
     newConversation: 'Iniciar una conversación nueva',
+    readAloud: 'Leer las respuestas en voz alta',
     retry: 'Inténtalo de nuevo',
     streamDropped: 'La conexión se cortó antes de terminar la respuesta.',
     noAnswer: 'No llegó ninguna respuesta. Inténtalo de nuevo.',
@@ -1483,6 +1494,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'اسأل عن أي شيء',
     sendMessage: 'إرسال الرسالة',
     newConversation: 'بدء محادثة جديدة',
+    readAloud: 'قراءة الإجابات بصوت عالٍ',
     retry: 'حاول مرة أخرى',
     streamDropped: 'انقطع الاتصال قبل أن تكتمل الإجابة.',
     noAnswer: 'لم تصل أي إجابة. حاول مرة أخرى.',

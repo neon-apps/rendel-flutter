@@ -31,6 +31,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'composerHint': (s) => s.composerHint,
   'sendMessage': (s) => s.sendMessage,
   'newConversation': (s) => s.newConversation,
+  'readAloud': (s) => s.readAloud,
   'retry': (s) => s.retry,
   'streamDropped': (s) => s.streamDropped,
   'noAnswer': (s) => s.noAnswer,

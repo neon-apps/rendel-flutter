@@ -9,6 +9,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../core/batteries.dart' show RendelDictationDenied, openAppSettings;
+import '../core/locale.dart' show resolveSpokenLocale;
+import '../core/read_aloud.dart';
 import '../core/config.dart'
     show RendelAttachIcon, RendelAttachment, RendelAttachSource, RendelSendIcon, RendelVoiceIcon;
 import '../engine/conversation_controller.dart';
@@ -60,6 +62,7 @@ class ThreadScreen extends StatefulWidget {
     this.dictationLevel,
     this.dictationStarted,
     this.onNavigate,
+    this.voice,
   });
 
   final ConversationController controller;
@@ -138,6 +141,10 @@ class ThreadScreen extends StatefulWidget {
   /// opens it with nothing around it, through the controller.
   final Future<bool> Function(NavigateAction action)? onNavigate;
 
+  /// Reads each finished answer's opening aloud, with the header's speaker to
+  /// turn it off. Null reads nothing and draws no speaker.
+  final RendelVoice? voice;
+
   @override
   State<ThreadScreen> createState() => _ThreadScreenState();
 }
@@ -214,6 +221,17 @@ class _ThreadScreenState extends State<ThreadScreen> {
     }
     _question = _lastQuestion(c);
     _wasBusy = c.busy;
+    c.onAnswered = _readAloud;
+    widget.voice?.prepare();
+  }
+
+  /// A finished answer's opening, in the voice of its own language.
+  void _readAloud(RendelMessage answer, String? lang) {
+    final voice = widget.voice;
+    final words = spokenLead(answer.blocks);
+    if (voice == null || words == null || !mounted) return;
+    final c = widget.controller;
+    voice.speak(words, lang ?? resolveSpokenLocale(c.locale, c.languages));
   }
 
   /// A tap, and a screen of the app opened the way the presentation opens
@@ -232,6 +250,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
   @override
   void dispose() {
     widget.controller.removeListener(_turnPages);
+    if (widget.controller.onAnswered == _readAloud) widget.controller.onAnswered = null;
+    widget.voice?.stop();
     _input.dispose();
     _dock.dispose();
     _head.dispose();
@@ -334,6 +354,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
     }
     final dictate = widget.onDictate;
     if (dictate == null || widget.controller.busy) return;
+    // The voice stops for the one who is about to speak.
+    widget.voice?.stop();
 
     final started = widget.dictationStarted;
     void opened() {
@@ -775,6 +797,8 @@ class _ThreadScreenState extends State<ThreadScreen> {
       _asked = null;
       changed = true;
     }
+    // A question going out, however it was asked, stops the last answer being read.
+    if (c.busy && !_wasBusy) widget.voice?.stop();
     _wasBusy = c.busy;
     // An answer the conversation no longer holds is no page.
     final before = c.pages.length;
@@ -1007,6 +1031,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
             onForward: idle && controller.page < controller.pages.length - 1
                 ? () => _step(1)
                 : null,
+            voice: widget.voice,
           ),
         ),
       ),
@@ -1397,10 +1422,14 @@ class _Header extends StatelessWidget {
     this.onForward,
     this.fresh = false,
     this.onReset,
+    this.voice,
   });
 
   final String title;
   final bool sandbox;
+
+  /// The speaker: answers read aloud, or not. Null draws none.
+  final RendelVoice? voice;
 
   /// No conversation yet. The opening screen says who this is, so the header
   /// keeps only its controls until there is one (Tuna, 2026-10-10).
@@ -1493,6 +1522,27 @@ class _Header extends StatelessWidget {
                     style: theme.text.heading,
                   ),
           ),
+          // Nothing to read yet: the speaker comes with the first answer.
+          if (voice case final voice? when !fresh)
+            ValueListenableBuilder<bool>(
+              valueListenable: voice.on,
+              builder: (context, on, _) => Semantics(
+                toggled: on,
+                child: RendelPressable(
+                  semanticLabel: RendelStringsScope.of(context).readAloud,
+                  onTap: () => voice.setOn(!on),
+                  child: SizedBox(
+                    height: 44,
+                    width: 44,
+                    child: Icon(
+                      on ? Icons.volume_up_rounded : Icons.volume_off_rounded,
+                      size: theme.type.display - 2,
+                      color: theme.colors.onSurfaceSoft,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           if (onReset != null)
             RendelPressable(
               semanticLabel: RendelStringsScope.of(context).newConversation,

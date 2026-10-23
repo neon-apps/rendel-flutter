@@ -14,6 +14,8 @@
   one that serves https and Custom Tabs. The composer's Camera needs to see
   the camera app: image_picker grants it the file to write the photograph
   into by looking it up, and a camera it cannot see is handed nothing.
+  Reading answers aloud needs to see the phone's speech engine, or
+  flutter_tts finds none and says nothing.
 
   No CAMERA permission, on purpose. The camera app takes the picture under
   its own; declaring it here would make the Play Store hide every host app
@@ -33,6 +35,9 @@
         </intent>
         <intent>
             <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 </manifest>
