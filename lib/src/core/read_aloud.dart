@@ -99,6 +99,20 @@ class RendelVoice {
     try {
       final tts = _tts ??= await _engine();
       await tts.stop();
+      if (_iOS) {
+        // Playback, set on every answer: ambient was silenced by the phone's
+        // silent switch, and a real iPhone read nothing (Tuna 2026-10-23, on
+        // Protein Ocean; the simulator has no switch). Set each time because
+        // the microphone puts back whatever category it found and switches
+        // the session off. Others' audio is ducked under the voice, and
+        // flutter_tts hands it back when the voice is done.
+        await tts.setIosAudioCategory(
+          IosTextToSpeechAudioCategory.playback,
+          const [IosTextToSpeechAudioCategoryOptions.duckOthers],
+          IosTextToSpeechAudioMode.spokenAudio,
+        );
+        await tts.setSharedInstance(true);
+      }
       final lang = locale.replaceAll('_', '-');
       await tts.setLanguage(lang);
       final voice = _voiceFor.containsKey(lang) ? _voiceFor[lang] : (_voiceFor[lang] = await _woman(tts, lang));
@@ -121,16 +135,6 @@ class RendelVoice {
 
   Future<FlutterTts> _engine() async {
     final tts = FlutterTts();
-    if (_iOS) {
-      // Ambient, as Monogram's: the phone's silent switch silences it, and
-      // whatever else is playing keeps playing under it.
-      await tts.setSharedInstance(true);
-      await tts.setIosAudioCategory(
-        IosTextToSpeechAudioCategory.ambient,
-        const [IosTextToSpeechAudioCategoryOptions.mixWithOthers],
-        IosTextToSpeechAudioMode.spokenAudio,
-      );
-    }
     // The engines' own "normal" is brisk on iOS; this is a calm reading pace.
     await tts.setSpeechRate(_iOS ? 0.5 : 0.95);
     return tts;

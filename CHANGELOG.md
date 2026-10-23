@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.57.1
+
+**Fixed**
+
+- On a real iPhone the answer was not read aloud while the ring/silent switch
+  was on, which is most of the time: the voice played in the ambient category,
+  which that switch silences (the simulator has no switch). It now plays as
+  spoken audio, ducking other sound under it, and sets that again for every
+  answer because the microphone puts back the category it found. No change
+  needed.
+
 ## 0.57.0
 
 **Added**
@@ -12,8 +23,8 @@ asks of you.
 - Each finished answer's opening is read aloud, in the language the answer is
   written in, by the phone's own speech engine in a woman's voice where the
   phone names one (`flutter_tts`, a new dependency). A speaker in the thread's
-  header turns it off, and the choice is kept between launches. On iOS it is
-  silenced by the ring/silent switch. Nothing to change in your app.
+  header turns it off, and the choice is kept between launches. Nothing to
+  change in your app.
 
 ## 0.56.3
 
