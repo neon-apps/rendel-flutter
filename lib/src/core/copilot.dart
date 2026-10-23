@@ -479,8 +479,7 @@ class Rendel {
       onUnavailable: (reason) => _setAvailable(false, reason),
       user: () => _user,
       parallelReads: () => _parallelReads,
-      // A test key is someone testing: never read to (Tuna 2026-10-23).
-      readsAloud: () => !_sandboxKey && _voice.on.value,
+      readsAloud: () => _voice.on.value,
     )..manifestHash = _currentManifestHash();
     _events.add(RendelEvent.opened);
     // One recogniser per presentation, for the built-in dictation. It listens
@@ -542,9 +541,10 @@ class Rendel {
           dictationLevel: _config.onDictate == null ? speech.level : null,
           dictationStarted: _config.onDictate == null ? speech.started : null,
           onNavigate: (action) => presentation.navigate(action),
-          // Each answer's opening read aloud, to the people using the app on a
-          // live key only: whoever tests on a test key hears nothing.
-          voice: _sandboxKey ? null : _voice,
+          // Each answer's opening read aloud, on a test key as on a live one:
+          // 0.58.4 silenced test keys on a misreading, and the owner testing
+          // her own app heard nothing (Tuna 2026-10-23).
+          voice: _voice,
         ),
       ),
     );
@@ -573,7 +573,7 @@ class Rendel {
   /// The voice that reads each answer's opening aloud, one for the app's life.
   static final RendelVoice _voice = RendelVoice();
 
-  /// A test key: someone testing the app, not using it.
+  /// A test key: the thread says so in its header.
   static bool get _sandboxKey => RegExp(r'^(rd|nc)_pk_test_').hasMatch(_appKey ?? '');
 
   /// How many thread sheets are on screen right now. `reset()` needs to know:
