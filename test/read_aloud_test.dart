@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
@@ -11,12 +13,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Each answer's opening read aloud, in the answer's own language (Tuna
 /// 2026-10-23, after Monogram).
 class _Api extends RendelApiClient {
-  _Api(this.script) : super(appKey: 'nc_pk_test_x', deviceId: 'd', config: const RendelConfig());
+  _Api(this.script, {this.hold}) : super(appKey: 'nc_pk_test_x', deviceId: 'd', config: const RendelConfig());
 
   final List<RendelWireEvent> script;
 
+  /// Held open before the turn's end, so a test can look while the cards are still coming.
+  final Future<void>? hold;
+
   @override
-  Stream<RendelWireEvent> chat(Map<String, dynamic> body) => Stream.fromIterable(script);
+  Stream<RendelWireEvent> chat(Map<String, dynamic> body) async* {
+    for (final event in script) {
+      if (event is TurnEnd && hold != null) await hold;
+      yield event;
+    }
+  }
 }
 
 /// A voice that writes down what it was asked to say.
@@ -69,9 +79,9 @@ void main() {
     setUp(() => SharedPreferences.setMockInitialValues({}));
 
     Future<(ConversationController, _Voice)> open(WidgetTester tester, List<RendelWireEvent> script,
-        {String? locale}) async {
+        {String? locale, Future<void>? hold}) async {
       final c = ConversationController(
-        api: _Api(script),
+        api: _Api(script, hold: hold),
         actions: const {},
         sdkVersion: 'flutter/test',
         locale: locale,
@@ -88,6 +98,34 @@ void main() {
           BlockReady(index: 0, block: _text(markdown)),
           TurnEnd(status: 'completed', pending: const [], lang: lang, speech: speech),
         ];
+
+    testWidgets('starts reading the moment the opening is written, while the cards are still coming', (tester) async {
+      final end = Completer<void>();
+      final (c, voice) = await open(
+        tester,
+        [
+          const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
+          const BlockStart(index: 0, id: 't', blockType: 'text'),
+          const BlockDelta(index: 0, textDelta: 'C vitamini için bir doktora danışın. İşte mağazadakiler.'),
+          const TurnSpeech(token: 'tok9', text: 'C vitamini için bir doktora danışın. İşte mağazadakiler.', lang: 'tr'),
+          const BlockStart(index: 1, id: 'p', blockType: 'product_cards'),
+          const TurnEnd(status: 'completed', pending: [], lang: 'tr', speech: 'tok9'),
+        ],
+        hold: end.future,
+      );
+      late Future<bool> sent;
+      await tester.runAsync(() async {
+        sent = c.send('C vitamini önerir misin');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      expect(c.busy, isTrue, reason: 'the turn has not ended');
+      expect(voice.said, [('C vitamini için bir doktora danışın. İşte mağazadakiler.', 'tr')]);
+      expect(voice.urls.single, endsWith('/v1/speech/tok9'));
+      end.complete();
+      await tester.runAsync(() => sent);
+      await tester.pump();
+      expect(voice.said, hasLength(1), reason: 'read once, not again at the end');
+    });
 
     testWidgets("plays the server's natural voice when it sent a token", (tester) async {
       final (c, voice) = await open(tester, answer('Yarın hava açık.', lang: 'tr', speech: 'tok123'));

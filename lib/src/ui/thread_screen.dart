@@ -234,9 +234,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
   /// A finished answer's opening, in the voice of its own language: the
   /// server's natural one when it sent a token for it, the phone's otherwise.
-  void _readAloud(RendelMessage answer, String? lang, String? speech) {
+  void _readAloud(RendelMessage answer, {String? text, String? lang, String? speech}) {
     final voice = widget.voice;
-    final words = spokenLead(answer.blocks);
+    final words = text ?? spokenLead(answer.blocks);
     if (voice == null || words == null || !mounted) return;
     // Only an answer the person is there for: not one that lands while the
     // app is in the background (Tuna 2026-10-23: only when a question is

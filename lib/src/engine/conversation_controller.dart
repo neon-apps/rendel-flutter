@@ -229,11 +229,16 @@ class ConversationController extends ChangeNotifier {
   /// nothing to the user. The argument is for the developer's log.
   final void Function(String reason)? onUnavailable;
 
-  /// A turn finished with an answer: the message, the language its words are
-  /// in when the server could tell, and the token its opening is spoken from
-  /// (`/v1/speech`). The thread on screen sets it, to read the answer aloud;
-  /// a turn finished with no thread open is read by nobody.
-  void Function(RendelMessage answer, String? lang, String? speech)? onAnswered;
+  /// An answer to read aloud: the message, its opening's words when the
+  /// server sent them, the language they are in when it could tell, and the
+  /// token they are spoken from (`/v1/speech`). Called once a question: the
+  /// moment the server says the opening is written (`speech`), ahead of the
+  /// cards under it, or at the turn's end from a server that does not. The
+  /// thread on screen sets it; an answer with no thread open is read by nobody.
+  void Function(RendelMessage answer, {String? text, String? lang, String? speech})? onAnswered;
+
+  /// Whether this question's answer has been handed to [onAnswered] already.
+  var _readThisQuestion = false;
 
   /// A quiet line over the composer after a turn: "1 question left today".
   String? hint;
@@ -1019,6 +1024,9 @@ class ConversationController extends ChangeNotifier {
   Future<void> _run(Map<String, dynamic> payload, [int? inherited]) async {
     final generation = inherited ?? _generation;
     if (generation != _generation) return;
+    // A question of the person's, not the continuation of one: its answer is
+    // read anew.
+    if (inherited == null) _readThisQuestion = false;
     _lastPayload = payload;
     // `send`, `submitForm` and `retry` clear this; the confirm, decline and
     // pending-read continuations did not, so an error from an earlier turn
@@ -1278,6 +1286,12 @@ class ConversationController extends ChangeNotifier {
               '$message${lastRequestId == null ? '' : ' (request $lastRequestId)'}',
             );
 
+          case TurnSpeech(:final token, :final text, :final lang):
+            visible = false;
+            if (!_readThisQuestion && _openAssistant != null) {
+              _readThisQuestion = true;
+              onAnswered?.call(_openAssistant!, text: text, lang: lang, speech: token);
+            }
           case Ping():
             visible = false;
         }
@@ -1411,8 +1425,9 @@ class ConversationController extends ChangeNotifier {
     if (phase == RendelPhase.awaitingConfirmation) _lastPayload = null;
     _notify();
 
-    if (completed && errorText == null && answer != null && messages.contains(answer)) {
-      onAnswered?.call(answer, answerLang, answerSpeech);
+    if (completed && errorText == null && answer != null && messages.contains(answer) && !_readThisQuestion) {
+      _readThisQuestion = true;
+      onAnswered?.call(answer, lang: answerLang, speech: answerSpeech);
     }
   }
 

@@ -554,6 +554,11 @@ sealed class RendelWireEvent {
           actionLabel: action is Map ? _text(action['label']) : null,
           actionUrl: action is Map ? _text(action['url']) : null,
         );
+      case 'speech':
+        final token = _text(data['token']);
+        final text = _text(data['text']);
+        if (token == null || text == null) return null;
+        return TurnSpeech(token: token, text: text, lang: _text(data['lang']));
       case 'ping':
         return const Ping();
     }
@@ -664,6 +669,16 @@ class RendelNotice extends RendelWireEvent {
   final DateTime? until;
   final String? actionLabel;
   final String? actionUrl;
+}
+
+/// The answer's opening, the moment it is written and ahead of the cards
+/// under it: [token] for `GET /v1/speech/:token` (MP3 in a natural voice),
+/// [text] and [lang] for reading it in the phone's own voice instead.
+class TurnSpeech extends RendelWireEvent {
+  const TurnSpeech({required this.token, required this.text, this.lang});
+  final String token;
+  final String text;
+  final String? lang;
 }
 
 class Ping extends RendelWireEvent {

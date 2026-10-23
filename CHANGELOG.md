@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.58.3
+
+**Changed**
+
+- The answer's opening is read aloud the moment it is written, while the
+  cards under it are still arriving, rather than once the whole answer has
+  finished. The API sends a `speech` event for it and begins the voice then;
+  an older API is read at the end as before. No change needed.
+
 ## 0.58.2
 
 **Fixed**
