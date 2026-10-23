@@ -2,7 +2,7 @@ name: rendel
 description: >-
   A Generative UI SDK for Flutter: turns what users say, type and tap into
   native screens in your app, while your team controls every action.
-version: 0.57.1
+version: 0.58.0
 homepage: https://rendel.ai
 repository: https://github.com/neon-apps/rendel-flutter
 
@@ -29,6 +29,7 @@ dependencies:
   # not 0.27.0, whose Android build fails under Flutter 3.44's Kotlin setup.
   maplibre_gl: ^0.27.1
   flutter_tts: ^4.2.5
+  audioplayers: ^6.4.0
 
 dev_dependencies:
   flutter_lints: ^5.0.0

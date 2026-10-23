@@ -533,6 +533,7 @@ sealed class RendelWireEvent {
           pending: (data['pending'] as List?)?.whereType<String>().toList() ?? const [],
           remainingHint: remaining is Map ? _text(remaining['hint']) : null,
           lang: _text(data['lang']),
+          speech: _text(data['speech']),
         );
       case 'error':
         return RendelError(
@@ -621,7 +622,7 @@ class ActionExecute extends RendelWireEvent {
 }
 
 class TurnEnd extends RendelWireEvent {
-  const TurnEnd({required this.status, required this.pending, this.remainingHint, this.lang});
+  const TurnEnd({required this.status, required this.pending, this.remainingHint, this.lang, this.speech});
   final String status;
   final List<String> pending;
 
@@ -631,6 +632,10 @@ class TurnEnd extends RendelWireEvent {
   /// The language the answer is written in (`tr`, `en`…), for the voice that
   /// reads it aloud. Null when its words did not say, and from an older server.
   final String? lang;
+
+  /// The answer's opening, sealed for `GET /v1/speech/:token`, which returns
+  /// it as MP3 in a natural voice. Null where the server has no voice.
+  final String? speech;
 }
 
 class RendelError extends RendelWireEvent {

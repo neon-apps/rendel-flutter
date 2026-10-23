@@ -229,10 +229,11 @@ class ConversationController extends ChangeNotifier {
   /// nothing to the user. The argument is for the developer's log.
   final void Function(String reason)? onUnavailable;
 
-  /// A turn finished with an answer: the message, and the language its words
-  /// are in when the server could tell. The thread on screen sets it, to read
-  /// the answer aloud; a turn finished with no thread open is read by nobody.
-  void Function(RendelMessage answer, String? lang)? onAnswered;
+  /// A turn finished with an answer: the message, the language its words are
+  /// in when the server could tell, and the token its opening is spoken from
+  /// (`/v1/speech`). The thread on screen sets it, to read the answer aloud;
+  /// a turn finished with no thread open is read by nobody.
+  void Function(RendelMessage answer, String? lang, String? speech)? onAnswered;
 
   /// A quiet line over the composer after a turn: "1 question left today".
   String? hint;
@@ -1141,6 +1142,7 @@ class ConversationController extends ChangeNotifier {
     // `turn.end` said the answer is complete, and in which language.
     var completed = false;
     String? answerLang;
+    String? answerSpeech;
 
     try {
       // A stalled stream is indistinguishable from a slow one until it is
@@ -1227,10 +1229,11 @@ class ConversationController extends ChangeNotifier {
           case ActionExecute():
             _pendingReads[event.invocationId] = event;
             structural = false;
-          case TurnEnd(:final status, :final remainingHint, :final lang):
+          case TurnEnd(:final status, :final remainingHint, :final lang, :final speech):
             settled = true;
             completed = status == 'completed';
             answerLang = lang;
+            answerSpeech = speech;
             if (remainingHint != null) hint = remainingHint;
             if (status == 'error' && errorText == null) {
               // The separate `error` frame usually carries the message; if it
@@ -1409,7 +1412,7 @@ class ConversationController extends ChangeNotifier {
     _notify();
 
     if (completed && errorText == null && answer != null && messages.contains(answer)) {
-      onAnswered?.call(answer, answerLang);
+      onAnswered?.call(answer, answerLang, answerSpeech);
     }
   }
 

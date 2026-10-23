@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.58.0
+
+**Changed**
+
+- Answers are read aloud in a natural voice (OpenAI's "nova"), streamed from
+  the Rendel API, in place of the phone's own speech engine, which sounded
+  robotic. The phone's voice is still used when the server sends no voice for
+  an answer or it cannot be played. New dependency: `audioplayers`. Nothing to
+  change in your app beyond a full rebuild for the new plugin.
+
 ## 0.57.1
 
 **Fixed**

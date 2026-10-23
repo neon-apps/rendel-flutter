@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, ValueNotifier, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_tts/flutter_tts.dart';
@@ -51,10 +54,12 @@ String _short(String text) {
   return '${space > 200 ? cut.substring(0, space) : cut}…';
 }
 
-/// The SDK's own voice: `flutter_tts`, the phone's speech engine, in a
-/// woman's voice where the phone says which voices are women's.
+/// The SDK's own voice: OpenAI's natural one, streamed from `/v1/speech`
+/// when the server sends a token for the answer, and the phone's own speech
+/// engine (`flutter_tts`, a woman's voice where the phone names one) when it
+/// does not or the stream fails.
 ///
-/// Free and on the device, as Tuna chose for a first version (2026-10-23).
+/// The phone's voice came first and read as robotic (Tuna 2026-10-23).
 /// Whether it reads at all is the person's, remembered between launches: the
 /// header's speaker turns it off.
 class RendelVoice {
@@ -66,6 +71,11 @@ class RendelVoice {
   final on = ValueNotifier<bool>(true);
 
   FlutterTts? _tts;
+  AudioPlayer? _player;
+
+  /// Bumped by every speak and stop, so a stream that loads after the person
+  /// moved on is not played over them.
+  var _turn = 0;
   final _voiceFor = <String, Map<String, String>?>{};
   var _loaded = false;
 
@@ -92,10 +102,46 @@ class RendelVoice {
     } catch (_) {}
   }
 
-  /// Says [text] in [locale] (`tr`, `en-US`…), over anything still being said.
-  Future<void> speak(String text, String locale) async {
+  /// Says [text] in [locale] (`tr`, `en-US`…), over anything still being said:
+  /// from [url] in the natural voice when there is one, else on the phone.
+  Future<void> speak(String text, String locale, {String? url}) async {
     await _load();
     if (!on.value || kIsWeb) return;
+    await stop();
+    final turn = _turn;
+    if (url != null) {
+      try {
+        final player = _player ??= AudioPlayer();
+        await player
+            .play(
+              UrlSource(url, mimeType: 'audio/mpeg'),
+              // Heard with the silent switch on, other sound ducked under it
+              // (the lesson of 0.57.1).
+              ctx: AudioContext(
+                iOS: AudioContextIOS(
+                  category: AVAudioSessionCategory.playback,
+                  options: const {AVAudioSessionOptions.duckOthers},
+                ),
+                android: const AudioContextAndroid(
+                  contentType: AndroidContentType.speech,
+                  // The media volume, the one people turn up to hear.
+                  usageType: AndroidUsageType.media,
+                  audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+                ),
+              ),
+            )
+            .timeout(const Duration(seconds: 10));
+        // Stopped while it was still loading: it must not start after all.
+        if (turn != _turn) await player.stop();
+        return;
+      } catch (err) {
+        RendelLog.warn('read_aloud_stream_failed', 'the natural voice did not play, reading on the phone: $err');
+        try {
+          await _player?.stop();
+        } catch (_) {}
+        if (turn != _turn || !on.value) return;
+      }
+    }
     try {
       final tts = _tts ??= await _engine();
       await tts.stop();
@@ -124,6 +170,10 @@ class RendelVoice {
   }
 
   Future<void> stop() async {
+    _turn++;
+    try {
+      await _player?.stop();
+    } catch (_) {}
     try {
       await _tts?.stop();
     } catch (_) {}

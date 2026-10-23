@@ -225,13 +225,18 @@ class _ThreadScreenState extends State<ThreadScreen> {
     widget.voice?.prepare();
   }
 
-  /// A finished answer's opening, in the voice of its own language.
-  void _readAloud(RendelMessage answer, String? lang) {
+  /// A finished answer's opening, in the voice of its own language: the
+  /// server's natural one when it sent a token for it, the phone's otherwise.
+  void _readAloud(RendelMessage answer, String? lang, String? speech) {
     final voice = widget.voice;
     final words = spokenLead(answer.blocks);
     if (voice == null || words == null || !mounted) return;
     final c = widget.controller;
-    voice.speak(words, lang ?? resolveSpokenLocale(c.locale, c.languages));
+    voice.speak(
+      words,
+      lang ?? resolveSpokenLocale(c.locale, c.languages),
+      url: speech == null ? null : '${c.api.config.apiBaseUrl}/v1/speech/$speech',
+    );
   }
 
   /// A tap, and a screen of the app opened the way the presentation opens

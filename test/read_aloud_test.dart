@@ -22,11 +22,14 @@ class _Api extends RendelApiClient {
 /// A voice that writes down what it was asked to say.
 class _Voice extends RendelVoice {
   final said = <(String, String)>[];
+  final urls = <String?>[];
   var stops = 0;
 
   @override
-  Future<void> speak(String text, String locale) async {
-    if (on.value) said.add((text, locale));
+  Future<void> speak(String text, String locale, {String? url}) async {
+    if (!on.value) return;
+    said.add((text, locale));
+    urls.add(url);
   }
 
   @override
@@ -80,11 +83,25 @@ void main() {
       return (c, voice);
     }
 
-    List<RendelWireEvent> answer(String markdown, {String? lang}) => [
+    List<RendelWireEvent> answer(String markdown, {String? lang, String? speech}) => [
           const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
           BlockReady(index: 0, block: _text(markdown)),
-          TurnEnd(status: 'completed', pending: const [], lang: lang),
+          TurnEnd(status: 'completed', pending: const [], lang: lang, speech: speech),
         ];
+
+    testWidgets("plays the server's natural voice when it sent a token", (tester) async {
+      final (c, voice) = await open(tester, answer('Yarın hava açık.', lang: 'tr', speech: 'tok123'));
+      await tester.runAsync(() => c.send('Hava nasıl?'));
+      await tester.pump();
+      expect(voice.urls.single, '${c.api.config.apiBaseUrl}/v1/speech/tok123');
+    });
+
+    testWidgets('and leaves it to the phone when it did not', (tester) async {
+      final (c, voice) = await open(tester, answer('Yarın hava açık.', lang: 'tr'));
+      await tester.runAsync(() => c.send('Hava nasıl?'));
+      await tester.pump();
+      expect(voice.urls.single, isNull);
+    });
 
     testWidgets("reads a finished answer in the answer's language", (tester) async {
       final (c, voice) = await open(tester, answer('Yarın hava açık. Detaylar aşağıda.', lang: 'tr'), locale: 'en');
