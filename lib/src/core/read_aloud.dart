@@ -1,16 +1,18 @@
 import 'dart:async';
 import 'dart:io' show Directory, File;
-import 'dart:typed_data' show Uint8List;
+import 'dart:typed_data' show ByteData, Uint8List;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart'
-    show TargetPlatform, ValueNotifier, defaultTargetPlatform, kIsWeb;
+    show TargetPlatform, ValueNotifier, defaultTargetPlatform, kIsWeb, visibleForTesting;
+import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../protocol/protocol.dart' show WireBlock;
 import 'log.dart';
+import 'platform.dart';
 
 /// What is read aloud of an answer: its opening paragraph, as words.
 ///
@@ -43,11 +45,59 @@ String _plain(String markdown) => markdown
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
 
+/// Words that end in a full stop without ending the sentence. Lower case, without the stop.
+const _abbreviations = {
+  'dr', 'prof', 'doç', 'av', 'op', 'uzm', 'yrd', 'sn', 'vb', 'vs', 'örn', 'bkz', 'no', 'tel', //
+  'mah', 'cad', 'sok', 'apt', 'blv', 'şti', 'ltd', 'st', 'mr', 'mrs', 'ms', 'e.g', 'i.e', 'etc',
+};
+
+/// The sentences of [text], cut as the server cuts them (`speakable.ts`): at
+/// `.!?…` and closing quotes before a space and anything but a lower-case
+/// letter, never inside a number ("1.299,90"), after an abbreviation ("Dr.
+/// Ayşe") or an initial, or after an ordinal going on in lower case ("3. kat").
+List<String> sentences(String text) {
+  const ends = '.!?…';
+  const closers = '"”’)»\'';
+  final lower = RegExp(r'\p{Ll}', unicode: true);
+  final out = <String>[];
+  var start = 0;
+  var i = 0;
+  while (i < text.length) {
+    if (!ends.contains(text[i])) {
+      i++;
+      continue;
+    }
+    final runStart = i;
+    while (i < text.length && ends.contains(text[i])) {
+      i++;
+    }
+    while (i < text.length && closers.contains(text[i])) {
+      i++;
+    }
+    final runEnd = i;
+    if (runEnd < text.length && text[runEnd].trim().isNotEmpty) continue;
+    var next = runEnd;
+    while (next < text.length && text[next].trim().isEmpty) {
+      next++;
+    }
+    if (next < text.length && lower.hasMatch(text[next])) continue;
+    if (next < text.length && text.substring(runStart, runEnd) == '.') {
+      final word = RegExp(r'[\p{L}\p{N}.]+$', unicode: true).firstMatch(text.substring(start, runStart))?.group(0) ?? '';
+      final initial = RegExp(r'^\p{Lu}$', unicode: true).hasMatch(word);
+      if (initial || _abbreviations.contains(word.toLowerCase())) continue;
+    }
+    out.add(text.substring(start, runEnd).trim());
+    start = runEnd;
+  }
+  final tail = text.substring(start).trim();
+  if (tail.isNotEmpty) out.add(tail);
+  return out.where((s) => s.isNotEmpty).toList();
+}
+
 /// Two sentences at most, and never a minute of speech.
 String _short(String text) {
-  final sentences = RegExp(r'[^.!?…]+[.!?…]+["”’)]*|[^.!?…]+$').allMatches(text).map((m) => m[0]!.trim());
   var said = '';
-  for (final sentence in sentences.take(2)) {
+  for (final sentence in sentences(text).take(2)) {
     if (said.isNotEmpty && said.length + sentence.length > 280) break;
     said = said.isEmpty ? sentence : '$said $sentence';
   }
@@ -57,35 +107,138 @@ String _short(String text) {
   return '${space > 200 ? cut.substring(0, space) : cut}…';
 }
 
-/// The SDK's own voice: OpenAI's natural one, streamed from `/v1/speech`
-/// when the server sends a token for the answer, and the phone's own speech
-/// engine (`flutter_tts`, a woman's voice where the phone names one) when it
-/// does not or the stream fails.
+/// Where the voice's PCM goes: the speaker. One answer at a time.
+abstract class RendelPcmOut {
+  /// Ready to play mono 16-bit PCM at [sampleRate].
+  Future<void> open(int sampleRate);
+
+  /// Queues [s16le] (an even number of bytes) behind what is playing.
+  Future<void> feed(Uint8List s16le);
+
+  /// Done when everything fed has been heard.
+  Future<void> drained();
+
+  /// Silent at once, what is queued dropped.
+  Future<void> close();
+}
+
+/// [RendelPcmOut] on `flutter_pcm_sound`.
+class _PluginPcmOut implements RendelPcmOut {
+  Completer<void>? _drained;
+  var _ending = false;
+
+  /// The buffer ran dry after the last feed: the zero event comes once a feed.
+  var _dry = false;
+
+  @override
+  Future<void> open(int sampleRate) async {
+    await FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
+    await FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10);
+    _drained = Completer<void>();
+    _ending = false;
+    _dry = false;
+    FlutterPcmSound.setFeedCallback((remaining) {
+      if (remaining > 0) return;
+      _dry = true;
+      if (_ending && !(_drained?.isCompleted ?? true)) _drained!.complete();
+    });
+  }
+
+  @override
+  Future<void> feed(Uint8List s16le) {
+    _dry = false;
+    return FlutterPcmSound.feed(PcmArrayInt16(bytes: ByteData.sublistView(s16le)));
+  }
+
+  @override
+  Future<void> drained() {
+    _ending = true;
+    final drained = _drained;
+    if (drained == null) return Future.value();
+    if (_dry && !drained.isCompleted) drained.complete();
+    return drained.future;
+  }
+
+  @override
+  Future<void> close() async {
+    final drained = _drained;
+    if (drained != null && !drained.isCompleted) drained.complete();
+    FlutterPcmSound.setFeedCallback(null);
+    await FlutterPcmSound.release();
+  }
+}
+
+/// No first sound by then: silence rather than a voice that is late (Tuna 2026-10-23).
+const _firstSound = Duration(seconds: 3);
+
+/// PCM is fed in pieces of at least this many bytes: a tenth of a second at 24 kHz.
+const _minPiece = 4800;
+
+/// The first sound waits for this much of the voice. The stream sends a fifth
+/// of a second, pauses for up to half a second, then the rest faster than it is
+/// spoken (measured on api.rendel.ai, 2026-10-23); begun on the first fifth, the
+/// voice broke off inside its first word. A stream that stalls before then
+/// stays silent under [_firstSound], as one did for 18 seconds.
+const _startHeld = Duration(milliseconds: 500);
+
+/// The SDK's own voice: OpenAI's natural one, streamed from `/v1/speech` as it
+/// is made and fed to the speaker as it arrives, so the first words are heard
+/// while the rest is still spoken (Tuna 2026-10-23). A server that turns the
+/// stream away is played the whole file; a phone's own voice (`flutter_tts`,
+/// a woman's where the phone names one) reads only where the server has no
+/// voice at all. A voice that made no sound in three seconds stays silent: the
+/// answer is on the screen.
 ///
-/// The phone's voice came first and read as robotic (Tuna 2026-10-23).
-/// Whether it reads at all is the person's, remembered between launches: the
-/// header's speaker turns it off.
+/// [on] is the header's speaker: whether an answer to a spoken question is read
+/// by itself, remembered between launches. A tap on an answer's own speaker
+/// reads it whatever [on] says, and the last answer read is kept, so a second
+/// tap does not fetch it again.
 class RendelVoice {
-  RendelVoice();
+  RendelVoice({RendelPcmOut? out, http.Client Function()? client})
+      : _out = out ?? _PluginPcmOut(),
+        _client = client ?? http.Client.new;
 
   static const _key = 'rendel_read_aloud';
 
-  /// Whether answers are read aloud. On until the person turns it off.
+  /// Whether an answer to a spoken question is read by itself. On until the person turns it off.
   final on = ValueNotifier<bool>(true);
+
+  /// The answer being read, by the key it was read under; null when quiet.
+  final playing = ValueNotifier<String?>(null);
+
+  final RendelPcmOut _out;
+  final http.Client Function() _client;
+  http.Client? _fetching;
+
+  /// The speaker is open and the audio session ours: only then is either let
+  /// go, so a stop never cuts the host app's own sound.
+  var _holding = false;
+
+  Future<void> _hold(int rate) async {
+    if (!_holding) {
+      _holding = true;
+      await RendelPlatform.voiceSession(true);
+    }
+    await _out.open(rate);
+  }
+
+  Future<void> _release() async {
+    if (!_holding) return;
+    _holding = false;
+    try {
+      await _out.close();
+    } catch (_) {}
+    await RendelPlatform.voiceSession(false);
+  }
+
+  /// The last answer's voice as it was played, for a second tap.
+  ({String key, int rate, List<Uint8List> pieces})? _kept;
 
   FlutterTts? _tts;
   AudioPlayer? _player;
 
   /// The last answer's voice on disk, removed when the next answer is read.
   final _spoken = <File>[];
-
-  Future<Uint8List> _fetch(String url) async {
-    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
-    if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
-      throw StateError('the voice answered ${response.statusCode}');
-    }
-    return response.bodyBytes;
-  }
 
   /// Bumped by every speak and stop, so a stream that loads after the person
   /// moved on is not played over them.
@@ -117,77 +270,156 @@ class RendelVoice {
   }
 
   /// Says [text] in [locale] (`tr`, `en-US`…), over anything still being said:
-  /// from [url] in the natural voice when there is one, else on the phone.
-  Future<void> speak(String text, String locale, {String? url, List<String> parts = const []}) async {
+  /// from [url] in the natural voice when the server sent one, else on the
+  /// phone. [key] names the answer, for [playing] and a second tap.
+  Future<void> speak(String text, String locale, {String? url, String? key}) async {
     await _load();
-    if (!on.value || kIsWeb) return;
+    if (kIsWeb) return;
     await stop();
     final turn = _turn;
-    // A sentence at a time when the server sent them, else the whole.
-    final urls = parts.isNotEmpty ? parts : [if (url != null) url];
-    if (urls.isNotEmpty) {
-      // All asked for at once: the first plays as soon as it lands, and the
-      // rest arrive while it does (Tuna 2026-10-23: the voice must start as
-      // the answer arrives, not once its cards are done).
-      final voices = [for (final u in urls) _fetch(u)];
-      for (final v in voices) {
-        v.ignore();
+    if (url == null) return _phone(text, locale, turn);
+    final name = key ?? text;
+    playing.value = name;
+    final kept = _kept;
+    if (kept != null && kept.key == name) {
+      await _play(kept.rate, kept.pieces, turn);
+      return;
+    }
+    final next = await _stream(url, name, turn);
+    if (turn != _turn) return;
+    if (next == _Next.file) {
+      await _file(url, turn);
+    } else if (next == _Next.silent) {
+      _quiet(turn);
+    }
+  }
+
+  /// The voice as it is made: fetched as PCM, begun once half a second of it
+  /// is in, then fed to the speaker in pieces of a tenth of a second or more.
+  Future<_Next> _stream(String url, String key, int turn) async {
+    final client = _fetching = _client();
+    var late = false;
+    final deadline = Timer(_firstSound, () {
+      late = true;
+      client.close();
+    });
+    final pieces = <Uint8List>[];
+    try {
+      final request = http.Request('GET', Uri.parse('$url${url.contains('?') ? '&' : '?'}f=pcm'));
+      final response = await client.send(request);
+      if (response.statusCode == 404) {
+        deadline.cancel();
+        return _Next.file;
       }
-      var heard = false;
-      for (var i = 0; i < voices.length; i++) {
-        try {
-          final bytes = await voices[i];
-          if (turn != _turn) return;
-          // Played from a file, fetched whole: a real iPhone's AVPlayer did not
-          // play the server's stream (no length, no byte ranges), and
-          // audioplayers cannot play bytes on iOS.
-          final file = File('${Directory.systemTemp.path}/rendel_answer_${turn}_$i.mp3');
-          await file.writeAsBytes(bytes, flush: true);
-          _spoken.add(file);
-          if (turn != _turn) return;
-          final player = _player ??= AudioPlayer();
-          final done = player.onPlayerComplete.first;
-          await player
-              .play(
-                DeviceFileSource(file.path, mimeType: 'audio/mpeg'),
-                // Heard with the silent switch on, other sound ducked under it
-                // (the lesson of 0.57.1).
-                ctx: AudioContext(
-                  iOS: AudioContextIOS(
-                    category: AVAudioSessionCategory.playback,
-                    options: const {AVAudioSessionOptions.duckOthers},
-                  ),
-                  android: const AudioContextAndroid(
-                    contentType: AndroidContentType.speech,
-                    // The media volume, the one people turn up to hear.
-                    usageType: AndroidUsageType.media,
-                    audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-                  ),
-                ),
-              )
-              .timeout(const Duration(seconds: 10));
-          // Stopped while it was still loading: it must not start after all.
-          if (turn != _turn) {
-            await player.stop();
-            return;
-          }
-          heard = true;
-          if (i < voices.length - 1) await done.timeout(const Duration(seconds: 60));
-          if (turn != _turn) return;
-        } catch (err) {
-          try {
-            await _player?.stop();
-          } catch (_) {}
-          // A later sentence lost is a voice that stops early; the first lost
-          // is read on the phone instead.
-          if (heard) return;
-          RendelLog.warn('read_aloud_stream_failed', 'the natural voice did not play, reading on the phone: $err');
-          if (turn != _turn || !on.value) return;
-          break;
+      if (response.statusCode != 200) {
+        deadline.cancel();
+        return _Next.silent;
+      }
+      final rate = int.tryParse(RegExp(r'rate=(\d+)').firstMatch(response.headers['content-type'] ?? '')?.group(1) ?? '') ?? 24000;
+      final start = rate * 2 * _startHeld.inMilliseconds ~/ 1000;
+      var opened = false;
+      var held = Uint8List(0);
+      Future<void> play(Uint8List bytes) async {
+        if (!opened) {
+          opened = true;
+          await _hold(rate);
+        }
+        pieces.add(bytes);
+        await _out.feed(bytes);
+        deadline.cancel();
+      }
+
+      await for (final chunk in response.stream) {
+        if (turn != _turn) return _Next.played;
+        held = Uint8List.fromList([...held, ...chunk]);
+        if (held.length >= (opened ? _minPiece : start)) {
+          final even = held.length - held.length % 2;
+          await play(Uint8List.sublistView(held, 0, even));
+          held = Uint8List.fromList(held.sublist(even));
         }
       }
-      if (heard) return;
+      if (held.length > 1 && turn == _turn) await play(Uint8List.sublistView(held, 0, held.length - held.length % 2));
+      deadline.cancel();
+      if (pieces.isEmpty) return _Next.silent;
+      _kept = (key: key, rate: rate, pieces: pieces);
+      await _finish(turn);
+      return _Next.played;
+    } catch (err) {
+      deadline.cancel();
+      if (turn != _turn) return _Next.played;
+      if (pieces.isNotEmpty) {
+        await _finish(turn);
+        return _Next.played;
+      }
+      if (!late) RendelLog.warn('read_aloud_stream_failed', 'the natural voice did not play: $err');
+      return _Next.silent;
+    } finally {
+      if (identical(_fetching, client)) _fetching = null;
+      client.close();
     }
+  }
+
+  /// Plays what was kept, without asking the server again.
+  Future<void> _play(int rate, List<Uint8List> pieces, int turn) async {
+    await _hold(rate);
+    for (final piece in pieces) {
+      if (turn != _turn) return;
+      await _out.feed(piece);
+    }
+    await _finish(turn);
+  }
+
+  /// Waits for the last piece to be heard, then gives the audio back.
+  Future<void> _finish(int turn) async {
+    await _out.drained();
+    if (turn != _turn) return;
+    await _release();
+    _quiet(turn);
+  }
+
+  /// The whole file, for a server that turned the stream away (switched off there).
+  Future<void> _file(String url, int turn) async {
+    try {
+      final response = await _client().get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty || turn != _turn) return _quiet(turn);
+      // Played from a file: a real iPhone's AVPlayer does not play a stream
+      // with no length, and audioplayers cannot play bytes on iOS.
+      final file = File('${Directory.systemTemp.path}/rendel_answer_$turn.mp3');
+      await file.writeAsBytes(response.bodyBytes, flush: true);
+      _spoken.add(file);
+      if (turn != _turn) return;
+      final player = _player ??= AudioPlayer();
+      final done = player.onPlayerComplete.first;
+      await player.play(
+        DeviceFileSource(file.path, mimeType: 'audio/mpeg'),
+        // Heard with the silent switch on, other sound ducked under it
+        // (the lesson of 0.57.1).
+        ctx: AudioContext(
+          iOS: AudioContextIOS(
+            category: AVAudioSessionCategory.playback,
+            options: const {AVAudioSessionOptions.duckOthers},
+          ),
+          android: const AudioContextAndroid(
+            contentType: AndroidContentType.speech,
+            // The media volume, the one people turn up to hear.
+            usageType: AndroidUsageType.media,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+        ),
+      );
+      if (turn != _turn) {
+        await player.stop();
+        return;
+      }
+      await done.timeout(const Duration(seconds: 60));
+    } catch (err) {
+      RendelLog.warn('read_aloud_failed', 'the natural voice did not play: $err');
+    }
+    _quiet(turn);
+  }
+
+  /// A server with no natural voice: the phone's own.
+  Future<void> _phone(String text, String locale, int turn) async {
     try {
       final tts = _tts ??= await _engine();
       await tts.stop();
@@ -209,18 +441,27 @@ class RendelVoice {
       await tts.setLanguage(lang);
       final voice = _voiceFor.containsKey(lang) ? _voiceFor[lang] : (_voiceFor[lang] = await _woman(tts, lang));
       if (voice != null) await tts.setVoice(voice);
+      if (turn != _turn) return;
       await tts.speak(text);
     } catch (err) {
       RendelLog.warn('read_aloud_failed', 'could not read the answer aloud: $err');
     }
   }
 
+  void _quiet(int turn) {
+    if (turn == _turn) playing.value = null;
+  }
+
   Future<void> stop() async {
     _turn++;
+    playing.value = null;
+    _fetching?.close();
+    _fetching = null;
     for (final file in _spoken) {
       file.delete().ignore();
     }
     _spoken.clear();
+    await _release();
     try {
       await _player?.stop();
     } catch (_) {}
@@ -228,6 +469,10 @@ class RendelVoice {
       await _tts?.stop();
     } catch (_) {}
   }
+
+  /// For tests: what a second tap would play from.
+  @visibleForTesting
+  String? get keptKey => _kept?.key;
 
   static bool get _iOS => defaultTargetPlatform == TargetPlatform.iOS;
 
@@ -269,3 +514,5 @@ class RendelVoice {
     return {'name': pick['name'] ?? '', 'locale': pick['locale'] ?? lang, if (pick['identifier'] != null) 'identifier': pick['identifier']!};
   }
 }
+
+enum _Next { played, file, silent }

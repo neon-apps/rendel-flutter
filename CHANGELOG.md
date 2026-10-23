@@ -5,6 +5,54 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.0
+
+**Voice**
+
+- Someone who asks out loud hears the answer: its opening is read by itself,
+  and the speaker in the header mutes that. Every other answer has a speaker
+  of its own and is read on a tap.
+- The voice streams, so it starts sooner. It waits for half a second of
+  sound before the first word, so that word is never cut off. Music or a
+  podcast playing in another app is turned down under the voice and comes
+  back up after.
+- The answer's words arrive at a steady pace, with its cards in step,
+  instead of in bursts.
+- The console's switch (Settings › Voice) turns the voice off without a
+  release, as `RendelConfig.readAloud: false` does in code; either off wins.
+- New dependency: `flutter_pcm_sound`. Rebuild the app fully once for the
+  new plugin.
+
+**Preference memory**
+
+- Rendel remembers what a person tells it once, such as "always
+  lactose-free", and says so under the answer, with Undo. Updated and
+  forgotten preferences, and an answer based on one, are shown there too.
+- A card value or form field filled in from a preference says "From your
+  preferences".
+- "What I remember for you" lists each preference with Forget, and Forget
+  all. `Rendel.openMemory(context)` opens it from your own settings or
+  privacy screen.
+- 22 new `memory*` strings in `RendelStrings`, in all six languages.
+
+**Follow-ups and push**
+
+- When something a person asked for has news, Rendel shows it over
+  `RendelLauncher` and at the top of the thread; a tap opens the
+  conversation about it. The SDK asks after `init` and whenever the app
+  comes back to the front, at most every ten minutes.
+- An app with its own launcher reads `Rendel.followup` and calls
+  `Rendel.openFollowup(context)` and `Rendel.dismissFollowup()`.
+  `Rendel.isOpen` says whether the thread is on screen.
+- `Rendel.setPushToken(token)` and `Rendel.handlePush(context, data)` bring
+  follow-ups to the lock screen. The new `rendel_push` 0.1.0 package wires
+  both to Firebase Cloud Messaging for you.
+- `Rendel.track('purchase', {...})` counts a purchase towards the follow-up
+  the person last opened.
+
+No change needed beyond the new version and a full rebuild.
+`RendelLauncher`'s constructor is unchanged.
+
 ## 0.58.6
 
 **Fixed**

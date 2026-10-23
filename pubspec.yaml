@@ -2,7 +2,7 @@ name: rendel
 description: >-
   A Generative UI SDK for Flutter: turns what users say, type and tap into
   native screens in your app, while your team controls every action.
-version: 0.58.6
+version: 0.59.0
 homepage: https://rendel.ai
 repository: https://github.com/neon-apps/rendel-flutter
 
@@ -29,6 +29,11 @@ dependencies:
   # not 0.27.0, whose Android build fails under Flutter 3.44's Kotlin setup.
   maplibre_gl: ^0.27.1
   flutter_tts: ^4.2.5
+  # The answer's voice as the server makes it: raw PCM fed to the speaker as it
+  # arrives, so the first words play while the rest is still spoken. No other
+  # dependencies and no native libraries of its own (Tuna V2, 2026-10-23).
+  flutter_pcm_sound: ^3.3.3
+  # The whole file, for a server that turns the stream away. One release more.
   audioplayers: ^6.4.0
 
 dev_dependencies:

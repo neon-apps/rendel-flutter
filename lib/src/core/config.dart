@@ -125,6 +125,7 @@ class RendelConfig {
     this.voiceIcon = RendelVoiceIcon.microphone,
     this.sendIcon = RendelSendIcon.arrowUp,
     this.feedback = false,
+    this.readAloud = true,
     this.enabled = true,
     this.remoteConfig = true,
     this.strings,
@@ -396,6 +397,13 @@ class RendelConfig {
   /// switched on from the console rather than here.
   final bool feedback;
 
+  /// Answers read aloud in a natural voice: a question asked out loud has its
+  /// answer's opening read by itself (the header's speaker mutes that), and
+  /// every answer has a speaker of its own that reads it on a tap. On unless
+  /// false; the app's console (Settings › Voice) can turn it off too, and
+  /// either off wins.
+  final bool readAloud;
+
   /// The kill switch, in code. The console can flip the published one, which
   /// is how a customer pulls the copilot out of a shipped binary without an
   /// App Store review. Setting it false here disables it regardless.
@@ -460,6 +468,7 @@ class RendelConfig {
     RendelVoiceIcon? voiceIcon,
     RendelSendIcon? sendIcon,
     bool? feedback,
+    bool? readAloud,
   }) {
     return RendelConfig(
       apiBaseUrl: apiBaseUrl,
@@ -483,6 +492,8 @@ class RendelConfig {
       voiceIcon: voiceIcon ?? this.voiceIcon,
       sendIcon: sendIcon ?? this.sendIcon,
       feedback: feedback ?? this.feedback,
+      // Off in code or off in the console: either is the floor, as for [enabled].
+      readAloud: readAloud == null ? this.readAloud : (this.readAloud && readAloud),
       // A host that turned the copilot off in code stays off whatever the
       // console publishes: the local switch is the floor, not a default.
       enabled: enabled == null ? this.enabled : (this.enabled && enabled),

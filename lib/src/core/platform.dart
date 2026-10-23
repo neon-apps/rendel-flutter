@@ -17,6 +17,20 @@ class RendelPlatform {
 
   static const _channel = MethodChannel('rendel/platform');
 
+  /// The voice's hold on the audio: on while an answer is read aloud (other
+  /// sound ducked under it, heard with the silent switch on), let go after so
+  /// the sound it ducked comes back up. Nothing where there is no native half.
+  static Future<void> voiceSession(bool active) async {
+    if (kIsWeb) return;
+    try {
+      await _channel.invokeMethod<void>('voiceSession', active);
+    } on MissingPluginException {
+      // A test, or a host on a build of the native half from before it.
+    } on PlatformException catch (err) {
+      RendelLog.warn('voice_session_failed', 'the audio session did not ${active ? 'start' : 'stop'}: ${err.message}');
+    }
+  }
+
   /// The lines the built-in microphone needs in `ios/Runner/Info.plist`.
   static const microphoneUsageKeys = [
     'NSMicrophoneUsageDescription',

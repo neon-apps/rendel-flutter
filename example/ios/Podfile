@@ -4,6 +4,9 @@
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
+# The app's own minimum: Xcode 27 builds nothing below iOS 15, and the Flutter pod took 13 without this.
+platform :ios, '15.0'
+
 project 'Runner', {
   'Debug' => :debug,
   'Profile' => :release,
@@ -39,5 +42,9 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
+    # Every pod at the app's minimum, the Flutter pod's own podspec included.
+    target.build_configurations.each do |config|
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
+    end
   end
 end

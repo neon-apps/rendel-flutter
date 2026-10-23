@@ -564,6 +564,20 @@ sealed class RendelWireEvent {
           lang: _text(data['lang']),
           parts: (data['parts'] as List?)?.whereType<String>().toList() ?? const [],
         );
+      case 'memory':
+        final op = MemoryOp.values.asNameMap()[_text(data['op'])];
+        final key = _text(data['key']);
+        if (op == null || key == null || key.isEmpty) return null;
+        return MemoryChange(
+          op: op,
+          kind: MemoryKind.values.asNameMap()[_text(data['kind'])],
+          id: _text(data['id']),
+          key: key,
+          label: _text(data['label']),
+          value: _text(data['value']),
+          category: _text(data['category']),
+          expiresAt: DateTime.tryParse(_text(data['expires_at']) ?? ''),
+        );
       case 'ping':
         return const Ping();
     }
@@ -693,6 +707,48 @@ class TurnSpeech extends RendelWireEvent {
 
 class Ping extends RendelWireEvent {
   const Ping();
+}
+
+/// What a turn did to the person's memory (`design/plans/preference-memory.md`).
+enum MemoryOp { saved, updated, forgotten, used }
+
+/// Who a note came from: the person said it (`stated`), Rendel noticed it
+/// (`learned`), or the app wrote it (`set`).
+enum MemoryKind { stated, learned, set }
+
+/// One `memory` event: a note saved, changed or forgotten by this turn, or
+/// one the answer relied on ([MemoryOp.used]). One event per note, before
+/// `turn.end`, for the chips under the answer.
+///
+/// [id] is the note's, for Undo (`DELETE /v1/memory/:id`); null for a forget,
+/// whose row is gone. [key] `*` is a forget of everything.
+class MemoryChange extends RendelWireEvent {
+  MemoryChange({
+    required this.op,
+    required this.key,
+    this.kind,
+    this.id,
+    this.label,
+    this.value,
+    this.category,
+    this.expiresAt,
+  });
+  final MemoryOp op;
+  final MemoryKind? kind;
+  final String? id;
+  final String key;
+  final String? label;
+  final String? value;
+  final String? category;
+
+  /// The instant the note stops holding: the midnight after its last day.
+  final DateTime? expiresAt;
+
+  /// True once this save was taken back with Undo, on this device.
+  bool undone = false;
+
+  /// What the chip calls the note: its label, or its key.
+  String get name => label ?? key;
 }
 
 // ————————————————————————— manifest —————————————————————————

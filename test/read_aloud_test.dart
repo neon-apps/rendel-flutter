@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:rendel/rendel.dart';
 import 'package:rendel/src/core/read_aloud.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
@@ -35,19 +38,59 @@ class _Api extends RendelApiClient {
 class _Voice extends RendelVoice {
   final said = <(String, String)>[];
   final urls = <String?>[];
-  final parts = <List<String>>[];
   var stops = 0;
 
   @override
-  Future<void> speak(String text, String locale, {String? url, List<String> parts = const []}) async {
-    if (!on.value) return;
+  Future<void> speak(String text, String locale, {String? url, String? key}) async {
     said.add((text, locale));
     urls.add(url);
-    this.parts.add(parts);
+    playing.value = key ?? text;
   }
 
   @override
-  Future<void> stop() async => stops++;
+  Future<void> stop() async {
+    stops++;
+    playing.value = null;
+  }
+}
+
+/// The speaker, as a list of what it was given.
+class _Out implements RendelPcmOut {
+  final opened = <int>[];
+  final fed = <int>[];
+  var closes = 0;
+
+  @override
+  Future<void> open(int sampleRate) async => opened.add(sampleRate);
+
+  @override
+  Future<void> feed(Uint8List s16le) async => fed.add(s16le.length);
+
+  @override
+  Future<void> drained() async {}
+
+  @override
+  Future<void> close() async => closes++;
+}
+
+/// A server that sends a fifth of a second of the voice and then nothing, as
+/// api.rendel.ai did for 18 seconds (2026-10-23); closing the client ends it.
+class _Stalls extends http.BaseClient {
+  final _body = StreamController<List<int>>();
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    _body.add(Uint8List(9600));
+    return http.StreamedResponse(_body.stream, 200,
+        headers: {'content-type': 'audio/pcm; rate=24000; channels=1; encoding=s16le'});
+  }
+
+  @override
+  void close() {
+    if (_body.isClosed) return;
+    _body.addError(http.ClientException('closed'));
+    _body.close();
+  }
 }
 
 WireBlock _text(String markdown) =>
@@ -79,6 +122,96 @@ void main() {
     });
   });
 
+  group('sentences', () {
+    test('are cut as the server cuts them: not inside a number, after Dr. or before a lower-case ordinal', () {
+      expect(sentences('Whey Protein 2.270 g şu an 1.299,90 TL. Stokta var.'),
+          ['Whey Protein 2.270 g şu an 1.299,90 TL.', 'Stokta var.']);
+      expect(sentences('Dr. Ayşe yarın 3. katta. Geç kalma.'), ['Dr. Ayşe yarın 3. katta.', 'Geç kalma.']);
+    });
+  });
+
+  group('the natural voice', () {
+    late List<Uri> asked;
+    late _Out out;
+    late http.Client Function() client;
+
+    /// A server that answers [respond] for each request.
+    void serve(http.StreamedResponse Function(Uri url) respond) {
+      asked = [];
+      client = () => MockClient.streaming((request, _) async {
+            asked.add(request.url);
+            return respond(request.url);
+          });
+    }
+
+    http.StreamedResponse pcm(List<int> pieces) => http.StreamedResponse(
+          Stream.fromIterable([for (final bytes in pieces) Uint8List(bytes)]),
+          200,
+          headers: {'content-type': 'audio/pcm; rate=24000; channels=1; encoding=s16le'},
+        );
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues({});
+      out = _Out();
+    });
+
+    test('is streamed to the speaker as it arrives, and kept for a second tap', () async {
+      serve((_) => pcm([4800, 43200]));
+      final voice = RendelVoice(out: out, client: client);
+      await voice.speak('Yarın hava açık.', 'tr', url: 'https://api.test/v1/speech/t1', key: 'a1');
+      expect(asked.single.toString(), 'https://api.test/v1/speech/t1?f=pcm');
+      expect(out.opened, [24000]);
+      expect(out.fed.fold<int>(0, (a, b) => a + b), 48000);
+      expect(voice.playing.value, isNull, reason: 'heard to the end');
+      expect(voice.keptKey, 'a1');
+      await voice.speak('Yarın hava açık.', 'tr', url: 'https://api.test/v1/speech/t1', key: 'a1');
+      expect(asked, hasLength(1), reason: 'the second tap plays what was kept');
+      expect(out.fed.fold<int>(0, (a, b) => a + b), 96000);
+    });
+
+    test('keeps an odd byte for its other half', () async {
+      serve((_) => pcm([4801, 4799]));
+      final voice = RendelVoice(out: out, client: client);
+      await voice.speak('Bir.', 'tr', url: 'https://api.test/v1/speech/t2');
+      expect(out.fed.every((bytes) => bytes.isEven), isTrue);
+      expect(out.fed.fold<int>(0, (a, b) => a + b), 9600);
+    });
+
+    test('waits for half a second of the voice before the first sound, then feeds the rest as it comes', () async {
+      // As api.rendel.ai sends it: a fifth of a second, a pause, then the rest.
+      serve((_) => pcm([9600, 4800, 9600, 24000]));
+      final voice = RendelVoice(out: out, client: client);
+      await voice.speak('Yarın hava açık.', 'tr', url: 'https://api.test/v1/speech/t5');
+      expect(out.fed, [24000, 24000]);
+    });
+
+    test('stays silent when the voice stalls before half a second of it is in', () async {
+      final voice = RendelVoice(out: out, client: _Stalls.new);
+      await voice.speak('Yarın hava açık.', 'tr', url: 'https://api.test/v1/speech/t6');
+      expect(out.opened, isEmpty, reason: 'the speaker was never opened');
+      expect(voice.playing.value, isNull);
+    });
+
+    test('asks for the whole file where the server turned the stream away', () async {
+      serve((url) => url.query.contains('f=pcm')
+          ? http.StreamedResponse(const Stream.empty(), 404)
+          : http.StreamedResponse(Stream.value(Uint8List(2)), 200));
+      final voice = RendelVoice(out: out, client: client);
+      await voice.speak('Bir.', 'tr', url: 'https://api.test/v1/speech/t3');
+      expect(asked.map((u) => u.toString()), ['https://api.test/v1/speech/t3?f=pcm', 'https://api.test/v1/speech/t3']);
+      expect(out.opened, isEmpty);
+    });
+
+    test('stays silent, not robotic, when the natural voice fails', () async {
+      serve((_) => http.StreamedResponse(const Stream.empty(), 502));
+      final voice = RendelVoice(out: out, client: client);
+      await voice.speak('Bir.', 'tr', url: 'https://api.test/v1/speech/t4');
+      expect(asked, hasLength(1));
+      expect(out.opened, isEmpty);
+      expect(voice.playing.value, isNull);
+    });
+  });
+
   group('read_aloud', () {
     Future<List<Object?>> capabilities(bool reads) async {
       final api = _Api(const [TurnEnd(status: 'completed', pending: [])]);
@@ -96,8 +229,10 @@ void main() {
   group('the thread', () {
     setUp(() => SharedPreferences.setMockInitialValues({}));
 
+    late Completer<String?> heard;
+
     Future<(ConversationController, _Voice)> open(WidgetTester tester, List<RendelWireEvent> script,
-        {String? locale, Future<void>? hold}) async {
+        {String? locale, Future<void>? hold, bool voiced = true}) async {
       final c = ConversationController(
         api: _Api(script, hold: hold),
         actions: const {},
@@ -106,18 +241,48 @@ void main() {
       );
       final voice = _Voice();
       await tester.pumpWidget(MaterialApp(
-        home: Scaffold(body: ThreadScreen(controller: c, voice: voice)),
+        home: Scaffold(
+          body: ThreadScreen(
+            controller: c,
+            voice: voiced ? voice : null,
+            onDictate: (onPartial) {
+              heard = Completer<String?>();
+              return heard.future;
+            },
+            onStopDictating: () {},
+          ),
+        ),
       ));
+      await tester.pump();
       return (c, voice);
     }
 
-    List<RendelWireEvent> answer(String markdown, {String? lang, String? speech}) => [
+    /// A question asked out loud: the microphone, and its words heard whole.
+    Future<void> say(WidgetTester tester, String words) async {
+      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      await tester.pump();
+      heard.complete(words);
+      await tester.pump();
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    Future<void> type(WidgetTester tester, ConversationController c, String words) async {
+      await tester.runAsync(() => c.send(words));
+      // The page's entrance, before its foot can be found.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    List<RendelWireEvent> answer(String markdown, {String? lang, String? token}) => [
           const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
           BlockReady(index: 0, block: _text(markdown)),
-          TurnEnd(status: 'completed', pending: const [], lang: lang, speech: speech),
+          if (token != null) TurnSpeech(token: token, text: markdown, lang: lang),
+          TurnEnd(status: 'completed', pending: const [], lang: lang),
         ];
 
-    testWidgets('starts reading the moment the opening is written, while the cards are still coming', (tester) async {
+    testWidgets("reads a spoken question's answer by itself, the moment its opening is written", (tester) async {
       final end = Completer<void>();
       final (c, voice) = await open(
         tester,
@@ -125,90 +290,90 @@ void main() {
           const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
           const BlockStart(index: 0, id: 't', blockType: 'text'),
           const BlockDelta(index: 0, textDelta: 'C vitamini için bir doktora danışın. İşte mağazadakiler.'),
-          const TurnSpeech(
-            token: 'tok9',
-            text: 'C vitamini için bir doktora danışın. İşte mağazadakiler.',
-            lang: 'tr',
-            parts: ['p1', 'p2'],
-          ),
+          const TurnSpeech(token: 'tok9', text: 'C vitamini için bir doktora danışın. İşte mağazadakiler.', lang: 'tr'),
           const BlockStart(index: 1, id: 'p', blockType: 'product_cards'),
-          const TurnEnd(status: 'completed', pending: [], lang: 'tr', speech: 'tok9'),
+          const TurnEnd(status: 'completed', pending: [], lang: 'tr'),
         ],
         hold: end.future,
       );
-      late Future<bool> sent;
-      await tester.runAsync(() async {
-        sent = c.send('C vitamini önerir misin');
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-      });
+      await say(tester, 'C vitamini önerir misin');
       expect(c.busy, isTrue, reason: 'the turn has not ended');
       expect(voice.said, [('C vitamini için bir doktora danışın. İşte mağazadakiler.', 'tr')]);
-      expect(voice.urls.single, endsWith('/v1/speech/tok9'));
-      // A sentence at a time, so the first is heard soonest.
-      expect(voice.parts.single.map((u) => u.split('/').last), ['p1', 'p2']);
+      expect(voice.urls.single, '${c.api.config.apiBaseUrl}/v1/speech/tok9');
       end.complete();
-      await tester.runAsync(() => sent);
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
       await tester.pump();
       expect(voice.said, hasLength(1), reason: 'read once, not again at the end');
+      await tester.pump(const Duration(minutes: 2));
     });
 
-    testWidgets("plays the server's natural voice when it sent a token", (tester) async {
-      final (c, voice) = await open(tester, answer('Yarın hava açık.', lang: 'tr', speech: 'tok123'));
-      await tester.runAsync(() => c.send('Hava nasıl?'));
+    testWidgets("does not read a typed question's answer by itself; its own speaker reads it on a tap",
+        (tester) async {
+      final (c, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok1'));
+      await type(tester, c, 'Weather?');
+      expect(voice.said, isEmpty);
+      await tester.tap(find.bySemanticsLabel('Read aloud'));
       await tester.pump();
-      expect(voice.urls.single, '${c.api.config.apiBaseUrl}/v1/speech/tok123');
+      expect(voice.said, [('Tomorrow is clear.', 'en')]);
+      expect(voice.urls.single, '${c.api.config.apiBaseUrl}/v1/speech/tok1');
+      // While it reads, the same speaker stops it.
+      final stops = voice.stops;
+      await tester.tap(find.bySemanticsLabel('Stop reading'));
+      await tester.pump();
+      expect(voice.stops, greaterThan(stops));
     });
 
-    testWidgets('and leaves it to the phone when it did not', (tester) async {
-      final (c, voice) = await open(tester, answer('Yarın hava açık.', lang: 'tr'));
-      await tester.runAsync(() => c.send('Hava nasıl?'));
+    testWidgets('offers no speaker once its voice token has lived its thirty minutes', (tester) async {
+      final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok2'));
+      await type(tester, c, 'Weather?');
+      expect(find.bySemanticsLabel('Read aloud'), findsOneWidget);
+      final answered = c.messages.last;
+      answered.speech = RendelAnswerSpeech(token: 'tok2', lang: 'en', at: DateTime.now().subtract(const Duration(minutes: 31)));
+      answered.touch();
       await tester.pump();
+      expect(find.bySemanticsLabel('Read aloud'), findsNothing);
+    });
+
+    testWidgets('leaves it to the phone where the server has no voice', (tester) async {
+      final (_, voice) = await open(tester, answer('Yarın hava açık.', lang: 'tr'));
+      await say(tester, 'Hava nasıl?');
       expect(voice.urls.single, isNull);
-    });
-
-    testWidgets("reads a finished answer in the answer's language", (tester) async {
-      final (c, voice) = await open(tester, answer('Yarın hava açık. Detaylar aşağıda.', lang: 'tr'), locale: 'en');
-      await tester.runAsync(() => c.send('Hava nasıl?'));
-      await tester.pump();
-      expect(voice.said, [('Yarın hava açık. Detaylar aşağıda.', 'tr')]);
+      expect(voice.said, [('Yarın hava açık.', 'tr')]);
     });
 
     testWidgets("falls back to the app's language when the server does not say", (tester) async {
-      final (c, voice) = await open(tester, answer('Tomorrow is clear.'), locale: 'en-GB');
-      await tester.runAsync(() => c.send('Weather?'));
-      await tester.pump();
+      final (_, voice) = await open(tester, answer('Tomorrow is clear.'), locale: 'en-GB');
+      await say(tester, 'Weather?');
       expect(voice.said.single.$2, 'en-GB');
     });
 
     testWidgets('reads nothing that lands with the app in the background, and stops when it goes there',
         (tester) async {
-      final (c, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
+      final (_, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
       // The order the platform reports them in; the binding refuses a skipped step.
       void go(List<AppLifecycleState> states) => states.forEach(tester.binding.handleAppLifecycleStateChanged);
       final stops = voice.stops;
       go([AppLifecycleState.inactive, AppLifecycleState.hidden, AppLifecycleState.paused]);
       expect(voice.stops, greaterThan(stops), reason: 'put away, the voice stops');
-      await tester.runAsync(() => c.send('Weather?'));
-      await tester.pump();
+      await say(tester, 'Weather?');
       expect(voice.said, isEmpty);
       go([AppLifecycleState.hidden, AppLifecycleState.inactive, AppLifecycleState.resumed]);
     });
 
     testWidgets('reads nothing of a turn that did not finish', (tester) async {
-      final (c, voice) = await open(tester, [
+      final (_, voice) = await open(tester, [
         const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
         BlockReady(index: 0, block: _text('Half an answer.')),
         const TurnEnd(status: 'error', pending: []),
       ]);
-      await tester.runAsync(() => c.send('Hi'));
-      await tester.pump();
+      await say(tester, 'Hi');
       expect(voice.said, isEmpty);
     });
 
-    testWidgets('the speaker turns it off, and a new question stops the voice', (tester) async {
+    testWidgets("the header's speaker mutes what is read by itself, and a new question stops the voice",
+        (tester) async {
       final (c, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
-      await tester.runAsync(() => c.send('Weather?'));
-      await tester.pump();
+      await say(tester, 'Weather?');
       expect(voice.said, hasLength(1));
 
       await tester.tap(find.bySemanticsLabel('Read answers aloud'));
@@ -217,13 +382,24 @@ void main() {
       expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
 
       final stopsBefore = voice.stops;
-      await tester.enterText(find.byType(TextField), 'And Friday?');
-      await tester.pump();
-      await tester.tap(find.bySemanticsLabel('Send message'));
-      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
-      await tester.pump();
+      await say(tester, 'And Friday?');
       expect(voice.stops, greaterThan(stopsBefore));
-      expect(voice.said, hasLength(1), reason: 'off stays off');
+      expect(voice.said, hasLength(1), reason: 'muted, a spoken question is not read by itself');
+    });
+
+    testWidgets('draws no speaker at all where the host or the console turned voice off', (tester) async {
+      final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok3'), voiced: false);
+      await type(tester, c, 'Weather?');
+      expect(find.bySemanticsLabel('Read aloud'), findsNothing);
+      expect(find.bySemanticsLabel('Read answers aloud'), findsNothing);
+    });
+  });
+
+  group('the console switch', () {
+    test('is a floor, like enabled: off in code or off in the console stays off', () {
+      expect(const RendelConfig().readAloud, isTrue);
+      expect(const RendelConfig().copyWith(readAloud: false).readAloud, isFalse);
+      expect(const RendelConfig(readAloud: false).copyWith(readAloud: true).readAloud, isFalse);
     });
   });
 }

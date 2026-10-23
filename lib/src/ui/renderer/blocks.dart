@@ -126,6 +126,11 @@ Widget buildFallback(BuildContext context, WireBlock block) {
 Widget _textParagraph(BuildContext context, String text, TextStyle style, TextAlign? align, {required bool caret}) {
   final theme = RendelThemeScope.of(context);
   final marks = _markSpans(text);
+  if (!caret) {
+    final spans = marks?.spans ?? [TextSpan(text: text.isEmpty ? '…' : text)];
+    final drawn = _revealable(context, spans, style, align);
+    return marks == null ? drawn : _Marks(ranges: marks.ranges, color: theme.mark, child: drawn);
+  }
   final drawn = Text.rich(
     TextSpan(
       children: [
@@ -222,12 +227,12 @@ Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher di
     }
 
     if (marks == null) {
-      return Text(text.isEmpty ? '…' : text, style: style, textAlign: align);
+      return _revealable(context, [TextSpan(text: text.isEmpty ? '…' : text)], style, align);
     }
     return _Marks(
       ranges: marks.ranges,
       color: theme.mark,
-      child: Text.rich(TextSpan(children: marks.spans), style: style, textAlign: align),
+      child: _revealable(context, marks.spans, style, align),
     );
   }
 
@@ -1967,7 +1972,7 @@ Widget _confirmCard(
         if (display.isNotEmpty || controls.isNotEmpty) ...[
           SizedBox(height: theme.space.md),
           _KvPanel(children: [
-            for (final row in display)
+            for (final row in display) ...[
               if (controls[_str(row['param'])] case final control?)
                 _EditRow(control: control, edits: edits!)
               // A support message or an address is read whole, from the left,
@@ -1984,6 +1989,8 @@ Widget _confirmCard(
                   value: _str(row['value']) ?? '',
                   part: 'details',
                 ),
+              if (row['remembered'] == true) _Remembered(dispatch: dispatch),
+            ],
             // An editable value the call left empty (an optional note) still
             // has its control.
             for (final entry in controls.entries)
@@ -2124,6 +2131,38 @@ class _StackedRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// "From your preferences", with a bookmark, under a value the server filled
+/// from what the person asked Rendel to remember (preference memory §3.4).
+/// A tap opens "What I remember for you", where the build can open it.
+class _Remembered extends StatelessWidget {
+  const _Remembered({required this.dispatch});
+
+  final RendelDispatcher dispatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final words = RendelStringsScope.of(context).memoryFromPreference;
+    final faint = theme.colors.onSurfaceFaint;
+    final mark = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.bookmark_border_rounded, size: theme.type.caption, color: faint),
+        SizedBox(width: theme.space.xs),
+        Flexible(child: Text(words, style: theme.text.caption.copyWith(color: faint))),
+      ],
+    );
+    final open = dispatch.onOpenMemory;
+    if (open == null) return mark;
+    return RendelPressable(
+      semanticLabel: words,
+      onTap: open,
+      pressedScale: 0.98,
+      child: Align(alignment: AlignmentDirectional.centerStart, widthFactor: 1, child: mark),
     );
   }
 }
@@ -5047,7 +5086,7 @@ class _FormBlockState extends State<_FormBlock> {
     final kind = _str(field['kind']);
     final canAttach =
         widget.dispatch.onPickFile != null && widget.dispatch.onUpload != null;
-    return _Field(
+    final control = _Field(
       field: field,
       controller: _controllers[name],
       focusNode: _focus[name],
@@ -5066,6 +5105,19 @@ class _FormBlockState extends State<_FormBlock> {
       files: kind == 'upload' ? _filesOf(name) : null,
       onAttach: kind == 'upload' && canAttach ? () => _attach(field) : null,
       onDetach: (file) => _detach(name, file),
+    );
+    // Filled from the person's notes, until they change it themselves.
+    if (field['remembered'] != true || formFieldKeys(field).any(_edited.contains)) return control;
+    final theme = RendelThemeScope.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        control,
+        Padding(
+          padding: EdgeInsets.fromLTRB(theme.space.md, 0, theme.space.md, theme.space.xs),
+          child: _Remembered(dispatch: widget.dispatch),
+        ),
+      ],
     );
   }
 
@@ -8658,6 +8710,20 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
   bool _fresh = false;
   bool _started = false;
 
+  /// How long this block waits for the one before it, held at the start of
+  /// its own animation rather than on a timer.
+  var _waitMs = 0;
+
+  /// The block below keeps its state when the blur above it is dropped as it
+  /// lands: without this it was built afresh, and its words began again.
+  final _keep = GlobalKey();
+
+  /// When the next block may start entering: blocks that arrive in one burst
+  /// enter at least [_enterGap] apart, in step rather than all at once (Tuna
+  /// 2026-10-23: smooth, as Monogram's).
+  static DateTime _nextEnter = DateTime.fromMillisecondsSinceEpoch(0);
+  static const _enterGap = Duration(milliseconds: 150);
+
   @override
   void initState() {
     super.initState();
@@ -8670,9 +8736,18 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // A section arriving on a page rises out of a blur (`design/PAGES.md`).
-    _controller.duration = const Duration(milliseconds: 520);
-    _curve.curve = RendelThemeScope.of(context).motion.curve;
+    if (!_started && _fresh) {
+      final now = DateTime.now();
+      final wait = _nextEnter.isAfter(now) ? _nextEnter.difference(now) : Duration.zero;
+      _nextEnter = now.add(wait + _enterGap);
+      _waitMs = wait.inMilliseconds;
+    }
+    // A section arriving on a page rises out of a blur (`design/PAGES.md`),
+    // after the block before it has begun to.
+    const enterMs = 520;
+    final curve = RendelThemeScope.of(context).motion.curve;
+    _controller.duration = Duration(milliseconds: enterMs + _waitMs);
+    _curve.curve = _waitMs == 0 ? curve : Interval(_waitMs / (enterMs + _waitMs), 1, curve: curve);
     if (_started) return;
     _started = true;
     if (_fresh) {
@@ -8691,10 +8766,13 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    if (MediaQuery.disableAnimationsOf(context)) return widget.child;
+    final child = KeyedSubtree(key: _keep, child: _Arriving(fresh: _fresh, child: widget.child));
+    if (MediaQuery.disableAnimationsOf(context)) return child;
     const travel = 14.0;
     return FadeTransition(
       opacity: _curve,
+      // There for a screen reader while it fades in, waiting its turn included.
+      alwaysIncludeSemantics: true,
       // Translated by a fixed distance rather than a fraction of the block's
       // own height, so the arrival reads the same whether the block is one
       // line of prose or a rail of product cards.
@@ -8713,10 +8791,106 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
             child: moved,
           );
         },
-        child: widget.child,
+        child: child,
       ),
     );
   }
+}
+
+/// Whether the block below is arriving now, for the first time: a text block
+/// then has its words come in one after another ([_WordReveal]).
+class _Arriving extends InheritedWidget {
+  const _Arriving({required this.fresh, required super.child});
+
+  final bool fresh;
+
+  static bool of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_Arriving>()?.fresh ?? false;
+
+  @override
+  bool updateShouldNotify(_Arriving oldWidget) => oldWidget.fresh != fresh;
+}
+
+/// An answer's words, coming in one after another as it arrives (Tuna
+/// 2026-10-23: the text came in jerks, not as smoothly as Monogram's). The
+/// server sends prose a block at a time, so the pace is set here: each word
+/// fades in 30 ms after the last, the whole held between 250 and 1200 ms.
+/// Colour only, so the paragraph is laid out once and its marks stay where
+/// they are; the text is all there for a screen reader from the start.
+class _WordReveal extends StatefulWidget {
+  const _WordReveal({required this.spans, required this.style, this.align});
+
+  /// Plain text spans, as `_markSpans` makes them.
+  final List<InlineSpan> spans;
+  final TextStyle style;
+  final TextAlign? align;
+
+  @override
+  State<_WordReveal> createState() => _WordRevealState();
+}
+
+class _WordRevealState extends State<_WordReveal> with SingleTickerProviderStateMixin {
+  static const _fade = 180.0;
+  late final AnimationController _controller = AnimationController(vsync: this);
+  late final List<List<String>> _pieces = [
+    for (final span in widget.spans)
+      if (span is TextSpan) RegExp(r'\s+|\S+').allMatches(span.text ?? '').map((m) => m.group(0)!).toList() else const [],
+  ];
+  late final int _words = _pieces.expand((p) => p).where((piece) => piece.trim().isNotEmpty).length;
+  late final double _step = _words == 0 ? 0 : (_words * 30).clamp(250, 1200) / _words;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.duration = Duration(milliseconds: (_step * _words + _fade).round());
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ink = widget.style.color ?? DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000);
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final ms = _controller.value * (_controller.duration?.inMilliseconds ?? 0);
+        var word = 0;
+        return Text.rich(
+          TextSpan(children: [
+            for (var i = 0; i < widget.spans.length; i++)
+              if (widget.spans[i] is TextSpan)
+                TextSpan(children: [
+                  for (final piece in _pieces[i])
+                    if (piece.trim().isEmpty)
+                      TextSpan(text: piece)
+                    else
+                      TextSpan(
+                        text: piece,
+                        style: TextStyle(color: ink.withValues(alpha: ink.a * ((ms - _step * word++) / _fade).clamp(0.0, 1.0))),
+                      ),
+                ])
+              else
+                widget.spans[i],
+          ]),
+          style: widget.style,
+          textAlign: widget.align,
+        );
+      },
+    );
+  }
+}
+
+/// [spans] as a paragraph: its words coming in one after another when its
+/// block is arriving now and ready whole, as it is.
+Widget _revealable(BuildContext context, List<InlineSpan> spans, TextStyle style, TextAlign? align) {
+  if (_Arriving.of(context) && !MediaQuery.disableAnimationsOf(context)) {
+    return _WordReveal(spans: spans, style: style, align: align);
+  }
+  return Text.rich(TextSpan(children: spans), style: style, textAlign: align);
 }
 
 // ————————————————————————— comparison —————————————————————————

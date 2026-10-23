@@ -610,6 +610,8 @@ class RendelRemoteConfig {
       voiceIcon: RendelVoiceIcon.fromName(_iconName(copilot['voiceIcon'])),
       sendIcon: RendelSendIcon.fromName(_iconName(copilot['sendIcon'])),
       feedback: copilot['feedback'] is bool ? copilot['feedback'] as bool : null,
+      // The console's voice switch (Settings › Voice), laid over the config by the API.
+      readAloud: copilot['readAloud'] is bool ? copilot['readAloud'] as bool : null,
     );
   }
 

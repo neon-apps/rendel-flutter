@@ -10,6 +10,7 @@ import '../core/batteries.dart' show dial, mail, openExternally;
 import '../core/events.dart';
 import '../core/locale.dart';
 import '../core/log.dart';
+import '../core/memory.dart';
 import '../core/platform.dart';
 import '../core/route.dart';
 import '../protocol/protocol.dart';
@@ -65,6 +66,9 @@ class RendelMessage extends ChangeNotifier {
 
   RendelMessage.assistant() : role = 'assistant', blocks = [];
 
+  /// A finished turn from the server's history.
+  RendelMessage.history(this.role, this.blocks, {this.serverId});
+
   final String role;
   final List<WireBlock> blocks;
 
@@ -90,9 +94,31 @@ class RendelMessage extends ChangeNotifier {
   /// is no page.
   RendelDetail? detail;
 
+  /// This answer's opening as the server said it would be read: the token its
+  /// natural voice is fetched with (null where the server has none), its
+  /// words and language, and when, since the token lives thirty minutes. For
+  /// the answer's own speaker, which reads it on a tap. Local.
+  RendelAnswerSpeech? speech;
+
+  /// What this answer did to the person's memory, in the order the server
+  /// said it: saves, changes and forgets, and the notes it relied on that no
+  /// earlier answer in this thread named. For the chips under it; never in
+  /// history.
+  final List<MemoryChange> memory = [];
+
   /// Something inside this turn changed: a token arrived, a block hydrated, a
   /// confirm card resolved.
   void touch() => notifyListeners();
+}
+
+/// What [RendelMessage.speech] holds.
+class RendelAnswerSpeech {
+  RendelAnswerSpeech({this.token, this.text, this.lang, DateTime? at}) : at = at ?? DateTime.now();
+
+  final String? token;
+  final String? text;
+  final String? lang;
+  final DateTime at;
 }
 
 /// A card opened over its page (`design/DETAIL.md`): what the card itself
@@ -161,10 +187,10 @@ class ConversationController extends ChangeNotifier {
   static bool _always() => true;
   static bool _never() => false;
 
-  /// Whether this thread will read the answer aloud: declared as `read_aloud`,
-  /// so the server sends the opening the moment it is written and begins its
-  /// voice. False on a test key and with the speaker off, where a voice begun
-  /// would be paid for and never played.
+  /// Whether answers may be read aloud here: declared as `read_aloud`, so the
+  /// server sends each opening's voice token as it is written. A token costs
+  /// nothing until a voice is fetched with it: by itself for a spoken
+  /// question, or on a tap on the answer's speaker.
   final bool Function() readsAloud;
 
   /// Whether context providers and device reads run side by side, up to four
@@ -190,6 +216,10 @@ class ConversationController extends ChangeNotifier {
   static Map<String, String>? _nobody() => null;
 
   final RendelApiClient api;
+
+  /// What Rendel remembers about the person: the sheet's list and Forget,
+  /// and a chip's Undo.
+  late final RendelMemory memory = RendelMemory(api, user: user);
 
   /// Who is signed in right now, read on every turn — `identify` and `reset`
   /// can change it while the thread is open. Null sends `user: null`, which
@@ -237,13 +267,14 @@ class ConversationController extends ChangeNotifier {
   /// nothing to the user. The argument is for the developer's log.
   final void Function(String reason)? onUnavailable;
 
-  /// An answer to read aloud: the message, its opening's words when the
-  /// server sent them, the language they are in when it could tell, and the
-  /// token they are spoken from (`/v1/speech`). Called once a question: the
-  /// moment the server says the opening is written (`speech`), ahead of the
-  /// cards under it, or at the turn's end from a server that does not. The
-  /// thread on screen sets it; an answer with no thread open is read by nobody.
-  void Function(RendelMessage answer, {String? text, String? lang, String? speech, List<String> parts})? onAnswered;
+  /// An answer that may be read aloud: the message, its opening's words when
+  /// the server sent them, the language they are in when it could tell, and
+  /// the token they are spoken from (`/v1/speech`). Called once a question:
+  /// the moment the server says the opening is written (`speech`), ahead of
+  /// the cards under it, or at the turn's end from a server that does not.
+  /// The same is kept on the message ([RendelMessage.speech]). The thread on
+  /// screen sets it, and decides whether it is read.
+  void Function(RendelMessage answer, {String? text, String? lang, String? speech})? onAnswered;
 
   /// Whether this question's answer has been handed to [onAnswered] already.
   var _readThisQuestion = false;
@@ -379,6 +410,19 @@ class ConversationController extends ChangeNotifier {
   bool _lastErrorRetryable = true;
   bool get canRetry =>
       errorText != null && _lastPayload != null && !busy && _lastErrorRetryable;
+
+  /// The notes a "Based on…" chip has named in this thread, by id, so each is
+  /// named once (`design/plans/preference-memory.md` §3.3). Emptied by
+  /// [reset].
+  final Set<String> _usedShown = {};
+
+  /// Memory changes from a pass that drew nothing (it only ran the app's
+  /// reads, and a forget is done in whichever pass asks), for the answer that
+  /// follows it.
+  final List<MemoryChange> _carriedMemory = [];
+
+  /// Saves whose Undo is on its way.
+  final Set<MemoryChange> _undoing = {};
 
   /// Wire-index → block for the turn currently streaming.
   final Map<int, WireBlock> _turnBlocks = {};
@@ -656,6 +700,26 @@ class ConversationController extends ChangeNotifier {
     if (cleared) return;
 
     await api.sendFeedback({'message_id': id, 'rating': rating});
+  }
+
+  /// Takes back [change], a save shown under an answer ("I'll remember: … ·
+  /// Undo"): `DELETE /v1/memory/:id`, then the chip says it was not saved.
+  ///
+  /// Returns whether the note is gone. Anything but a save with an id, a
+  /// save already taken back, or one whose Undo is on its way, sends nothing.
+  Future<bool> undo(MemoryChange change) async {
+    final id = change.id;
+    if (change.op != MemoryOp.saved || id == null || change.undone || !_undoing.add(change)) return false;
+    try {
+      if (!await memory.forget(id)) return false;
+      change.undone = true;
+      for (final message in messages) {
+        if (message.memory.contains(change)) message.touch();
+      }
+      return true;
+    } finally {
+      _undoing.remove(change);
+    }
   }
 
   /// A channel of the `contact` block [block] was tapped (analytics-roi T3):
@@ -1000,6 +1064,8 @@ class ConversationController extends ChangeNotifier {
     conversationId = null;
     messages.clear();
     enteredBlockIds.clear();
+    _usedShown.clear();
+    _carriedMemory.clear();
     _turnBlocks.clear();
     _openAssistant = null;
     _pendingReads.clear();
@@ -1021,6 +1087,30 @@ class ConversationController extends ChangeNotifier {
     _notify();
   }
 
+  /// A conversation the server wrote, such as the one a follow-up opens on
+  /// (`POST /v1/followups/:id/open`): the thread starts over on it, drawn as
+  /// history, its newest answer the page on screen. Ignored while a turn is
+  /// running, which keeps the thread it belongs to.
+  void loadHistory(String id, List<Map<String, dynamic>> history) {
+    if (busy) return;
+    reset();
+    conversationId = id;
+    for (final raw in history) {
+      final role = raw['role'];
+      if (role != 'user' && role != 'assistant') continue;
+      final blocks = [
+        for (final block in raw['blocks'] as List? ?? const [])
+          if (WireBlock.tryParse(block) case final parsed?) parsed..ready = true,
+      ];
+      if (blocks.isEmpty) continue;
+      final serverId = raw['id'];
+      messages.add(RendelMessage.history(role as String, blocks, serverId: serverId is String ? serverId : null));
+    }
+    pages.addAll(messages.where((m) => m.role == 'assistant'));
+    page = pages.length - 1;
+    _notify();
+  }
+
   // ————————————————————————— internals —————————————————————————
 
   /// [inherited] carries the generation of the turn that led here.
@@ -1034,7 +1124,10 @@ class ConversationController extends ChangeNotifier {
     if (generation != _generation) return;
     // A question of the person's, not the continuation of one: its answer is
     // read anew.
-    if (inherited == null) _readThisQuestion = false;
+    if (inherited == null) {
+      _readThisQuestion = false;
+      _carriedMemory.clear();
+    }
     _lastPayload = payload;
     // `send`, `submitForm` and `retry` clear this; the confirm, decline and
     // pending-read continuations did not, so an error from an earlier turn
@@ -1140,7 +1233,10 @@ class ConversationController extends ChangeNotifier {
     if (generation != _generation) return;
 
     _turnBlocks.clear();
-    _openAssistant = RendelMessage.assistant()..detail = _detail;
+    _openAssistant = RendelMessage.assistant()
+      ..detail = _detail
+      ..memory.addAll(_carriedMemory);
+    _carriedMemory.clear();
     _detail?.answers.add(_openAssistant!);
     messages.add(_openAssistant!);
     _pendingReads.clear();
@@ -1294,12 +1390,16 @@ class ConversationController extends ChangeNotifier {
               '$message${lastRequestId == null ? '' : ' (request $lastRequestId)'}',
             );
 
-          case TurnSpeech(:final token, :final text, :final lang, :final parts):
+          case TurnSpeech(:final token, :final text, :final lang):
             visible = false;
             if (!_readThisQuestion && _openAssistant != null) {
               _readThisQuestion = true;
-              onAnswered?.call(_openAssistant!, text: text, lang: lang, speech: token, parts: parts);
+              _openAssistant!.speech = RendelAnswerSpeech(token: token, text: text, lang: lang);
+              onAnswered?.call(_openAssistant!, text: text, lang: lang, speech: token);
             }
+          case final MemoryChange change:
+            visible = _keepMemory(change);
+            structural = false;
           case Ping():
             visible = false;
         }
@@ -1435,6 +1535,8 @@ class ConversationController extends ChangeNotifier {
 
     if (completed && errorText == null && answer != null && messages.contains(answer) && !_readThisQuestion) {
       _readThisQuestion = true;
+      answer.speech = RendelAnswerSpeech(token: answerSpeech, lang: answerLang);
+      answer.touch();
       onAnswered?.call(answer, lang: answerLang, speech: answerSpeech);
     }
   }
@@ -1995,7 +2097,22 @@ class ConversationController extends ChangeNotifier {
 
   void _pruneEmptyAssistant() {
     final open = _openAssistant;
-    if (open != null && open.blocks.isEmpty) messages.remove(open);
+    if (open != null && open.blocks.isEmpty) {
+      messages.remove(open);
+      _carriedMemory.addAll(open.memory);
+    }
     _openAssistant = null;
+  }
+
+  /// Puts [change] on the answer it came with; false when it is not shown.
+  /// A note a "Based on…" chip already named in this thread is not named
+  /// again: a note every answer relies on is a chip nobody reads by the third.
+  bool _keepMemory(MemoryChange change) {
+    final open = _openAssistant;
+    if (open == null) return false;
+    if (change.op == MemoryOp.used && !_usedShown.add(change.id ?? change.key)) return false;
+    open.memory.add(change);
+    open.touch();
+    return true;
   }
 }

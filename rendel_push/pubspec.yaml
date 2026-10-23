@@ -1,0 +1,31 @@
+name: rendel_push
+description: >-
+  Push notifications for Rendel follow-ups on Firebase Cloud Messaging: asks
+  for permission, hands the token to Rendel, and opens Rendel's pushes.
+version: 0.1.0
+homepage: https://rendel.ai
+# Added from git, beside `rendel` in the same public repository; pub.dev takes
+# no package with a git dependency.
+publish_to: none
+
+environment:
+  sdk: ^3.7.0
+  flutter: ">=3.29.0"
+
+dependencies:
+  firebase_messaging: ^17.0.1
+  flutter:
+    sdk: flutter
+  # The SDK as every snippet pins it, at the tag this package ships in: an app
+  # pins `rendel` and `rendel_push` to the same tag, so every Flutter release
+  # moves this `ref` too. `Rendel.setPushToken` and `handlePush` came in 0.59.0.
+  rendel:
+    git:
+      url: https://github.com/neon-apps/rendel-flutter.git
+      ref: v0.59.0
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+  http: ^1.6.0

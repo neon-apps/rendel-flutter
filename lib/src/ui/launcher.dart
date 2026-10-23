@@ -1,6 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/copilot.dart';
+import '../core/events.dart';
+import '../core/followups.dart';
+import 'followup_card.dart';
 import 'renderer/blocks.dart' show RendelPressable;
 import 'theme.dart';
 
@@ -17,7 +22,10 @@ import 'theme.dart';
 /// It carries its word and nothing else. It used to lead with the turn mark,
 /// which is withdrawn; a bolt is what every
 /// actually does.
-class RendelLauncher extends StatelessWidget {
+///
+/// A follow-up waiting for this person (`Rendel.followup`) shows over it,
+/// anchored to it in the app's overlay, while the thread is closed.
+class RendelLauncher extends StatefulWidget {
   const RendelLauncher({super.key, this.label});
 
   /// Overrides both the code config's `launcherLabel` and anything the console
@@ -26,7 +34,96 @@ class RendelLauncher extends StatelessWidget {
   final String? label;
 
   @override
-  Widget build(BuildContext context) {
+  State<RendelLauncher> createState() => _RendelLauncherState();
+}
+
+class _RendelLauncherState extends State<RendelLauncher> {
+  final _link = LayerLink();
+  OverlayEntry? _popup;
+  StreamSubscription<RendelEvent>? _events;
+
+  @override
+  void initState() {
+    super.initState();
+    RendelFollowups.instance.current.addListener(_schedule);
+    Rendel.minimised.addListener(_schedule);
+    Rendel.configRevision.addListener(_schedule);
+    _events = Rendel.events.listen((_) => _schedule());
+    _schedule();
+  }
+
+  @override
+  void dispose() {
+    RendelFollowups.instance.current.removeListener(_schedule);
+    Rendel.minimised.removeListener(_schedule);
+    Rendel.configRevision.removeListener(_schedule);
+    _events?.cancel();
+    _popup?.remove();
+    _popup = null;
+    super.dispose();
+  }
+
+  /// After the frame: an overlay is not changed while the tree builds.
+  void _schedule() => WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+
+  /// The popup is up while a follow-up waits and the thread is closed.
+  void _sync() {
+    if (!mounted) return;
+    final show = RendelFollowups.instance.current.value != null &&
+        Rendel.isInitialized &&
+        Rendel.isEnabled &&
+        !Rendel.isOpen &&
+        !Rendel.minimised.value;
+    if (!show) {
+      _popup?.remove();
+      _popup = null;
+      return;
+    }
+    if (_popup == null) {
+      final overlay = Overlay.maybeOf(context);
+      if (overlay == null) return;
+      overlay.insert(_popup = OverlayEntry(builder: _buildPopup));
+    } else {
+      _popup!.markNeedsBuild();
+    }
+    RendelFollowups.instance.shown();
+  }
+
+  Widget _buildPopup(BuildContext overlayContext) {
+    final waiting = RendelFollowups.instance.current.value;
+    if (waiting == null || !mounted) return const SizedBox.shrink();
+    final theme = context.dependOnInheritedWidgetOfExactType<RendelThemeScope>()?.theme ?? Rendel.themeOf(context);
+    // Over the launcher, opening toward the screen: from its right edge in a
+    // left-to-right app, from its left in a right-to-left one.
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final width = (MediaQuery.sizeOf(overlayContext).width - 2 * theme.space.lg).clamp(0.0, 320.0);
+    return Positioned(
+      width: width,
+      child: CompositedTransformFollower(
+        link: _link,
+        showWhenUnlinked: false,
+        targetAnchor: rtl ? Alignment.topLeft : Alignment.topRight,
+        followerAnchor: rtl ? Alignment.bottomLeft : Alignment.bottomRight,
+        offset: Offset(0, -theme.space.md),
+        child: Material(
+          type: MaterialType.transparency,
+          child: RendelFollowupCard(
+            followup: waiting,
+            theme: theme,
+            raised: true,
+            closeLabel: Rendel.strings.closeDetail,
+            onOpen: () => unawaited(Rendel.openFollowup(context)),
+            onDismiss: Rendel.dismissFollowup,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => CompositedTransformTarget(link: _link, child: _launcher(context));
+
+  Widget _launcher(BuildContext context) {
     // Rebuilds when a published config lands, so a kill switch or a renamed
     // launcher takes effect without a relaunch. The notifier ticks at most
     // once per fetch, so this costs nothing per frame.
@@ -57,7 +154,7 @@ class RendelLauncher extends StatelessWidget {
     if (!Rendel.isInitialized || !Rendel.isEnabled) {
       return const SizedBox.shrink();
     }
-    final word = label ?? Rendel.config.launcherLabel;
+    final word = widget.label ?? Rendel.config.launcherLabel;
     return RendelPressable(
       semanticLabel: Rendel.strings.openCopilot,
       onTap: () => Rendel.open(context),

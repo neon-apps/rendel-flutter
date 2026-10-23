@@ -3,9 +3,14 @@ package ai.rendel.sdk;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
+import android.media.AudioManager;
 import android.database.Cursor;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.CalendarContract;
@@ -57,6 +62,7 @@ public class RendelPlugin
   @Override
   public void onAttachedToEngine(@NonNull FlutterPluginBinding binding) {
     channel = new MethodChannel(binding.getBinaryMessenger(), "rendel/platform");
+    context = binding.getApplicationContext();
     channel.setMethodCallHandler(this);
   }
 
@@ -71,9 +77,41 @@ public class RendelPlugin
       pickDocument(result);
     } else if (call.method.equals("addToCalendar")) {
       addToCalendar(call, result);
+    } else if (call.method.equals("voiceSession")) {
+      voiceSession(Boolean.TRUE.equals(call.arguments), result);
     } else {
       result.notImplemented();
     }
+  }
+
+  @Nullable private Context context;
+  @Nullable private AudioFocusRequest focus;
+
+  /**
+   * An answer read aloud asks for the sound while it speaks, and gives it back
+   * after (Tuna 2026-10-23): transient focus that may duck, so music plays on
+   * under the voice and comes back up when it ends.
+   */
+  private void voiceSession(boolean active, MethodChannel.Result result) {
+    AudioManager audio = context == null ? null : (AudioManager) context.getSystemService(Context.AUDIO_SERVICE);
+    if (audio == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      result.success(null);
+      return;
+    }
+    if (active) {
+      if (focus == null) {
+        focus = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
+            .setAudioAttributes(new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build())
+            .build();
+      }
+      audio.requestAudioFocus(focus);
+    } else if (focus != null) {
+      audio.abandonAudioFocusRequest(focus);
+    }
+    result.success(null);
   }
 
   private void pickDocument(MethodChannel.Result result) {

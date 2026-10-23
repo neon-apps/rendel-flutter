@@ -32,7 +32,12 @@ class RendelDispatcher {
     this.onEditCard,
     this.onContactOpen,
     this.cardSource,
+    this.onOpenMemory,
   });
+
+  /// Opens "What I remember for you", from a value marked "From your
+  /// preferences" (preference memory). Null draws the mark as text.
+  final VoidCallback? onOpenMemory;
 
   /// The current text a full-text card's action replaces, from the app
   /// (`Rendel.setCardSource`): null when the app gave none.

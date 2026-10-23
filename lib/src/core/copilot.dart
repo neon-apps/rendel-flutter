@@ -3,11 +3,13 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show ValueListenable, defaultTargetPlatform;
 import 'package:flutter/material.dart';
 
 import '../engine/conversation_controller.dart';
 import '../protocol/protocol.dart';
 import '../transport/api_client.dart';
+import '../ui/memory_sheet.dart';
 import '../ui/presentation.dart';
 import '../ui/theme.dart';
 import '../ui/thread_screen.dart';
@@ -17,8 +19,10 @@ import 'read_aloud.dart';
 import 'config.dart';
 import 'device_id.dart';
 import 'events.dart';
+import 'followups.dart';
 import 'locale.dart';
 import 'log.dart';
+import 'memory.dart';
 import 'pairing.dart';
 import 'platform.dart';
 import 'route.dart';
@@ -233,6 +237,7 @@ class Rendel {
       httpClient: config.httpClient,
     );
     _handOverClient(_api);
+    RendelFollowups.instance.send = (event) => unawaited(_api?.sendEvent(event));
     unawaited(_syncManifest());
     // An app that restores its session before initialising the copilot calls
     // `identify` first. That call used to go nowhere, silently.
@@ -247,14 +252,18 @@ class Rendel {
     final recalled = await _recallUser();
     _user ??= recalled;
 
-    if (!config.remoteConfig) return;
+    if (!config.remoteConfig) {
+      unawaited(_checkFollowup());
+      return;
+    }
     // The cached payload is applied BEFORE the fetch is even started, and
     // awaited, so launch two paints the customer's own look in the first
     // frame rather than flashing the code default and then correcting. The
     // network then runs unawaited: `init()` must not be slower than the
     // launcher it precedes, and an unreachable API must not delay it at all.
     await _applyCachedConfig();
-    unawaited(_refreshConfig());
+    // A follow-up once the app knows whether Rendel is on here at all.
+    unawaited(_refreshConfig().then((_) => _checkFollowup()));
   }
 
   /// Re-reads the published config. Call it when your app returns to the
@@ -463,24 +472,7 @@ class Rendel {
     // The adoption funnel's middle step (analytics-roi T4); the server keeps
     // one a device a day.
     unawaited(api.sendEvent({'type': 'assistant_open'}));
-    _controller ??= ConversationController(
-      api: api,
-      actions: _actions,
-      cardSources: _cardSources,
-      routes: _routes,
-      sdkVersion: _config.sdkVersion,
-      contextProviders: _providers,
-      sandbox: _sandboxKey,
-      onOpenUrl: _config.onOpenUrl ?? openLink,
-      streamIdleTimeout: _config.streamIdleTimeout,
-      locale: _config.locale,
-      languages: _config.languages,
-      onEvent: _events.add,
-      onUnavailable: (reason) => _setAvailable(false, reason),
-      user: () => _user,
-      parallelReads: () => _parallelReads,
-      readsAloud: () => _voice.on.value,
-    )..manifestHash = _currentManifestHash();
+    final controller = _ensureController(api);
     _events.add(RendelEvent.opened);
     // One recogniser per presentation, for the built-in dictation. It listens
     // in the app's locale or the phone's, never narrowed to `languages`: a
@@ -488,7 +480,6 @@ class Rendel {
     // Russian phone's speaker into Turkish nonsense (Tuna 2026-10-22). The
     // answer follows whatever the words turn out to be.
     final speech = RendelSpeech(locale: resolveLocale(_config.locale));
-    final controller = _controller!;
     late final RendelPresentation presentation;
     presentation = _presentation = RendelPresentation(
       context: context,
@@ -543,8 +534,11 @@ class Rendel {
           onNavigate: (action) => presentation.navigate(action),
           // Each answer's opening read aloud, on a test key as on a live one:
           // 0.58.4 silenced test keys on a misreading, and the owner testing
-          // her own app heard nothing (Tuna 2026-10-23).
-          voice: _voice,
+          // her own app heard nothing (Tuna 2026-10-23). Not at all where the
+          // host or the app's console turned voice off.
+          voice: _config.readAloud ? _voice : null,
+          followup: RendelFollowups.instance.current,
+          onFollowupOpen: () => unawaited(openFollowup(context)),
         ),
       ),
     );
@@ -565,6 +559,28 @@ class Rendel {
       _events.add(RendelEvent.closed);
     }
   }
+
+  /// The conversation, made the first time it is needed: on the first
+  /// `open`, or by a follow-up opened before the thread ever was.
+  static ConversationController _ensureController(RendelApiClient api) =>
+      _controller ??= ConversationController(
+        api: api,
+        actions: _actions,
+        cardSources: _cardSources,
+        routes: _routes,
+        sdkVersion: _config.sdkVersion,
+        contextProviders: _providers,
+        sandbox: _sandboxKey,
+        onOpenUrl: _config.onOpenUrl ?? openLink,
+        streamIdleTimeout: _config.streamIdleTimeout,
+        locale: _config.locale,
+        languages: _config.languages,
+        onEvent: _events.add,
+        onUnavailable: (reason) => _setAvailable(false, reason),
+        user: () => _user,
+        parallelReads: () => _parallelReads,
+        readsAloud: () => _config.readAloud,
+      )..manifestHash = _currentManifestHash();
 
   /// The thread on screen, in its sheet or in the bubble. Null when the
   /// copilot is closed.
@@ -587,16 +603,179 @@ class Rendel {
 
   static void close(BuildContext context) => Navigator.of(context).maybePop();
 
+  /// Opens "What I remember for you" as a sheet: the preferences Rendel
+  /// keeps for the person signed in (signed out, for this device), each with
+  /// Forget, and Forget all. For your app's own privacy or settings screen;
+  /// the thread opens it from its chips too. Does nothing before [init].
+  static Future<void> openMemory(BuildContext context) async {
+    final api = _api;
+    if (api == null) return;
+    await showRendelMemory(
+      context,
+      memory: RendelMemory(api, user: () => _user),
+      theme: themeOf(context),
+      strings: strings,
+    );
+  }
+
   /// Call on logout: clears the thread and the user. The next turn from this
   /// phone is anonymous until the next [identify].
   static void reset() => _endSession(forget: true);
+
+  // ————————————————————————— follow-ups —————————————————————————
+
+  /// The follow-up waiting for this person, or null (design/plans/
+  /// marketing-channels.md §3.10). [RendelLauncher] shows it over itself and
+  /// the thread at its top; an app with its own launcher can listen here and
+  /// draw its own, with [openFollowup] and [dismissFollowup].
+  static ValueListenable<RendelFollowup?> get followup => RendelFollowups.instance.current;
+
+  /// Whether the thread is on screen, in its sheet or in the bubble.
+  static bool get isOpen => _presentation != null;
+
+  /// Opens the conversation the server wrote for the waiting follow-up. False
+  /// when there is none, or it could not be opened.
+  static Future<bool> openFollowup(BuildContext context) async {
+    final waiting = RendelFollowups.instance.current.value;
+    if (waiting == null) return false;
+    return _openFollowupById(context, waiting.id);
+  }
+
+  /// Puts the waiting follow-up away; it is not shown again.
+  static void dismissFollowup() => RendelFollowups.instance.dismiss();
+
+  /// A push from Rendel, tapped: opens the conversation it is about and
+  /// returns true. False for a push that is not Rendel's, which the app
+  /// handles itself.
+  ///
+  /// ```dart
+  /// FirebaseMessaging.onMessageOpenedApp.listen(
+  ///   (message) => Rendel.handlePush(context, message.data),
+  /// );
+  /// ```
+  ///
+  /// [context] is one below the app's navigator, a screen's, as for [open];
+  /// `rendel_push` wires all of this for you.
+  static Future<bool> handlePush(BuildContext context, Map<String, dynamic> data) async {
+    final id = data['rendel_followup'];
+    if (data['rendel'] != '1' || id is! String || id.isEmpty) return false;
+    // A cold start from a push can tap before init has its client.
+    await _whenClient();
+    if (!context.mounted) return false;
+    return _openFollowupById(context, id);
+  }
+
+  /// The device's push token, for follow-ups by push: the Firebase token, again
+  /// on every refresh, and null when the person turns notifications off.
+  /// [timezone] is the device's IANA zone where the app knows it
+  /// (`rendel_push` does); without it, the offset is sent.
+  static Future<void> setPushToken(String? token, {String? timezone}) async {
+    final api = await _whenClient();
+    if (api == null) return;
+    final platform = switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => 'ios',
+      TargetPlatform.android => 'android',
+      _ => null,
+    };
+    if (platform == null) {
+      RendelLog.warn('push_platform', 'setPushToken is for iOS and Android; nothing was sent');
+      return;
+    }
+    await api.setPushToken(
+      token: token,
+      platform: platform,
+      timezone: timezone ?? offsetZone(DateTime.now().timeZoneOffset),
+      locale: resolveLocale(_config.locale),
+    );
+  }
+
+  /// Something the person did that the app wants counted: only `'purchase'`
+  /// today, `{'value': 549.9, 'currency': 'TRY', 'items': [...]}`, which
+  /// Follow-ups credits to the follow-up they last opened (R2). Never a throw.
+  static void track(String name, Map<String, dynamic> props) {
+    if (name != 'purchase') {
+      RendelLog.warn('unknown_event', 'track("$name") is not counted; only "purchase" is');
+      return;
+    }
+    final value = props['value'];
+    final given = props['currency'];
+    final currency = given is String ? given.trim().toUpperCase() : '';
+    if (value is! num || !value.isFinite || value < 0 || !RegExp(r'^[A-Z]{3}$').hasMatch(currency)) {
+      RendelLog.warn(
+        'invalid_purchase',
+        'track("purchase") needs a value of 0 or more and a three-letter currency code such as "TRY"',
+      );
+      return;
+    }
+    final items = props['items'];
+    unawaited(_whenClient().then((api) => api?.sendEvent({
+          'type': 'purchase',
+          'value': value,
+          'currency': currency,
+          if (items is List) 'items': items.take(20).toList(),
+        })));
+  }
+
+  static const _followupEvery = Duration(minutes: 10);
+  static DateTime? _followupAsked;
+  static AppLifecycleListener? _foreground;
+
+  /// Asks whether there is a follow-up for this device: after init, and when
+  /// the app comes back to the front, at most every ten minutes. One that is
+  /// waiting is not asked over.
+  static Future<void> _checkFollowup() async {
+    try {
+      _foreground ??= AppLifecycleListener(onResume: () => unawaited(_checkFollowup()));
+    } catch (_) {
+      // No binding yet: init ran before runApp. The next launch asks again.
+    }
+    final api = _api;
+    if (api == null || !isEnabled || RendelFollowups.instance.current.value != null) return;
+    final now = DateTime.now();
+    final asked = _followupAsked;
+    if (asked != null && now.difference(asked) < _followupEvery) return;
+    _followupAsked = now;
+    final next = await api.nextFollowup();
+    if (next != null && identical(api, _api)) RendelFollowups.instance.current.value = next;
+  }
+
+  /// The conversation the server opened on a follow-up, loaded as history,
+  /// and the thread opened on it. A turn still running keeps its thread.
+  static Future<bool> _openFollowupById(BuildContext context, String id) async {
+    final api = _api;
+    if (api == null || !isEnabled) return false;
+    final controller = _ensureController(api);
+    if (controller.busy) return false;
+    final conversationId = await api.openFollowup(id);
+    var history = const <Map<String, dynamic>>[];
+    if (conversationId != null) {
+      try {
+        history = await api.fetchMessages(conversationId);
+      } catch (_) {
+        // Opened, but not readable now: the thread opens as it was.
+      }
+    }
+    if (RendelFollowups.instance.current.value?.id == id) RendelFollowups.instance.current.value = null;
+    final loaded = conversationId != null && history.isNotEmpty;
+    if (loaded) {
+      controller.loadHistory(conversationId, history);
+    } else {
+      RendelLog.warn('followup_open_failed', "the follow-up's conversation could not be loaded; the thread opens as it was");
+    }
+    if (context.mounted) unawaited(open(context));
+    return loaded;
+  }
 
   /// [forget] is the logout: the stored user goes too. Without it this is
   /// what a process ending does to the SDK, and the device keeps who it was.
   static void _endSession({required bool forget}) {
     _user = null;
     _identity = null;
-    if (forget) unawaited(_storeUser(''));
+    if (forget) {
+      unawaited(_storeUser(''));
+      // A follow-up was for whoever was signed in.
+      RendelFollowups.instance.clear();
+    }
     final controller = _controller;
     if (controller == null) return;
     controller.reset();
@@ -654,6 +833,12 @@ class Rendel {
     _config = const RendelConfig();
     _logoAssetId = null;
     _codeConfig = _config;
+    RendelFollowups.instance
+      ..clear()
+      ..send = null;
+    _followupAsked = null;
+    _foreground?.dispose();
+    _foreground = null;
   }
 
   // ————————————————————————— remote config —————————————————————————

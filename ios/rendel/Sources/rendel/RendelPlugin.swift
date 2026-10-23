@@ -1,3 +1,4 @@
+import AVFoundation
 import EventKit
 import EventKitUI
 import Flutter
@@ -59,8 +60,30 @@ public class RendelPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate,
       pickDocument(result)
     case "addToCalendar":
       addToCalendar(call.arguments as? [String: Any] ?? [:], result)
+    case "voiceSession":
+      voiceSession(active: call.arguments as? Bool ?? false, result)
     default:
       result(FlutterMethodNotImplemented)
+    }
+  }
+
+  /// The answer read aloud owns the audio while it speaks, and gives it back
+  /// after (Tuna 2026-10-23). Active: playback, so the silent switch does not
+  /// mute it, spoken audio, and other apps' sound ducked under it. Inactive:
+  /// the session is let go with a word to the others, so the music that was
+  /// ducked comes back up. The PCM player sets a category but never lets go.
+  private func voiceSession(active: Bool, _ result: @escaping FlutterResult) {
+    let session = AVAudioSession.sharedInstance()
+    do {
+      if active {
+        try session.setCategory(.playback, mode: .spokenAudio, options: [.duckOthers])
+        try session.setActive(true)
+      } else {
+        try session.setActive(false, options: [.notifyOthersOnDeactivation])
+      }
+      result(nil)
+    } catch {
+      result(FlutterError(code: "audio_session", message: error.localizedDescription, details: nil))
     }
   }
 

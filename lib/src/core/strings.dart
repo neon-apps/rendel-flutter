@@ -52,6 +52,8 @@ class RendelStrings {
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
     this.readAloud = 'Read answers aloud',
+    this.readAloudThis = 'Read aloud',
+    this.stopReading = 'Stop reading',
     this.retry = 'Try again',
     this.streamDropped = 'The connection dropped before the answer finished.',
     this.noAnswer = 'No answer came back. Try again.',
@@ -178,6 +180,28 @@ class RendelStrings {
     this.con = 'Con',
     this.playVideo = 'Play video',
     this.copyCode = 'Copy',
+    this.memorySaved = 'I\'ll remember: {label}',
+    this.memorySavedUntil = 'I\'ll remember until {date}: {label}',
+    this.memoryNoted = 'Noted for next time: {label}',
+    this.memoryNotedUntil = 'Noted until {date}: {label}',
+    this.memoryUpdated = 'Updated: {label}',
+    this.memoryForgotten = 'Forgotten: {label}',
+    this.memoryForgottenAll = 'I\'ve forgotten everything I remembered',
+    this.memoryUndo = 'Undo',
+    this.memoryUndone = 'Not saved',
+    this.memoryUsed = 'Based on your {label} preference',
+    this.memoryUsedMany = 'Based on {count} of your preferences',
+    this.memoryFromPreference = 'From your preferences',
+    this.memoryTitle = 'What I remember for you',
+    this.memoryEmpty = 'Tell me a preference once, like “always lactose-free”, and I\'ll keep it in mind.',
+    this.memoryForget = 'Forget',
+    this.memoryForgetAll = 'Forget all',
+    this.memoryForgetAllConfirm = 'Forget everything I remember for you?',
+    this.memoryFromApp = 'From the app',
+    this.memoryNoticed = 'Noticed',
+    this.memoryUntil = 'Until {date}',
+    this.memoryFooter = 'The app\'s team can see these too.',
+    this.memoryOff = 'This app doesn\'t keep preferences.',
   });
 
   /// The two controls on a confirmation card. The ones that matter most.
@@ -247,6 +271,12 @@ class RendelStrings {
   /// The header's speaker: whether answers are read aloud. A toggle, so a
   /// screen reader says on or off with it.
   final String readAloud;
+
+  /// An answer's own speaker: read this one aloud.
+  final String readAloudThis;
+
+  /// The same speaker while it reads.
+  final String stopReading;
 
   final String retry;
   final String streamDropped;
@@ -515,12 +545,50 @@ class RendelStrings {
   final String playVideo;
   final String copyCode;
 
+  /// Preference memory (`design/plans/preference-memory.md` §3.7): the chips
+  /// under an answer that saved, changed, forgot or relied on a note
+  /// ({label} is the note's, {date} its last day, {count} how many), the mark
+  /// on a value filled from one, and the "What I remember for you" sheet.
+  final String memorySaved;
+  final String memorySavedUntil;
+  final String memoryNoted;
+  final String memoryNotedUntil;
+  final String memoryUpdated;
+  final String memoryForgotten;
+  final String memoryForgottenAll;
+  final String memoryUndo;
+  final String memoryUndone;
+  final String memoryUsed;
+  final String memoryUsedMany;
+  final String memoryFromPreference;
+  final String memoryTitle;
+  final String memoryEmpty;
+  final String memoryForget;
+  final String memoryForgetAll;
+  final String memoryForgetAllConfirm;
+  final String memoryFromApp;
+  final String memoryNoticed;
+  final String memoryUntil;
+  final String memoryFooter;
+  final String memoryOff;
+
   String formFailedWith(String submit) => formFailed.replaceAll('{submit}', submit);
   String removeFileNamed(String name) => removeFile.replaceAll('{name}', name);
   String detailAskAbout(String title) => detailAsk.replaceAll('{title}', title);
   String typeToConfirmFor(String value) => typeToConfirm.replaceAll('{value}', value);
   String readAllOf(String count) => readAll.replaceAll('{n}', count);
   String suggestedAfterFrom(String source) => suggestedAfter.replaceAll('{source}', source);
+  String memorySavedOf(String label, {String? until}) => (until == null ? memorySaved : memorySavedUntil)
+      .replaceAll('{label}', label)
+      .replaceAll('{date}', until ?? '');
+  String memoryNotedOf(String label, {String? until}) => (until == null ? memoryNoted : memoryNotedUntil)
+      .replaceAll('{label}', label)
+      .replaceAll('{date}', until ?? '');
+  String memoryUpdatedOf(String label) => memoryUpdated.replaceAll('{label}', label);
+  String memoryForgottenOf(String label) => memoryForgotten.replaceAll('{label}', label);
+  String memoryUsedOf(String label) => memoryUsed.replaceAll('{label}', label);
+  String memoryUsedManyOf(int count) => memoryUsedMany.replaceAll('{count}', '$count');
+  String memoryUntilOf(String date) => memoryUntil.replaceAll('{date}', date);
   String stepOfCount(int step, int count) =>
       stepOf.replaceAll('{step}', '$step').replaceAll('{count}', '$count');
   /// [now] for a label that is itself a when ("Today"): no "in" before it.
@@ -605,6 +673,8 @@ class RendelStrings {
     String? sendMessage,
     String? newConversation,
     String? readAloud,
+    String? readAloudThis,
+    String? stopReading,
     String? retry,
     String? streamDropped,
     String? noAnswer,
@@ -727,6 +797,28 @@ class RendelStrings {
     String? con,
     String? playVideo,
     String? copyCode,
+    String? memorySaved,
+    String? memorySavedUntil,
+    String? memoryNoted,
+    String? memoryNotedUntil,
+    String? memoryUpdated,
+    String? memoryForgotten,
+    String? memoryForgottenAll,
+    String? memoryUndo,
+    String? memoryUndone,
+    String? memoryUsed,
+    String? memoryUsedMany,
+    String? memoryFromPreference,
+    String? memoryTitle,
+    String? memoryEmpty,
+    String? memoryForget,
+    String? memoryForgetAll,
+    String? memoryForgetAllConfirm,
+    String? memoryFromApp,
+    String? memoryNoticed,
+    String? memoryUntil,
+    String? memoryFooter,
+    String? memoryOff,
   }) {
     return RendelStrings(
       confirm: confirm ?? this.confirm,
@@ -748,6 +840,8 @@ class RendelStrings {
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
       readAloud: readAloud ?? this.readAloud,
+      readAloudThis: readAloudThis ?? this.readAloudThis,
+      stopReading: stopReading ?? this.stopReading,
       retry: retry ?? this.retry,
       streamDropped: streamDropped ?? this.streamDropped,
       noAnswer: noAnswer ?? this.noAnswer,
@@ -870,6 +964,28 @@ class RendelStrings {
       con: con ?? this.con,
       playVideo: playVideo ?? this.playVideo,
       copyCode: copyCode ?? this.copyCode,
+      memorySaved: memorySaved ?? this.memorySaved,
+      memorySavedUntil: memorySavedUntil ?? this.memorySavedUntil,
+      memoryNoted: memoryNoted ?? this.memoryNoted,
+      memoryNotedUntil: memoryNotedUntil ?? this.memoryNotedUntil,
+      memoryUpdated: memoryUpdated ?? this.memoryUpdated,
+      memoryForgotten: memoryForgotten ?? this.memoryForgotten,
+      memoryForgottenAll: memoryForgottenAll ?? this.memoryForgottenAll,
+      memoryUndo: memoryUndo ?? this.memoryUndo,
+      memoryUndone: memoryUndone ?? this.memoryUndone,
+      memoryUsed: memoryUsed ?? this.memoryUsed,
+      memoryUsedMany: memoryUsedMany ?? this.memoryUsedMany,
+      memoryFromPreference: memoryFromPreference ?? this.memoryFromPreference,
+      memoryTitle: memoryTitle ?? this.memoryTitle,
+      memoryEmpty: memoryEmpty ?? this.memoryEmpty,
+      memoryForget: memoryForget ?? this.memoryForget,
+      memoryForgetAll: memoryForgetAll ?? this.memoryForgetAll,
+      memoryForgetAllConfirm: memoryForgetAllConfirm ?? this.memoryForgetAllConfirm,
+      memoryFromApp: memoryFromApp ?? this.memoryFromApp,
+      memoryNoticed: memoryNoticed ?? this.memoryNoticed,
+      memoryUntil: memoryUntil ?? this.memoryUntil,
+      memoryFooter: memoryFooter ?? this.memoryFooter,
+      memoryOff: memoryOff ?? this.memoryOff,
     );
   }
 }
@@ -904,6 +1020,8 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
     readAloud: 'Cevapları sesli oku',
+    readAloudThis: 'Bu cevabı dinle',
+    stopReading: 'Okumayı durdur',
     retry: 'Tekrar dene',
     streamDropped: 'Bağlantı, yanıt tamamlanmadan koptu.',
     noAnswer: 'Yanıt gelmedi. Tekrar deneyin.',
@@ -1030,6 +1148,28 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'Eksi',
     playVideo: 'Videoyu oynat',
     copyCode: 'Kopyala',
+    memorySaved: 'Aklımda: {label}',
+    memorySavedUntil: '{date} tarihine kadar aklımda: {label}',
+    memoryNoted: 'Sonrası için not aldım: {label}',
+    memoryNotedUntil: '{date} gününe dek not aldım: {label}',
+    memoryUpdated: 'Güncelledim: {label}',
+    memoryForgotten: 'Unuttum: {label}',
+    memoryForgottenAll: 'Hatırladığım her şeyi unuttum.',
+    memoryUndo: 'Geri al',
+    memoryUndone: 'Kaydetmedim',
+    memoryUsed: '{label} tercihine göre',
+    memoryUsedMany: '{count} tercihinize göre',
+    memoryFromPreference: 'Tercihlerinizden',
+    memoryTitle: 'Sizin için hatırladıklarım',
+    memoryEmpty: 'Bana \'hep laktozsuz\' gibi bir tercihinizi söyleyin, sonraki seferler için aklımda tutayım.',
+    memoryForget: 'Unut',
+    memoryForgetAll: 'Tümünü unut',
+    memoryForgetAllConfirm: 'Sizin için hatırladığım her şeyi unutayım mı?',
+    memoryFromApp: 'Uygulamadan',
+    memoryNoticed: 'Fark ettim',
+    memoryUntil: '{date} gününe dek',
+    memoryFooter: 'Uygulama ekibi de bu notları görebilir.',
+    memoryOff: 'Bu uygulama tercihlerinizi akılda tutmuyor.',
   ),
   'de': RendelStrings(
     nothingHeard: 'Es wurde nichts gehört. Prüfen Sie das Mikrofon.',
@@ -1051,6 +1191,8 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Nachricht senden',
     newConversation: 'Neue Unterhaltung beginnen',
     readAloud: 'Antworten vorlesen',
+    readAloudThis: 'Vorlesen',
+    stopReading: 'Vorlesen beenden',
     retry: 'Erneut versuchen',
     streamDropped: 'Die Verbindung wurde vor dem Ende der Antwort unterbrochen.',
     noAnswer: 'Es kam keine Antwort. Versuchen Sie es erneut.',
@@ -1179,6 +1321,28 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'Contra',
     playVideo: 'Video abspielen',
     copyCode: 'Kopieren',
+    memorySaved: 'Ich merke mir: {label}',
+    memorySavedUntil: 'Ich merke mir bis {date}: {label}',
+    memoryNoted: 'Für nächstes Mal notiert: {label}',
+    memoryNotedUntil: 'Notiert bis {date}: {label}',
+    memoryUpdated: 'Aktualisiert: {label}',
+    memoryForgotten: 'Vergessen: {label}',
+    memoryForgottenAll: 'Ich habe alles vergessen, was ich mir gemerkt hatte',
+    memoryUndo: 'Rückgängig',
+    memoryUndone: 'Nicht gespeichert',
+    memoryUsed: 'Nach Ihrer Vorliebe: {label}',
+    memoryUsedMany: 'Nach {count} Ihrer Vorlieben',
+    memoryFromPreference: 'Aus Ihren Vorlieben',
+    memoryTitle: 'Was ich mir für Sie merke',
+    memoryEmpty: 'Sagen Sie mir einmal eine Vorliebe, etwa „immer laktosefrei“, und ich behalte sie im Kopf.',
+    memoryForget: 'Vergessen',
+    memoryForgetAll: 'Alles vergessen',
+    memoryForgetAllConfirm: 'Alles vergessen, was ich mir für Sie gemerkt habe?',
+    memoryFromApp: 'Von der App',
+    memoryNoticed: 'Bemerkt',
+    memoryUntil: 'Bis {date}',
+    memoryFooter: 'Das Team der App kann diese Notizen auch sehen.',
+    memoryOff: 'Diese App speichert keine Vorlieben.',
   ),
   'fr': RendelStrings(
     nothingHeard: "Rien n'a été entendu. Vérifiez le microphone.",
@@ -1200,6 +1364,8 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Envoyer le message',
     newConversation: 'Démarrer une nouvelle conversation',
     readAloud: 'Lire les réponses à voix haute',
+    readAloudThis: 'Lire à voix haute',
+    stopReading: 'Arrêter la lecture',
     retry: 'Réessayer',
     streamDropped: 'La connexion a été perdue avant la fin de la réponse.',
     noAnswer: 'Aucune réponse n’est arrivée. Réessayez.',
@@ -1327,6 +1493,28 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'Contre',
     playVideo: 'Lire la vidéo',
     copyCode: 'Copier',
+    memorySaved: 'Je retiens : {label}',
+    memorySavedUntil: 'Je retiens jusqu’au {date} : {label}',
+    memoryNoted: 'Noté pour la prochaine fois : {label}',
+    memoryNotedUntil: 'Noté jusqu’au {date} : {label}',
+    memoryUpdated: 'Mis à jour : {label}',
+    memoryForgotten: 'Oublié : {label}',
+    memoryForgottenAll: 'J’ai oublié tout ce que j’avais retenu',
+    memoryUndo: 'Annuler',
+    memoryUndone: 'Non enregistré',
+    memoryUsed: 'Selon votre préférence : {label}',
+    memoryUsedMany: 'Selon {count} de vos préférences',
+    memoryFromPreference: 'D’après vos préférences',
+    memoryTitle: 'Ce que je retiens pour vous',
+    memoryEmpty: 'Dites-moi une préférence une fois, comme « toujours sans lactose », et je la garderai en tête.',
+    memoryForget: 'Oublier',
+    memoryForgetAll: 'Tout oublier',
+    memoryForgetAllConfirm: 'Oublier tout ce que je retiens pour vous ?',
+    memoryFromApp: 'De l’application',
+    memoryNoticed: 'Remarqué',
+    memoryUntil: 'Jusqu’au {date}',
+    memoryFooter: 'L’équipe de l’application peut aussi voir ces notes.',
+    memoryOff: 'Cette application ne garde pas de préférences.',
   ),
   'es': RendelStrings(
     nothingHeard: 'No se oyó nada. Comprueba el micrófono.',
@@ -1348,6 +1536,8 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Enviar mensaje',
     newConversation: 'Iniciar una conversación nueva',
     readAloud: 'Leer las respuestas en voz alta',
+    readAloudThis: 'Leer en voz alta',
+    stopReading: 'Dejar de leer',
     retry: 'Inténtalo de nuevo',
     streamDropped: 'La conexión se cortó antes de terminar la respuesta.',
     noAnswer: 'No llegó ninguna respuesta. Inténtalo de nuevo.',
@@ -1474,6 +1664,28 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'En contra',
     playVideo: 'Reproducir vídeo',
     copyCode: 'Copiar',
+    memorySaved: 'Lo recordaré: {label}',
+    memorySavedUntil: 'Lo recordaré hasta el {date}: {label}',
+    memoryNoted: 'Anotado para la próxima vez: {label}',
+    memoryNotedUntil: 'Anotado hasta el {date}: {label}',
+    memoryUpdated: 'Actualizado: {label}',
+    memoryForgotten: 'Olvidado: {label}',
+    memoryForgottenAll: 'He olvidado todo lo que recordaba',
+    memoryUndo: 'Deshacer',
+    memoryUndone: 'No guardado',
+    memoryUsed: 'Según tu preferencia: {label}',
+    memoryUsedMany: 'Según {count} de tus preferencias',
+    memoryFromPreference: 'De tus preferencias',
+    memoryTitle: 'Lo que recuerdo para ti',
+    memoryEmpty: 'Dime una preferencia una vez, como «siempre sin lactosa», y la tendré en cuenta.',
+    memoryForget: 'Olvidar',
+    memoryForgetAll: 'Olvidar todo',
+    memoryForgetAllConfirm: '¿Olvido todo lo que recuerdo para ti?',
+    memoryFromApp: 'De la app',
+    memoryNoticed: 'Lo noté',
+    memoryUntil: 'Hasta el {date}',
+    memoryFooter: 'El equipo de la app también puede ver estas notas.',
+    memoryOff: 'Esta app no guarda preferencias.',
   ),
   'ar': RendelStrings(
     nothingHeard: 'لم يُسمع شيء. تحقّق من الميكروفون.',
@@ -1495,6 +1707,8 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'إرسال الرسالة',
     newConversation: 'بدء محادثة جديدة',
     readAloud: 'قراءة الإجابات بصوت عالٍ',
+    readAloudThis: 'اقرأ بصوت عالٍ',
+    stopReading: 'أوقف القراءة',
     retry: 'حاول مرة أخرى',
     streamDropped: 'انقطع الاتصال قبل أن تكتمل الإجابة.',
     noAnswer: 'لم تصل أي إجابة. حاول مرة أخرى.',
@@ -1620,6 +1834,28 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'عيب',
     playVideo: 'تشغيل الفيديو',
     copyCode: 'نسخ',
+    memorySaved: 'سأتذكر: {label}',
+    memorySavedUntil: 'سأتذكر حتى {date}: {label}',
+    memoryNoted: 'دوّنته للمرة القادمة: {label}',
+    memoryNotedUntil: 'دوّنته حتى {date}: {label}',
+    memoryUpdated: 'تم التحديث: {label}',
+    memoryForgotten: 'نسيت: {label}',
+    memoryForgottenAll: 'نسيت كل ما كنت أتذكره',
+    memoryUndo: 'تراجع',
+    memoryUndone: 'لم يُحفظ',
+    memoryUsed: 'بناءً على تفضيلك: {label}',
+    memoryUsedMany: 'بناءً على {count} من تفضيلاتك',
+    memoryFromPreference: 'من تفضيلاتك',
+    memoryTitle: 'ما أتذكره لك',
+    memoryEmpty: 'أخبرني بتفضيل مرة واحدة، مثل «دائمًا خالٍ من اللاكتوز»، وسأتذكره.',
+    memoryForget: 'انسَ',
+    memoryForgetAll: 'انسَ الكل',
+    memoryForgetAllConfirm: 'هل أنسى كل ما أتذكره لك؟',
+    memoryFromApp: 'من التطبيق',
+    memoryNoticed: 'لاحظته',
+    memoryUntil: 'حتى {date}',
+    memoryFooter: 'يمكن لفريق التطبيق رؤية هذه الملاحظات أيضًا.',
+    memoryOff: 'لا يحتفظ هذا التطبيق بالتفضيلات.',
   ),
 };
 

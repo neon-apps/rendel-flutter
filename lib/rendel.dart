@@ -19,6 +19,7 @@ export 'src/core/batteries.dart' show RendelDictationDenied;
 export 'src/core/copilot.dart' show Rendel;
 export 'src/core/pairing.dart' show RendelPairResult, RendelPairFailure;
 export 'src/core/events.dart' show RendelEvent;
+export 'src/core/followups.dart' show RendelFollowup;
 export 'src/core/schema.dart' show RendelSchema;
 // Part of RendelDispatcher's signature, so a host registering a custom
 // builder has to be able to name it.

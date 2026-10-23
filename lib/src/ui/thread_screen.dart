@@ -28,8 +28,12 @@ import 'renderer/blocks.dart'
         balancedWidth,
         readsFlatOnPage;
 import 'renderer/registry.dart';
+import 'memory_chips.dart';
+import 'memory_sheet.dart';
 import '../core/log.dart';
+import '../core/followups.dart';
 import '../core/strings.dart';
+import 'followup_card.dart';
 import 'theme.dart';
 
 /// The conversation surface: header, one answer to a page, composer.
@@ -63,6 +67,8 @@ class ThreadScreen extends StatefulWidget {
     this.dictationStarted,
     this.onNavigate,
     this.voice,
+    this.followup,
+    this.onFollowupOpen,
   });
 
   final ConversationController controller;
@@ -145,6 +151,12 @@ class ThreadScreen extends StatefulWidget {
   /// turn it off. Null reads nothing and draws no speaker.
   final RendelVoice? voice;
 
+  /// A follow-up waiting for this person, drawn at the top of the thread
+  /// (design/plans/marketing-channels.md §3.10); [onFollowupOpen] opens the
+  /// conversation the server wrote for it. Null draws none.
+  final ValueListenable<RendelFollowup?>? followup;
+  final VoidCallback? onFollowupOpen;
+
   @override
   State<ThreadScreen> createState() => _ThreadScreenState();
 }
@@ -185,6 +197,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       onPickFile: widget.onPickAttachment,
       fileSources: widget.attachSources,
       onUpload: _upload,
+      onOpenMemory: _openMemory,
     );
     // Over a detail a reply, a form sent or an option picked is a question:
     // the sheet goes first and the answer opens as a new page. A link opens
@@ -209,6 +222,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       onPickFile: widget.onPickAttachment,
       fileSources: widget.attachSources,
       onUpload: _upload,
+      onOpenMemory: _openMemory,
     );
     widget.controller.addListener(_turnPages);
     final c = widget.controller;
@@ -232,25 +246,44 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     if (state != AppLifecycleState.resumed) widget.voice?.stop();
   }
 
-  /// A finished answer's opening, in the voice of its own language: the
-  /// server's natural one when it sent a token for it, the phone's otherwise.
-  void _readAloud(RendelMessage answer, {String? text, String? lang, String? speech, List<String> parts = const []}) {
+  /// An answer that may be read aloud. Read by itself only when its question
+  /// was asked out loud and the header's speaker is on (Tuna 2026-10-23); any
+  /// other answer waits for a tap on its own speaker.
+  void _readAloud(RendelMessage answer, {String? text, String? lang, String? speech}) {
     final voice = widget.voice;
-    final words = text ?? spokenLead(answer.blocks);
-    if (voice == null || words == null || !mounted) return;
+    if (voice == null || !mounted || !_askedByVoice || !voice.on.value) return;
     // Only an answer the person is there for: not one that lands while the
     // app is in the background (Tuna 2026-10-23: only when a question is
     // asked and answered).
     final lifecycle = WidgetsBinding.instance.lifecycleState;
     if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
+    _say(answer);
+  }
+
+  /// [answer]'s opening, in the voice of its own language: the server's
+  /// natural one when it sent a token for it, the phone's otherwise.
+  void _say(RendelMessage answer) {
+    final voice = widget.voice;
+    final speech = answer.speech;
+    final words = speech?.text ?? spokenLead(answer.blocks);
+    if (voice == null || speech == null || words == null) return;
     final c = widget.controller;
     voice.speak(
       words,
-      lang ?? resolveSpokenLocale(c.locale, c.languages),
-      url: speech == null ? null : '${c.api.config.apiBaseUrl}/v1/speech/$speech',
-      parts: [for (final part in parts) '${c.api.config.apiBaseUrl}/v1/speech/$part'],
+      speech.lang ?? resolveSpokenLocale(c.locale, c.languages),
+      url: speech.token == null ? null : '${c.api.config.apiBaseUrl}/v1/speech/${speech.token}',
+      key: _keyOf(answer),
     );
   }
+
+  /// What an answer is read under, for its speaker to know it is the one playing.
+  static String _keyOf(RendelMessage answer) => answer.serverId ?? 'answer-${identityHashCode(answer)}';
+
+  /// Whether an answer's own speaker may still read it: the server's token for
+  /// its voice lives thirty minutes, less a minute's margin; the phone's own
+  /// voice needs none.
+  static bool _canSay(RendelAnswerSpeech? speech) =>
+      speech != null && (speech.token == null || DateTime.now().difference(speech.at) < const Duration(minutes: 29));
 
   /// A tap, and a screen of the app opened the way the presentation opens
   /// one.
@@ -261,6 +294,14 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   }
 
   String? _routeTitle(String route) => widget.controller.routes[route]?.title;
+
+  /// "What I remember for you", from a chip under an answer or a value
+  /// marked as remembered.
+  void _openMemory() => showRendelMemory(
+        context,
+        memory: widget.controller.memory,
+        strings: widget.strings,
+      );
 
   Future<String> _upload(RendelAttachment file) =>
       widget.controller.api.upload(file.bytes, file.mediaType, fileName: file.name);
@@ -756,6 +797,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   bool _askedWhole = false;
   bool _spoken = false;
 
+  /// The newest question was asked out loud: its answer is read by itself.
+  bool _askedByVoice = false;
+
   /// The newest question this screen has seen, so the next one is noticed
   /// whichever way it was sent: typed, a suggestion, a quick reply, spoken.
   RendelMessage? _question;
@@ -797,6 +841,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
         final words = question.blocks.firstOrNull?.props['markdown'];
         _asked = words is String ? words : '';
         _askedWhole = _spoken;
+        _askedByVoice = _spoken;
         changed = true;
       }
     }
@@ -1054,6 +1099,30 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           ),
         ),
       ),
+      if (widget.followup case final followup?)
+        ValueListenableBuilder<RendelFollowup?>(
+          valueListenable: followup,
+          builder: (context, waiting, _) {
+            // Positioned even when empty: a sized child would size the stack.
+            if (waiting == null) return const Positioned(top: 0, left: 0, child: SizedBox.shrink());
+            WidgetsBinding.instance.addPostFrameCallback((_) => RendelFollowups.instance.shown());
+            return ValueListenableBuilder<double>(
+              valueListenable: _head,
+              builder: (context, head, _) => Positioned(
+                top: head + theme.space.sm,
+                left: theme.space.lg,
+                right: theme.space.lg,
+                child: RendelFollowupCard(
+                  followup: waiting,
+                  theme: theme,
+                  closeLabel: widget.strings.closeDetail,
+                  onOpen: widget.onFollowupOpen ?? () {},
+                  onDismiss: RendelFollowups.instance.dismiss,
+                ),
+              ),
+            );
+          },
+        ),
     ];
   }
 
@@ -1154,7 +1223,11 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   }) {
     return ListenableBuilder(
       // The thumbs wait for the turn to end, which the controller says.
-      listenable: Listenable.merge([...answers, if (widget.feedback && !detail) controller]),
+      listenable: Listenable.merge([
+        ...answers,
+        if ((widget.feedback || widget.voice != null) && !detail) controller,
+        if (widget.voice != null && !detail) widget.voice!.playing,
+      ]),
       builder: (context, _) {
         final blocks = [for (final answer in answers) ...answer.blocks];
         final dispatch = detail ? _detailDispatch : _dispatch;
@@ -1189,6 +1262,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
             .firstOrNull;
         final finished = answered != null &&
             (controller.phase == RendelPhase.idle || !identical(controller.messages.lastOrNull, answered));
+        // What the answer kept, changed, forgot or relied on about the person.
+        final memory = [for (final answer in answers) ...answer.memory];
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1252,18 +1327,81 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   ),
                 ),
               ),
-            if (!detail && widget.feedback && finished)
+            if (memory.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 24),
-                child: _Helpful(
-                  strings: widget.strings,
-                  given: answered.rating,
-                  onRate: (rating) => controller.rateTurn(answered, rating),
+                child: RendelMemoryChips(
+                  changes: memory,
+                  onUndo: controller.undo,
+                  onOpen: _openMemory,
+                ),
+              ),
+            if (!detail && finished && (widget.feedback || (widget.voice != null && _canSay(answered.speech))))
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: Row(
+                  children: [
+                    // Its own speaker, which reads it on a tap (Tuna 2026-10-23).
+                    if (widget.voice case final voice? when _canSay(answered.speech))
+                      _AnswerSpeaker(
+                        strings: widget.strings,
+                        playing: voice.playing.value == _keyOf(answered),
+                        onTap: () => voice.playing.value == _keyOf(answered) ? voice.stop() : _say(answered),
+                      ),
+                    if (widget.feedback)
+                      Flexible(
+                        child: _Helpful(
+                          strings: widget.strings,
+                          given: answered.rating,
+                          onRate: (rating) => controller.rateTurn(answered, rating),
+                        ),
+                      ),
+                  ],
                 ),
               ),
           ],
         );
       },
+    );
+  }
+}
+
+/// An answer's own speaker, at its foot: reads the answer's opening on a tap,
+/// or stops it while it reads.
+class _AnswerSpeaker extends StatelessWidget {
+  const _AnswerSpeaker({required this.strings, required this.playing, required this.onTap});
+
+  final RendelStrings strings;
+  final bool playing;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final faint = theme.colors.onSurface.withValues(alpha: 0.55);
+    return Semantics(
+      // Its own node: merged into the page's, its label was read with the question's.
+      container: true,
+      button: true,
+      selected: playing,
+      label: playing ? strings.stopReading : strings.readAloudThis,
+      excludeSemantics: true,
+      child: Material(
+        color: playing ? theme.colors.onSurface.withValues(alpha: 0.07) : Colors.transparent,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: onTap,
+          child: SizedBox.square(
+            dimension: 44,
+            child: Icon(
+              playing ? Icons.stop_rounded : Icons.volume_up_rounded,
+              size: 18,
+              color: playing ? theme.colors.onSurface : faint,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

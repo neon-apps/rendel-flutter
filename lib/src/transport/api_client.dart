@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
 import 'package:http/http.dart' as http;
 
 import '../core/config.dart';
+import '../core/followups.dart';
 import '../core/log.dart';
 import '../core/pairing.dart';
 import '../protocol/protocol.dart';
@@ -519,6 +520,32 @@ class RendelApiClient {
     return RendelPairResult.failed(reason, message);
   }
 
+  /// `/v1/memory`, or `/v1/memory/:id` with [id]: what Rendel keeps about
+  /// the person [user] names (`identify`'s `id`, and its `hmac` when the app
+  /// verifies identities), or about this install when nobody is signed in.
+  /// The status and the body, or null when the request could not be made.
+  Future<({int status, String body})?> memory(
+    String method, {
+    String? id,
+    Map<String, String>? user,
+  }) async {
+    try {
+      final path = id == null ? '' : '/${Uri.encodeComponent(id)}';
+      final request = http.Request(method, Uri.parse('${config.apiBaseUrl}/v1/memory$path'))
+        ..headers.addAll({
+          ..._headers,
+          if (user?['id'] case final who?) 'X-Rendel-User': who,
+          if (user?['hmac'] case final hmac?) 'X-Rendel-User-Hmac': hmac,
+        });
+      final response = await http.Response.fromStream(
+        await _http.send(request).timeout(config.requestTimeout),
+      );
+      return (status: response.statusCode, body: response.body);
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> identify(Map<String, dynamic> body) async {
     await _http
         .post(
@@ -545,6 +572,67 @@ class RendelApiClient {
         .whereType<Map>()
         .map((m) => m.cast<String, dynamic>())
         .toList();
+  }
+
+  /// GET /v1/followups/next: the follow-up this device should show now
+  /// (design/plans/marketing-channels.md §3.10), written by the server at the
+  /// moment it is asked. Null when there is none (204), which is most of the
+  /// time, and on any failure: a follow-up is never worth an error.
+  Future<RendelFollowup?> nextFollowup() async {
+    try {
+      final response = await _http
+          .get(Uri.parse('${config.apiBaseUrl}/v1/followups/next'), headers: _headers)
+          .timeout(config.requestTimeout);
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      return body is Map ? RendelFollowup.tryParse(body['followup']) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// POST /v1/followups/:id/open: the conversation the server wrote for a
+  /// tapped follow-up, or null. The server counts the tap itself.
+  Future<String?> openFollowup(String id) async {
+    try {
+      final response = await _http
+          .post(Uri.parse('${config.apiBaseUrl}/v1/followups/${Uri.encodeComponent(id)}/open'), headers: _headers)
+          .timeout(config.requestTimeout);
+      if (response.statusCode != 200) return null;
+      final body = jsonDecode(response.body);
+      final conversationId = body is Map ? body['conversation_id'] : null;
+      return conversationId is String ? conversationId : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// POST /v1/push/token: the device's push token (null when the permission
+  /// is gone), with its zone and language for quiet hours and the language a
+  /// follow-up is written in. Never a throw.
+  Future<bool> setPushToken({
+    required String? token,
+    required String platform,
+    String? timezone,
+    String? locale,
+  }) async {
+    try {
+      final response = await _http
+          .post(
+            Uri.parse('${config.apiBaseUrl}/v1/push/token'),
+            headers: _headers,
+            body: jsonEncode({
+              'token': token,
+              'platform': platform,
+              if (timezone != null) 'timezone': timezone,
+              if (locale != null) 'locale': locale,
+            }),
+          )
+          .timeout(config.requestTimeout);
+      return response.statusCode == 204 || response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 
   void dispose() => _http.close();
