@@ -558,7 +558,12 @@ sealed class RendelWireEvent {
         final token = _text(data['token']);
         final text = _text(data['text']);
         if (token == null || text == null) return null;
-        return TurnSpeech(token: token, text: text, lang: _text(data['lang']));
+        return TurnSpeech(
+          token: token,
+          text: text,
+          lang: _text(data['lang']),
+          parts: (data['parts'] as List?)?.whereType<String>().toList() ?? const [],
+        );
       case 'ping':
         return const Ping();
     }
@@ -675,10 +680,15 @@ class RendelNotice extends RendelWireEvent {
 /// under it: [token] for `GET /v1/speech/:token` (MP3 in a natural voice),
 /// [text] and [lang] for reading it in the phone's own voice instead.
 class TurnSpeech extends RendelWireEvent {
-  const TurnSpeech({required this.token, required this.text, this.lang});
+  const TurnSpeech({required this.token, required this.text, this.lang, this.parts = const []});
   final String token;
   final String text;
   final String? lang;
+
+  /// The same words a sentence at a time, each its own `/v1/speech` token,
+  /// played one after another so the first is heard soonest. Empty from a
+  /// server before 2026-10-23's.
+  final List<String> parts;
 }
 
 class Ping extends RendelWireEvent {

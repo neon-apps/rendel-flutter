@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.58.5
+
+**Changed**
+
+- The voice starts with the answer's first sentence instead of waiting for
+  both: the API makes each sentence's voice separately and at once, and the
+  SDK plays the first as soon as it lands and the next after it. In 0.58.3
+  the opening was asked for as it was written, but its voice, made whole,
+  was still landing after the cards. No change needed.
+
 ## 0.58.4
 
 **Changed**

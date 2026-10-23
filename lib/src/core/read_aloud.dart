@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Directory, File;
+import 'dart:typed_data' show Uint8List;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart'
@@ -75,8 +76,16 @@ class RendelVoice {
   FlutterTts? _tts;
   AudioPlayer? _player;
 
-  /// The last answer's voice on disk, removed when the next one is written.
-  File? _spoken;
+  /// The last answer's voice on disk, removed when the next answer is read.
+  final _spoken = <File>[];
+
+  Future<Uint8List> _fetch(String url) async {
+    final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+    if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+      throw StateError('the voice answered ${response.statusCode}');
+    }
+    return response.bodyBytes;
+  }
 
   /// Bumped by every speak and stop, so a stream that loads after the person
   /// moved on is not played over them.
@@ -109,59 +118,75 @@ class RendelVoice {
 
   /// Says [text] in [locale] (`tr`, `en-US`…), over anything still being said:
   /// from [url] in the natural voice when there is one, else on the phone.
-  Future<void> speak(String text, String locale, {String? url}) async {
+  Future<void> speak(String text, String locale, {String? url, List<String> parts = const []}) async {
     await _load();
     if (!on.value || kIsWeb) return;
     await stop();
     final turn = _turn;
-    if (url != null) {
-      try {
-        // Fetched whole, then played from a file. Played from the URL, the
-        // server's stream reached a real iPhone (both requests 200) and was
-        // never heard: AVPlayer wants byte ranges and a length, a stream has
-        // neither, and audioplayers cannot play bytes on iOS (Tuna
-        // 2026-10-23). One request, too, where AVPlayer made two and each
-        // was a voice paid for.
-        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
-        if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
-          throw StateError('the voice answered ${response.statusCode}');
-        }
-        if (turn != _turn) return;
-        final file = File('${Directory.systemTemp.path}/rendel_answer_$turn.mp3');
-        await file.writeAsBytes(response.bodyBytes, flush: true);
-        _spoken?.delete().ignore();
-        _spoken = file;
-        if (turn != _turn) return;
-        final player = _player ??= AudioPlayer();
-        await player
-            .play(
-              DeviceFileSource(file.path, mimeType: 'audio/mpeg'),
-              // Heard with the silent switch on, other sound ducked under it
-              // (the lesson of 0.57.1).
-              ctx: AudioContext(
-                iOS: AudioContextIOS(
-                  category: AVAudioSessionCategory.playback,
-                  options: const {AVAudioSessionOptions.duckOthers},
-                ),
-                android: const AudioContextAndroid(
-                  contentType: AndroidContentType.speech,
-                  // The media volume, the one people turn up to hear.
-                  usageType: AndroidUsageType.media,
-                  audioFocus: AndroidAudioFocus.gainTransientMayDuck,
-                ),
-              ),
-            )
-            .timeout(const Duration(seconds: 10));
-        // Stopped while it was still loading: it must not start after all.
-        if (turn != _turn) await player.stop();
-        return;
-      } catch (err) {
-        RendelLog.warn('read_aloud_stream_failed', 'the natural voice did not play, reading on the phone: $err');
-        try {
-          await _player?.stop();
-        } catch (_) {}
-        if (turn != _turn || !on.value) return;
+    // A sentence at a time when the server sent them, else the whole.
+    final urls = parts.isNotEmpty ? parts : [if (url != null) url];
+    if (urls.isNotEmpty) {
+      // All asked for at once: the first plays as soon as it lands, and the
+      // rest arrive while it does (Tuna 2026-10-23: the voice must start as
+      // the answer arrives, not once its cards are done).
+      final voices = [for (final u in urls) _fetch(u)];
+      for (final v in voices) {
+        v.ignore();
       }
+      var heard = false;
+      for (var i = 0; i < voices.length; i++) {
+        try {
+          final bytes = await voices[i];
+          if (turn != _turn) return;
+          // Played from a file, fetched whole: a real iPhone's AVPlayer did not
+          // play the server's stream (no length, no byte ranges), and
+          // audioplayers cannot play bytes on iOS.
+          final file = File('${Directory.systemTemp.path}/rendel_answer_${turn}_$i.mp3');
+          await file.writeAsBytes(bytes, flush: true);
+          _spoken.add(file);
+          if (turn != _turn) return;
+          final player = _player ??= AudioPlayer();
+          final done = player.onPlayerComplete.first;
+          await player
+              .play(
+                DeviceFileSource(file.path, mimeType: 'audio/mpeg'),
+                // Heard with the silent switch on, other sound ducked under it
+                // (the lesson of 0.57.1).
+                ctx: AudioContext(
+                  iOS: AudioContextIOS(
+                    category: AVAudioSessionCategory.playback,
+                    options: const {AVAudioSessionOptions.duckOthers},
+                  ),
+                  android: const AudioContextAndroid(
+                    contentType: AndroidContentType.speech,
+                    // The media volume, the one people turn up to hear.
+                    usageType: AndroidUsageType.media,
+                    audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+                  ),
+                ),
+              )
+              .timeout(const Duration(seconds: 10));
+          // Stopped while it was still loading: it must not start after all.
+          if (turn != _turn) {
+            await player.stop();
+            return;
+          }
+          heard = true;
+          if (i < voices.length - 1) await done.timeout(const Duration(seconds: 60));
+          if (turn != _turn) return;
+        } catch (err) {
+          try {
+            await _player?.stop();
+          } catch (_) {}
+          // A later sentence lost is a voice that stops early; the first lost
+          // is read on the phone instead.
+          if (heard) return;
+          RendelLog.warn('read_aloud_stream_failed', 'the natural voice did not play, reading on the phone: $err');
+          if (turn != _turn || !on.value) return;
+          break;
+        }
+      }
+      if (heard) return;
     }
     try {
       final tts = _tts ??= await _engine();
@@ -192,6 +217,10 @@ class RendelVoice {
 
   Future<void> stop() async {
     _turn++;
+    for (final file in _spoken) {
+      file.delete().ignore();
+    }
+    _spoken.clear();
     try {
       await _player?.stop();
     } catch (_) {}

@@ -234,7 +234,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
   /// A finished answer's opening, in the voice of its own language: the
   /// server's natural one when it sent a token for it, the phone's otherwise.
-  void _readAloud(RendelMessage answer, {String? text, String? lang, String? speech}) {
+  void _readAloud(RendelMessage answer, {String? text, String? lang, String? speech, List<String> parts = const []}) {
     final voice = widget.voice;
     final words = text ?? spokenLead(answer.blocks);
     if (voice == null || words == null || !mounted) return;
@@ -248,6 +248,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       words,
       lang ?? resolveSpokenLocale(c.locale, c.languages),
       url: speech == null ? null : '${c.api.config.apiBaseUrl}/v1/speech/$speech',
+      parts: [for (final part in parts) '${c.api.config.apiBaseUrl}/v1/speech/$part'],
     );
   }
 

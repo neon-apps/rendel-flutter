@@ -35,13 +35,15 @@ class _Api extends RendelApiClient {
 class _Voice extends RendelVoice {
   final said = <(String, String)>[];
   final urls = <String?>[];
+  final parts = <List<String>>[];
   var stops = 0;
 
   @override
-  Future<void> speak(String text, String locale, {String? url}) async {
+  Future<void> speak(String text, String locale, {String? url, List<String> parts = const []}) async {
     if (!on.value) return;
     said.add((text, locale));
     urls.add(url);
+    this.parts.add(parts);
   }
 
   @override
@@ -123,7 +125,12 @@ void main() {
           const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
           const BlockStart(index: 0, id: 't', blockType: 'text'),
           const BlockDelta(index: 0, textDelta: 'C vitamini için bir doktora danışın. İşte mağazadakiler.'),
-          const TurnSpeech(token: 'tok9', text: 'C vitamini için bir doktora danışın. İşte mağazadakiler.', lang: 'tr'),
+          const TurnSpeech(
+            token: 'tok9',
+            text: 'C vitamini için bir doktora danışın. İşte mağazadakiler.',
+            lang: 'tr',
+            parts: ['p1', 'p2'],
+          ),
           const BlockStart(index: 1, id: 'p', blockType: 'product_cards'),
           const TurnEnd(status: 'completed', pending: [], lang: 'tr', speech: 'tok9'),
         ],
@@ -137,6 +144,8 @@ void main() {
       expect(c.busy, isTrue, reason: 'the turn has not ended');
       expect(voice.said, [('C vitamini için bir doktora danışın. İşte mağazadakiler.', 'tr')]);
       expect(voice.urls.single, endsWith('/v1/speech/tok9'));
+      // A sentence at a time, so the first is heard soonest.
+      expect(voice.parts.single.map((u) => u.split('/').last), ['p1', 'p2']);
       end.complete();
       await tester.runAsync(() => sent);
       await tester.pump();

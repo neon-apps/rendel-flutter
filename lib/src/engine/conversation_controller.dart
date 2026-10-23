@@ -243,7 +243,7 @@ class ConversationController extends ChangeNotifier {
   /// moment the server says the opening is written (`speech`), ahead of the
   /// cards under it, or at the turn's end from a server that does not. The
   /// thread on screen sets it; an answer with no thread open is read by nobody.
-  void Function(RendelMessage answer, {String? text, String? lang, String? speech})? onAnswered;
+  void Function(RendelMessage answer, {String? text, String? lang, String? speech, List<String> parts})? onAnswered;
 
   /// Whether this question's answer has been handed to [onAnswered] already.
   var _readThisQuestion = false;
@@ -1294,11 +1294,11 @@ class ConversationController extends ChangeNotifier {
               '$message${lastRequestId == null ? '' : ' (request $lastRequestId)'}',
             );
 
-          case TurnSpeech(:final token, :final text, :final lang):
+          case TurnSpeech(:final token, :final text, :final lang, :final parts):
             visible = false;
             if (!_readThisQuestion && _openAssistant != null) {
               _readThisQuestion = true;
-              onAnswered?.call(_openAssistant!, text: text, lang: lang, speech: token);
+              onAnswered?.call(_openAssistant!, text: text, lang: lang, speech: token, parts: parts);
             }
           case Ping():
             visible = false;
