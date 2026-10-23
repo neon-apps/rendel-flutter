@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.58.1
+
+**Fixed**
+
+- The natural voice was never heard on a real iPhone: it was played straight
+  from the API's stream, which the device's player refuses without a length
+  and byte ranges (the simulator does not ask). The voice is now downloaded
+  whole and played from a temporary file, in one request. The API answers in
+  byte ranges too, so 0.58.0 is heard as well. No change needed.
+
 ## 0.58.0
 
 **Changed**

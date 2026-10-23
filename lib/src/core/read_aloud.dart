@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io' show Directory, File;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, ValueNotifier, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../protocol/protocol.dart' show WireBlock;
@@ -73,6 +75,9 @@ class RendelVoice {
   FlutterTts? _tts;
   AudioPlayer? _player;
 
+  /// The last answer's voice on disk, removed when the next one is written.
+  File? _spoken;
+
   /// Bumped by every speak and stop, so a stream that loads after the person
   /// moved on is not played over them.
   var _turn = 0;
@@ -111,10 +116,26 @@ class RendelVoice {
     final turn = _turn;
     if (url != null) {
       try {
+        // Fetched whole, then played from a file. Played from the URL, the
+        // server's stream reached a real iPhone (both requests 200) and was
+        // never heard: AVPlayer wants byte ranges and a length, a stream has
+        // neither, and audioplayers cannot play bytes on iOS (Tuna
+        // 2026-10-23). One request, too, where AVPlayer made two and each
+        // was a voice paid for.
+        final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 15));
+        if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+          throw StateError('the voice answered ${response.statusCode}');
+        }
+        if (turn != _turn) return;
+        final file = File('${Directory.systemTemp.path}/rendel_answer_$turn.mp3');
+        await file.writeAsBytes(response.bodyBytes, flush: true);
+        _spoken?.delete().ignore();
+        _spoken = file;
+        if (turn != _turn) return;
         final player = _player ??= AudioPlayer();
         await player
             .play(
-              UrlSource(url, mimeType: 'audio/mpeg'),
+              DeviceFileSource(file.path, mimeType: 'audio/mpeg'),
               // Heard with the silent switch on, other sound ducked under it
               // (the lesson of 0.57.1).
               ctx: AudioContext(
