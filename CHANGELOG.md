@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.58.2
+
+**Fixed**
+
+- The voice speaks only while the app is in front: an answer that lands with
+  the app in the background is not read, and putting the app away stops the
+  voice. No change needed.
+
 ## 0.58.1
 
 **Fixed**

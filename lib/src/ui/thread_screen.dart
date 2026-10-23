@@ -149,7 +149,7 @@ class ThreadScreen extends StatefulWidget {
   State<ThreadScreen> createState() => _ThreadScreenState();
 }
 
-class _ThreadScreenState extends State<ThreadScreen> {
+class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver {
   final _input = TextEditingController();
 
   /// How tall the composer floating over the page is, so the page can
@@ -223,6 +223,13 @@ class _ThreadScreenState extends State<ThreadScreen> {
     _wasBusy = c.busy;
     c.onAnswered = _readAloud;
     widget.voice?.prepare();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// The app put away: the voice stops, as nobody is there to hear it.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) widget.voice?.stop();
   }
 
   /// A finished answer's opening, in the voice of its own language: the
@@ -231,6 +238,11 @@ class _ThreadScreenState extends State<ThreadScreen> {
     final voice = widget.voice;
     final words = spokenLead(answer.blocks);
     if (voice == null || words == null || !mounted) return;
+    // Only an answer the person is there for: not one that lands while the
+    // app is in the background (Tuna 2026-10-23: only when a question is
+    // asked and answered).
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     final c = widget.controller;
     voice.speak(
       words,
@@ -254,6 +266,7 @@ class _ThreadScreenState extends State<ThreadScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_turnPages);
     if (widget.controller.onAnswered == _readAloud) widget.controller.onAnswered = null;
     widget.voice?.stop();

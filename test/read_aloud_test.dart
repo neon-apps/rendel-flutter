@@ -117,6 +117,20 @@ void main() {
       expect(voice.said.single.$2, 'en-GB');
     });
 
+    testWidgets('reads nothing that lands with the app in the background, and stops when it goes there',
+        (tester) async {
+      final (c, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
+      // The order the platform reports them in; the binding refuses a skipped step.
+      void go(List<AppLifecycleState> states) => states.forEach(tester.binding.handleAppLifecycleStateChanged);
+      final stops = voice.stops;
+      go([AppLifecycleState.inactive, AppLifecycleState.hidden, AppLifecycleState.paused]);
+      expect(voice.stops, greaterThan(stops), reason: 'put away, the voice stops');
+      await tester.runAsync(() => c.send('Weather?'));
+      await tester.pump();
+      expect(voice.said, isEmpty);
+      go([AppLifecycleState.hidden, AppLifecycleState.inactive, AppLifecycleState.resumed]);
+    });
+
     testWidgets('reads nothing of a turn that did not finish', (tester) async {
       final (c, voice) = await open(tester, [
         const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
