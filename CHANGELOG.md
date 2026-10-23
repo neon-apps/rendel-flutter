@@ -5,6 +5,19 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.1
+
+- Every answer has a "▶ Listen" button under its first paragraph, before its
+  cards. While it reads it shows "■ 0:04", the time heard, and a tap stops it.
+  It replaces the speaker at the foot of the answer, and it also shows when
+  the phone's own voice reads.
+- The header's speaker is now an "Auto-read" switch with a visible on/off
+  state. It still only reads answers to questions asked out loud. Below 360pt
+  it shows without its word, which stays its accessible name.
+- A comparison's pinned titles sit on a solid strip, so no row shows through.
+- New strings `listen` and `autoRead` in all six languages; `readAloudThis`
+  now contains the button's own word. No API changes.
+
 ## 0.59.0
 
 **Voice**

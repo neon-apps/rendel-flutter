@@ -40,6 +40,12 @@ class _Voice extends RendelVoice {
   final urls = <String?>[];
   var stops = 0;
 
+  /// What [elapsed] says: how long the answer being read has been heard.
+  Duration heard = Duration.zero;
+
+  @override
+  Duration get elapsed => playing.value == null ? Duration.zero : heard;
+
   @override
   Future<void> speak(String text, String locale, {String? url, String? key}) async {
     said.add((text, locale));
@@ -312,7 +318,8 @@ void main() {
       final (c, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok1'));
       await type(tester, c, 'Weather?');
       expect(voice.said, isEmpty);
-      await tester.tap(find.bySemanticsLabel('Read aloud'));
+      expect(find.text('Listen'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Listen to this answer'));
       await tester.pump();
       expect(voice.said, [('Tomorrow is clear.', 'en')]);
       expect(voice.urls.single, '${c.api.config.apiBaseUrl}/v1/speech/tok1');
@@ -321,17 +328,52 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Stop reading'));
       await tester.pump();
       expect(voice.stops, greaterThan(stops));
+      expect(find.text('Listen'), findsOneWidget);
+    });
+
+    testWidgets("sits under the answer's first paragraph and above its cards, and counts the time heard (QA 2026-10-24)",
+        (tester) async {
+      final (c, voice) = await open(tester, [
+        const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
+        BlockReady(index: 0, block: _text('Tomorrow is clear.')),
+        const TurnSpeech(token: 'tok20', text: 'Tomorrow is clear.', lang: 'en'),
+        BlockReady(
+          index: 1,
+          block: WireBlock(id: 'k', type: 'key_points', fallbackText: 'Dry', props: {
+            'items': [
+              {'icon': 'check', 'title': 'Dry all day', 'body': 'No rain.'},
+            ],
+          })
+            ..ready = true,
+        ),
+        TurnEnd(status: 'completed', pending: const [], lang: 'en'),
+      ]);
+      await type(tester, c, 'Weather?');
+      final pill = tester.getRect(find.text('Listen'));
+      expect(pill.top, greaterThan(tester.getRect(find.text('Tomorrow is clear.')).bottom));
+      expect(pill.bottom, lessThan(tester.getRect(find.text('Dry all day')).top));
+      expect(tester.getSize(find.bySemanticsLabel('Listen to this answer')).height, greaterThanOrEqualTo(44));
+
+      await tester.tap(find.bySemanticsLabel('Listen to this answer'));
+      await tester.pump();
+      expect(find.text('0:00'), findsOneWidget);
+      voice.heard = const Duration(milliseconds: 4200);
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('0:04'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Stop reading'));
+      await tester.pump();
+      expect(find.text('Listen'), findsOneWidget);
     });
 
     testWidgets('offers no speaker once its voice token has lived its thirty minutes', (tester) async {
       final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok2'));
       await type(tester, c, 'Weather?');
-      expect(find.bySemanticsLabel('Read aloud'), findsOneWidget);
+      expect(find.bySemanticsLabel('Listen to this answer'), findsOneWidget);
       final answered = c.messages.last;
       answered.speech = RendelAnswerSpeech(token: 'tok2', lang: 'en', at: DateTime.now().subtract(const Duration(minutes: 31)));
       answered.touch();
       await tester.pump();
-      expect(find.bySemanticsLabel('Read aloud'), findsNothing);
+      expect(find.bySemanticsLabel('Listen to this answer'), findsNothing);
     });
 
     testWidgets('leaves it to the phone where the server has no voice', (tester) async {
@@ -370,16 +412,23 @@ void main() {
       expect(voice.said, isEmpty);
     });
 
-    testWidgets("the header's speaker mutes what is read by itself, and a new question stops the voice",
+    testWidgets("the header's Auto-read switch mutes what is read by itself, and a new question stops the voice",
         (tester) async {
       final (c, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
       await say(tester, 'Weather?');
       expect(voice.said, hasLength(1));
 
-      await tester.tap(find.bySemanticsLabel('Read answers aloud'));
+      // Its own word and a switch, not a speaker glyph (QA 2026-10-24).
+      expect(find.text('Auto-read'), findsOneWidget);
+      expect(find.byIcon(Icons.volume_up_rounded), findsNothing);
+      expect(
+        tester.getSemantics(find.bySemanticsLabel('Auto-read')),
+        isSemantics(hasToggledState: true, isToggled: true, isButton: true, hint: 'Read answers aloud'),
+      );
+      await tester.tap(find.bySemanticsLabel('Auto-read'));
       await tester.pump();
       expect(voice.on.value, isFalse);
-      expect(find.byIcon(Icons.volume_off_rounded), findsOneWidget);
+      expect(tester.getSemantics(find.bySemanticsLabel('Auto-read')), isSemantics(hasToggledState: true, isToggled: false));
 
       final stopsBefore = voice.stops;
       await say(tester, 'And Friday?');
@@ -387,11 +436,27 @@ void main() {
       expect(voice.said, hasLength(1), reason: 'muted, a spoken question is not read by itself');
     });
 
+    testWidgets('Auto-read fits the header on a narrow phone, and at 320 is the switch alone, still named', (tester) async {
+      addTearDown(tester.view.reset);
+      for (final (width, scale) in [(390.0, 1.0), (360.0, 1.0), (360.0, 1.3), (320.0, 1.0), (320.0, 1.6)]) {
+        tester.view.physicalSize = Size(width * 3, 2400);
+        tester.view.devicePixelRatio = 3;
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok30'));
+        await type(tester, c, 'Weather?');
+        expect(tester.takeException(), isNull, reason: 'no overflow at $width x$scale');
+        expect(find.bySemanticsLabel('Auto-read'), findsOneWidget);
+        expect(find.text('Auto-read'), width < 360 ? findsNothing : findsOneWidget, reason: '$width');
+        tester.platformDispatcher.clearTextScaleFactorTestValue();
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
+
     testWidgets('draws no speaker at all where the host or the console turned voice off', (tester) async {
       final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok3'), voiced: false);
       await type(tester, c, 'Weather?');
-      expect(find.bySemanticsLabel('Read aloud'), findsNothing);
-      expect(find.bySemanticsLabel('Read answers aloud'), findsNothing);
+      expect(find.bySemanticsLabel('Listen to this answer'), findsNothing);
+      expect(find.bySemanticsLabel('Auto-read'), findsNothing);
     });
   });
 

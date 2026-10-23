@@ -481,14 +481,22 @@ void main() {
 
       await scrollTo(headFoot - 60 + 20);
       expect(opacity(), 1);
-      expect(tester.getTopLeft(pin).dy, moreOrLessEquals(60, epsilon: 0.5),
-          reason: 'under the bar, not at the top of the screen');
+      expect(tester.getRect(pin).bottom, moreOrLessEquals(60 + 38, epsilon: 0.5),
+          reason: 'its titles under the bar, not at the top of the screen');
       expect(find.descendant(of: pin, matching: find.text('Trail Circuit')), findsOneWidget);
+      // Opaque, and up under the bar too: no row reads through it, or shows
+      // between the bar and the titles (QA 2026-10-24).
+      expect(tester.getRect(pin).top, moreOrLessEquals(0, epsilon: 0.5));
+      final strip = tester.widget<Container>(
+        find.descendant(of: pin, matching: find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration)).first,
+      );
+      expect((strip.decoration! as BoxDecoration).color!.a, 1);
+      expect(find.descendant(of: pin, matching: find.byType(BackdropFilter)), findsNothing);
 
       // Kept under the bar while the rows go by.
       await scrollTo(headFoot + 200);
       expect(opacity(), 1);
-      expect(tester.getTopLeft(pin).dy, moreOrLessEquals(60, epsilon: 0.5));
+      expect(tester.getRect(pin).bottom, moreOrLessEquals(60 + 38, epsilon: 0.5));
 
       // Once the block's own foot comes up to the bar it goes.
       await scrollTo(foot - 60 + 10);

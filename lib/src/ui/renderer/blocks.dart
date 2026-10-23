@@ -9194,7 +9194,12 @@ class _ComparisonState extends State<_Comparison> {
     );
 
     // Out through the page's padding on a page, as the bar above it is.
-    final reach = page?.flat ?? false ? page!.inset : 0.0;
+    final flat = page?.flat ?? false;
+    final reach = flat ? page!.inset : 0.0;
+    // Opaque, on the ground it lies on, and up under the bar too (QA
+    // 2026-10-24): frosted, the rows read through it, and the page's fade
+    // under the bar let a row's label show between the bar and the titles.
+    final under = page?.bar ?? 0.0;
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -9202,10 +9207,10 @@ class _ComparisonState extends State<_Comparison> {
         ValueListenableBuilder<(double, bool)>(
           valueListenable: _pin,
           builder: (context, pin, _) => Positioned(
-            top: pin.$1,
+            top: pin.$1 - under,
             left: -reach,
             right: -reach,
-            height: _pinHeight,
+            height: _pinHeight + under,
             // Drawn, not read: the cells already name their things.
             child: IgnorePointer(
               child: ExcludeSemantics(
@@ -9214,31 +9219,26 @@ class _ComparisonState extends State<_Comparison> {
                   opacity: pin.$2 ? 1 : 0,
                   duration: still ? Duration.zero : const Duration(milliseconds: 220),
                   curve: theme.motion.curve,
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 7, sigmaY: 7),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: reach),
-                        decoration: BoxDecoration(
-                          color: theme.colors.surfaceRaised.withValues(alpha: 0.94),
-                          border: Border(bottom: line),
-                        ),
-                        child: columns(
-                          [
-                            for (final item in items)
-                              Text(
-                                titleOf(item),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.text.label.copyWith(
-                                  fontSize: 13.5,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                          ],
-                          align: CrossAxisAlignment.center,
-                        ),
-                      ),
+                  child: Container(
+                    padding: EdgeInsets.fromLTRB(reach, under, reach, 0),
+                    decoration: BoxDecoration(
+                      color: flat ? theme.colors.surface : theme.colors.surfaceRaised,
+                      border: Border(bottom: line),
+                    ),
+                    child: columns(
+                      [
+                        for (final item in items)
+                          Text(
+                            titleOf(item),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.text.label.copyWith(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                      align: CrossAxisAlignment.center,
                     ),
                   ),
                 ),

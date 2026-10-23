@@ -52,7 +52,9 @@ class RendelStrings {
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
     this.readAloud = 'Read answers aloud',
-    this.readAloudThis = 'Read aloud',
+    this.autoRead = 'Auto-read',
+    this.listen = 'Listen',
+    this.readAloudThis = 'Listen to this answer',
     this.stopReading = 'Stop reading',
     this.retry = 'Try again',
     this.streamDropped = 'The connection dropped before the answer finished.',
@@ -268,14 +270,22 @@ class RendelStrings {
   final String sendMessage;
   final String newConversation;
 
-  /// The header's speaker: whether answers are read aloud. A toggle, so a
-  /// screen reader says on or off with it.
+  /// What the header's Auto-read switch does, as its screen-reader hint: an
+  /// answer to a spoken question is read by itself.
   final String readAloud;
 
-  /// An answer's own speaker: read this one aloud.
+  /// The header's switch, in its own words: answers to spoken questions read
+  /// by themselves, on or off. A switch, so a screen reader says which.
+  final String autoRead;
+
+  /// The pill under an answer's first paragraph that reads it aloud.
+  final String listen;
+
+  /// That pill to a screen reader: holds the pill's own word ([listen]), and
+  /// what it reads.
   final String readAloudThis;
 
-  /// The same speaker while it reads.
+  /// The same pill while it reads, stopping it.
   final String stopReading;
 
   final String retry;
@@ -673,6 +683,8 @@ class RendelStrings {
     String? sendMessage,
     String? newConversation,
     String? readAloud,
+    String? autoRead,
+    String? listen,
     String? readAloudThis,
     String? stopReading,
     String? retry,
@@ -840,6 +852,8 @@ class RendelStrings {
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
       readAloud: readAloud ?? this.readAloud,
+      autoRead: autoRead ?? this.autoRead,
+      listen: listen ?? this.listen,
       readAloudThis: readAloudThis ?? this.readAloudThis,
       stopReading: stopReading ?? this.stopReading,
       retry: retry ?? this.retry,
@@ -1020,6 +1034,8 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
     readAloud: 'Cevapları sesli oku',
+    autoRead: 'Sesli oku',
+    listen: 'Dinle',
     readAloudThis: 'Bu cevabı dinle',
     stopReading: 'Okumayı durdur',
     retry: 'Tekrar dene',
@@ -1191,7 +1207,9 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Nachricht senden',
     newConversation: 'Neue Unterhaltung beginnen',
     readAloud: 'Antworten vorlesen',
-    readAloudThis: 'Vorlesen',
+    autoRead: 'Auto-Vorlesen',
+    listen: 'Anhören',
+    readAloudThis: 'Diese Antwort anhören',
     stopReading: 'Vorlesen beenden',
     retry: 'Erneut versuchen',
     streamDropped: 'Die Verbindung wurde vor dem Ende der Antwort unterbrochen.',
@@ -1364,7 +1382,9 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Envoyer le message',
     newConversation: 'Démarrer une nouvelle conversation',
     readAloud: 'Lire les réponses à voix haute',
-    readAloudThis: 'Lire à voix haute',
+    autoRead: 'Lecture auto',
+    listen: 'Écouter',
+    readAloudThis: 'Écouter cette réponse',
     stopReading: 'Arrêter la lecture',
     retry: 'Réessayer',
     streamDropped: 'La connexion a été perdue avant la fin de la réponse.',
@@ -1536,7 +1556,9 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'Enviar mensaje',
     newConversation: 'Iniciar una conversación nueva',
     readAloud: 'Leer las respuestas en voz alta',
-    readAloudThis: 'Leer en voz alta',
+    autoRead: 'Lectura auto',
+    listen: 'Escuchar',
+    readAloudThis: 'Escuchar esta respuesta',
     stopReading: 'Dejar de leer',
     retry: 'Inténtalo de nuevo',
     streamDropped: 'La conexión se cortó antes de terminar la respuesta.',
@@ -1707,7 +1729,9 @@ const Map<String, RendelStrings> _byLocale = {
     sendMessage: 'إرسال الرسالة',
     newConversation: 'بدء محادثة جديدة',
     readAloud: 'قراءة الإجابات بصوت عالٍ',
-    readAloudThis: 'اقرأ بصوت عالٍ',
+    autoRead: 'قراءة تلقائية',
+    listen: 'استمع',
+    readAloudThis: 'استمع إلى هذه الإجابة',
     stopReading: 'أوقف القراءة',
     retry: 'حاول مرة أخرى',
     streamDropped: 'انقطع الاتصال قبل أن تكتمل الإجابة.',

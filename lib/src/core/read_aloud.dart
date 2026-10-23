@@ -206,6 +206,16 @@ class RendelVoice {
   /// The answer being read, by the key it was read under; null when quiet.
   final playing = ValueNotifier<String?>(null);
 
+  /// When the answer being read was first heard; null until a sound is made.
+  DateTime? _heardAt;
+
+  /// How long the answer being read has been heard: zero while its voice is
+  /// still on its way, and when nothing is read. The Listen pill shows it.
+  Duration get elapsed {
+    final at = _heardAt;
+    return playing.value == null || at == null ? Duration.zero : DateTime.now().difference(at);
+  }
+
   final RendelPcmOut _out;
   final http.Client Function() _client;
   http.Client? _fetching;
@@ -277,8 +287,8 @@ class RendelVoice {
     if (kIsWeb) return;
     await stop();
     final turn = _turn;
-    if (url == null) return _phone(text, locale, turn);
     final name = key ?? text;
+    if (url == null) return _phone(text, locale, name, turn);
     playing.value = name;
     final kept = _kept;
     if (kept != null && kept.key == name) {
@@ -323,6 +333,7 @@ class RendelVoice {
         if (!opened) {
           opened = true;
           await _hold(rate);
+          _heardAt = DateTime.now();
         }
         pieces.add(bytes);
         await _out.feed(bytes);
@@ -362,6 +373,7 @@ class RendelVoice {
   /// Plays what was kept, without asking the server again.
   Future<void> _play(int rate, List<Uint8List> pieces, int turn) async {
     await _hold(rate);
+    _heardAt = DateTime.now();
     for (final piece in pieces) {
       if (turn != _turn) return;
       await _out.feed(piece);
@@ -411,6 +423,7 @@ class RendelVoice {
         await player.stop();
         return;
       }
+      _heardAt = DateTime.now();
       await done.timeout(const Duration(seconds: 60));
     } catch (err) {
       RendelLog.warn('read_aloud_failed', 'the natural voice did not play: $err');
@@ -418,8 +431,11 @@ class RendelVoice {
     _quiet(turn);
   }
 
-  /// A server with no natural voice: the phone's own.
-  Future<void> _phone(String text, String locale, int turn) async {
+  /// A server with no natural voice: the phone's own. Said to be playing for
+  /// as long as it speaks, so the answer's pill shows the time and stops it,
+  /// as it does for the natural voice.
+  Future<void> _phone(String text, String locale, String key, int turn) async {
+    playing.value = key;
     try {
       final tts = _tts ??= await _engine();
       await tts.stop();
@@ -442,19 +458,25 @@ class RendelVoice {
       final voice = _voiceFor.containsKey(lang) ? _voiceFor[lang] : (_voiceFor[lang] = await _woman(tts, lang));
       if (voice != null) await tts.setVoice(voice);
       if (turn != _turn) return;
+      _heardAt = DateTime.now();
+      // Returns once it has been said (`awaitSpeakCompletion`), or stopped.
       await tts.speak(text);
     } catch (err) {
       RendelLog.warn('read_aloud_failed', 'could not read the answer aloud: $err');
     }
+    _quiet(turn);
   }
 
   void _quiet(int turn) {
-    if (turn == _turn) playing.value = null;
+    if (turn != _turn) return;
+    playing.value = null;
+    _heardAt = null;
   }
 
   Future<void> stop() async {
     _turn++;
     playing.value = null;
+    _heardAt = null;
     _fetching?.close();
     _fetching = null;
     for (final file in _spoken) {
@@ -482,6 +504,8 @@ class RendelVoice {
     final tts = FlutterTts();
     // The engines' own "normal" is brisk on iOS; this is a calm reading pace.
     await tts.setSpeechRate(_iOS ? 0.5 : 0.95);
+    // `speak` returns when the words are said, so the pill knows when to stop counting.
+    await tts.awaitSpeakCompletion(true);
     return tts;
   }
 

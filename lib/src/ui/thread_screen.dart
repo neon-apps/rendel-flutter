@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' show ImageFilter;
+import 'dart:ui' show FontFeature, ImageFilter;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, ValueListenable, defaultTargetPlatform, listEquals;
@@ -1264,6 +1264,32 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
             (controller.phase == RendelPhase.idle || !identical(controller.messages.lastOrNull, answered));
         // What the answer kept, changed, forgot or relied on about the person.
         final memory = [for (final answer in answers) ...answer.memory];
+        // The answer's Listen pill, under its first paragraph and before its
+        // cards, as soon as its voice is known (QA 2026-10-24).
+        final voice = widget.voice;
+        final voiced = detail || voice == null
+            ? null
+            : answers.reversed.where((m) => m.role == 'assistant' && _canSay(m.speech)).firstOrNull;
+        final listen = voiced != null && (voiced.speech!.token != null || (voiced.speech!.text ?? spokenLead(voiced.blocks)) != null)
+            ? _ListenPill(
+                key: ValueKey('rendel-listen-${_keyOf(voiced)}'),
+                strings: widget.strings,
+                voice: voice!,
+                playing: voice.playing.value == _keyOf(voiced),
+                fresh: DateTime.now().difference(voiced.speech!.at) < const Duration(milliseconds: 1500),
+                onTap: () => voice.playing.value == _keyOf(voiced) ? voice.stop() : _say(voiced),
+              )
+            : null;
+        // Where it goes: after the voiced answer's first text block, or before its first block.
+        var listenAfter = -1;
+        if (voiced != null) {
+          var from = 0;
+          for (final answer in answers) {
+            if (identical(answer, voiced)) break;
+            from += answer.blocks.length;
+          }
+          listenAfter = from + voiced.blocks.indexWhere((b) => b.type == 'text');
+        }
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1273,7 +1299,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                 padding: const EdgeInsets.only(bottom: 14),
                 child: _AskedLine(text: askedText.trim(), image: asked.image),
               ),
-            for (var i = 0; i < blocks.length; i++)
+            if (listen != null && listenAfter < 0)
+              Padding(padding: const EdgeInsets.only(bottom: 16), child: listen),
+            for (var i = 0; i < blocks.length; i++) ...[
               Padding(
                 padding: EdgeInsets.only(top: gap(i)),
                 child: RendelPage(
@@ -1327,6 +1355,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   ),
                 ),
               ),
+              if (listen != null && i == listenAfter) Padding(padding: const EdgeInsets.only(top: 16), child: listen),
+            ],
             if (memory.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 24),
@@ -1336,26 +1366,18 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   onOpen: _openMemory,
                 ),
               ),
-            if (!detail && finished && (widget.feedback || (widget.voice != null && _canSay(answered.speech))))
+            if (!detail && finished && widget.feedback)
               Padding(
                 padding: const EdgeInsets.only(top: 24),
                 child: Row(
                   children: [
-                    // Its own speaker, which reads it on a tap (Tuna 2026-10-23).
-                    if (widget.voice case final voice? when _canSay(answered.speech))
-                      _AnswerSpeaker(
+                    Flexible(
+                      child: _Helpful(
                         strings: widget.strings,
-                        playing: voice.playing.value == _keyOf(answered),
-                        onTap: () => voice.playing.value == _keyOf(answered) ? voice.stop() : _say(answered),
+                        given: answered.rating,
+                        onRate: (rating) => controller.rateTurn(answered, rating),
                       ),
-                    if (widget.feedback)
-                      Flexible(
-                        child: _Helpful(
-                          strings: widget.strings,
-                          given: answered.rating,
-                          onRate: (rating) => controller.rateTurn(answered, rating),
-                        ),
-                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1366,42 +1388,233 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   }
 }
 
-/// An answer's own speaker, at its foot: reads the answer's opening on a tap,
-/// or stops it while it reads.
-class _AnswerSpeaker extends StatelessWidget {
-  const _AnswerSpeaker({required this.strings, required this.playing, required this.onTap});
+/// An answer's Listen pill (QA 2026-10-24), under its first paragraph and
+/// before its cards: "▶ Listen" reads the answer's opening on a tap, and
+/// "■ 0:04", the time heard, stops it while it reads. 44 high, and as wide
+/// either way, so nothing moves on a tap. Mirrors the web SDK's `.rd-listen`.
+class _ListenPill extends StatefulWidget {
+  const _ListenPill({
+    super.key,
+    required this.strings,
+    required this.voice,
+    required this.playing,
+    required this.fresh,
+    required this.onTap,
+  });
 
   final RendelStrings strings;
+  final RendelVoice voice;
   final bool playing;
+
+  /// It came with the answer just now, so it opens a little room for itself
+  /// under the paragraph; on a page come back to, it is simply there.
+  final bool fresh;
   final VoidCallback onTap;
+
+  @override
+  State<_ListenPill> createState() => _ListenPillState();
+}
+
+class _ListenPillState extends State<_ListenPill> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    _count();
+  }
+
+  @override
+  void didUpdateWidget(_ListenPill old) {
+    super.didUpdateWidget(old);
+    if (old.playing != widget.playing) _count();
+  }
+
+  /// The time on the pill counts while it reads, and stops with it.
+  void _count() {
+    _tick?.cancel();
+    _tick = widget.playing ? Timer.periodic(const Duration(milliseconds: 250), (_) => setState(() {})) : null;
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  static String _clock(Duration heard) {
+    final seconds = heard.inSeconds;
+    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
-    final faint = theme.colors.onSurface.withValues(alpha: 0.55);
-    return Semantics(
-      // Its own node: merged into the page's, its label was read with the question's.
-      container: true,
-      button: true,
-      selected: playing,
-      label: playing ? strings.stopReading : strings.readAloudThis,
-      excludeSemantics: true,
-      child: Material(
-        color: playing ? theme.colors.onSurface.withValues(alpha: 0.07) : Colors.transparent,
-        shape: const CircleBorder(),
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: onTap,
-          child: SizedBox.square(
-            dimension: 44,
-            child: Icon(
-              playing ? Icons.stop_rounded : Icons.volume_up_rounded,
-              size: 18,
-              color: playing ? theme.colors.onSurface : faint,
+    final still = MediaQuery.disableAnimationsOf(context);
+    final playing = widget.playing;
+    final ink = playing ? theme.colors.onAccent : theme.colors.onSurface;
+    final pill = RendelPressable(
+      semanticLabel: playing ? widget.strings.stopReading : widget.strings.readAloudThis,
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: still ? Duration.zero : const Duration(milliseconds: 200),
+        curve: theme.motion.curve,
+        height: 44,
+        constraints: const BoxConstraints(minWidth: 108),
+        padding: const EdgeInsetsDirectional.fromSTEB(15, 0, 18, 0),
+        decoration: BoxDecoration(
+          color: playing ? theme.colors.accent : theme.colors.surfaceRaised,
+          borderRadius: BorderRadius.circular(theme.radius.control),
+          border: Border.all(color: playing ? theme.colors.accent : theme.hairline),
+          boxShadow: [
+            BoxShadow(
+              color: theme.colors.shadow.withValues(alpha: playing ? 0.30 : 0.16),
+              blurRadius: 22,
+              spreadRadius: -12,
+              offset: const Offset(0, 10),
             ),
-          ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 20, color: ink),
+            const SizedBox(width: 8),
+            Text(
+              playing ? _clock(widget.voice.elapsed) : widget.strings.listen,
+              maxLines: 1,
+              style: theme.text.label.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                height: 1,
+                color: ink,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
         ),
       ),
+    );
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: widget.fresh && !still ? 0 : 1, end: 1),
+      duration: const Duration(milliseconds: 340),
+      curve: theme.motion.curve,
+      // Its own node: merged into the page's, its label was read with the question's.
+      child: Align(alignment: AlignmentDirectional.centerStart, child: Semantics(container: true, child: pill)),
+      builder:
+          (context, t, child) => ClipRect(
+            clipBehavior: t < 1 ? Clip.hardEdge : Clip.none,
+            child: Align(
+              alignment: AlignmentDirectional.topStart,
+              heightFactor: t,
+              child: Opacity(opacity: t, child: child),
+            ),
+          ),
+    );
+  }
+}
+
+/// The header's Auto-read switch (QA 2026-10-24): whether an answer to a
+/// spoken question is read by itself. Its word and a switch on the glass the
+/// page steps sit on, not a speaker glyph, which under an answer meant
+/// something else. 36 drawn, 44 to the finger. On a phone narrower than 360
+/// the switch alone, its word still its name. Mirrors the web SDK's
+/// `.rd-autoread`.
+class _AutoRead extends StatelessWidget {
+  const _AutoRead({required this.voice});
+
+  final RendelVoice voice;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final still = MediaQuery.disableAnimationsOf(context);
+    final shape = BorderRadius.circular(theme.radius.control);
+    final compact = MediaQuery.sizeOf(context).width < 360;
+    return ValueListenableBuilder<bool>(
+      valueListenable: voice.on,
+      builder:
+          (context, on, _) => Semantics(
+            toggled: on,
+            hint: strings.readAloud,
+            child: RendelPressable(
+              semanticLabel: strings.autoRead,
+              onTap: () => voice.setOn(!on),
+              child: Center(
+                widthFactor: 1,
+                // No drop shadow, for the reason `_PageSteps` gives.
+                child: ClipRRect(
+                  borderRadius: shape,
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                    child: Container(
+                      height: 36,
+                      padding: EdgeInsetsDirectional.fromSTEB(compact ? 4 : 11, 0, 4, 0),
+                      decoration: BoxDecoration(
+                        color: theme.colors.surfaceHigh.withValues(alpha: 0.72),
+                        border: Border.all(color: theme.hairline),
+                        borderRadius: shape,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (!compact) ...[
+                            Flexible(
+                              child: Text(
+                                strings.autoRead,
+                                maxLines: 1,
+                                softWrap: false,
+                                overflow: TextOverflow.ellipsis,
+                                // The header has no room to grow into: the word scales a little, not with the page.
+                                textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2),
+                                style: theme.text.label.copyWith(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  height: 1,
+                                  color: on ? theme.colors.onSurface : theme.colors.onSurfaceSoft,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
+                          AnimatedContainer(
+                            key: const ValueKey('rendel-autoread-switch'),
+                            duration: still ? Duration.zero : const Duration(milliseconds: 200),
+                            width: 28,
+                            height: 18,
+                            padding: const EdgeInsets.all(3),
+                            decoration: BoxDecoration(
+                              color: on ? theme.colors.accent : theme.colors.onSurface.withValues(alpha: 0.16),
+                              border: Border.all(color: on ? theme.colors.accent : theme.hairline, width: 0.5),
+                              borderRadius: BorderRadius.circular(9),
+                            ),
+                            child: AnimatedAlign(
+                              duration: still ? Duration.zero : const Duration(milliseconds: 220),
+                              curve: theme.motion.curve,
+                              alignment: on ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: on ? theme.colors.onAccent : theme.colors.surfaceRaised,
+                                  shape: BoxShape.circle,
+                                  boxShadow: const [
+                                    BoxShadow(color: Color(0x38000000), blurRadius: 3, offset: Offset(0, 1)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
     );
   }
 }
@@ -1638,12 +1851,13 @@ class _Header extends StatelessWidget {
         maxLines: 1,
       ),
     );
-    final row = Row(
+    final row = LayoutBuilder(
+      builder: (context, box) => Row(
         children: [
           // Back and forward at the leading edge. No rule under the header:
           // the page fades out beneath it instead.
           _PageSteps(onBack: onBack, onForward: onForward),
-          SizedBox(width: theme.space.md),
+          SizedBox(width: theme.space.sm),
           // The mark before the name, and never instead of it.
           //
           // A logo is a picture of a word at best and a picture of a shape
@@ -1679,26 +1893,13 @@ class _Header extends StatelessWidget {
                     style: theme.text.heading,
                   ),
           ),
-          // Nothing to read yet: the speaker comes with the first answer.
+          // Nothing to read yet: Auto-read comes with the first answer. Never
+          // wider than what the steps and the two buttons leave: at a large
+          // text size its word gives way rather than the row overflowing.
           if (voice case final voice? when !fresh)
-            ValueListenableBuilder<bool>(
-              valueListenable: voice.on,
-              builder: (context, on, _) => Semantics(
-                toggled: on,
-                child: RendelPressable(
-                  semanticLabel: RendelStringsScope.of(context).readAloud,
-                  onTap: () => voice.setOn(!on),
-                  child: SizedBox(
-                    height: 44,
-                    width: 44,
-                    child: Icon(
-                      on ? Icons.volume_up_rounded : Icons.volume_off_rounded,
-                      size: theme.type.display - 2,
-                      color: theme.colors.onSurfaceSoft,
-                    ),
-                  ),
-                ),
-              ),
+            ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: math.max(36, box.maxWidth - 2 * 44 - 2 * 44 - 2 * 3 - theme.space.sm)),
+              child: _AutoRead(voice: voice),
             ),
           if (onReset != null)
             RendelPressable(
@@ -1729,7 +1930,8 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
-      );
+      ),
+    );
     return Container(
       // Directional: the leading inset is the 16pt edge every block in the
       // thread shares, and physically pinned it landed on the wrong side in
