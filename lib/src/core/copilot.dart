@@ -470,7 +470,7 @@ class Rendel {
       routes: _routes,
       sdkVersion: _config.sdkVersion,
       contextProviders: _providers,
-      sandbox: RegExp(r'^(rd|nc)_pk_test_').hasMatch(_appKey ?? ''),
+      sandbox: _sandboxKey,
       onOpenUrl: _config.onOpenUrl ?? openLink,
       streamIdleTimeout: _config.streamIdleTimeout,
       locale: _config.locale,
@@ -479,6 +479,8 @@ class Rendel {
       onUnavailable: (reason) => _setAvailable(false, reason),
       user: () => _user,
       parallelReads: () => _parallelReads,
+      // A test key is someone testing: never read to (Tuna 2026-10-23).
+      readsAloud: () => !_sandboxKey && _voice.on.value,
     )..manifestHash = _currentManifestHash();
     _events.add(RendelEvent.opened);
     // One recogniser per presentation, for the built-in dictation. It listens
@@ -487,8 +489,6 @@ class Rendel {
     // Russian phone's speaker into Turkish nonsense (Tuna 2026-10-22). The
     // answer follows whatever the words turn out to be.
     final speech = RendelSpeech(locale: resolveLocale(_config.locale));
-    // And one voice, reading each answer's opening aloud.
-    final voice = RendelVoice();
     final controller = _controller!;
     late final RendelPresentation presentation;
     presentation = _presentation = RendelPresentation(
@@ -542,7 +542,9 @@ class Rendel {
           dictationLevel: _config.onDictate == null ? speech.level : null,
           dictationStarted: _config.onDictate == null ? speech.started : null,
           onNavigate: (action) => presentation.navigate(action),
-          voice: voice,
+          // Each answer's opening read aloud, to the people using the app on a
+          // live key only: whoever tests on a test key hears nothing.
+          voice: _sandboxKey ? null : _voice,
         ),
       ),
     );
@@ -567,6 +569,12 @@ class Rendel {
   /// The thread on screen, in its sheet or in the bubble. Null when the
   /// copilot is closed.
   static RendelPresentation? _presentation;
+
+  /// The voice that reads each answer's opening aloud, one for the app's life.
+  static final RendelVoice _voice = RendelVoice();
+
+  /// A test key: someone testing the app, not using it.
+  static bool get _sandboxKey => RegExp(r'^(rd|nc)_pk_test_').hasMatch(_appKey ?? '');
 
   /// How many thread sheets are on screen right now. `reset()` needs to know:
   /// a controller disposed under a mounted [ThreadScreen] leaves the composer

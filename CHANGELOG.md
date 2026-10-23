@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.58.4
+
+**Changed**
+
+- Answers are never read aloud on a test key (`rd_pk_test_…`), and the
+  speaker is not drawn there: whoever tests the app, you or your team, does
+  not hear the voice; the people using it on a live key do. The SDK declares
+  `read_aloud` to the API only when it will read, so no voice is made for a
+  thread that would not play it. No change needed.
+
 ## 0.58.3
 
 **Changed**

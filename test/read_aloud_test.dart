@@ -16,12 +16,14 @@ class _Api extends RendelApiClient {
   _Api(this.script, {this.hold}) : super(appKey: 'nc_pk_test_x', deviceId: 'd', config: const RendelConfig());
 
   final List<RendelWireEvent> script;
+  final sent = <Map<String, dynamic>>[];
 
   /// Held open before the turn's end, so a test can look while the cards are still coming.
   final Future<void>? hold;
 
   @override
   Stream<RendelWireEvent> chat(Map<String, dynamic> body) async* {
+    sent.add(body);
     for (final event in script) {
       if (event is TurnEnd && hold != null) await hold;
       yield event;
@@ -72,6 +74,20 @@ void main() {
       final card = WireBlock(id: 'c', type: 'info_card', fallbackText: 'A card', props: {})..ready = true;
       expect(spokenLead([card, _text('# \n\nYour order is on its way.')]), 'Your order is on its way.');
       expect(spokenLead([card]), isNull);
+    });
+  });
+
+  group('read_aloud', () {
+    Future<List<Object?>> capabilities(bool reads) async {
+      final api = _Api(const [TurnEnd(status: 'completed', pending: [])]);
+      final c = ConversationController(api: api, actions: const {}, sdkVersion: 'flutter/test', readsAloud: () => reads);
+      await c.send('Hi');
+      return (api.sent.single['client'] as Map)['capabilities'] as List<Object?>;
+    }
+
+    test('is declared only by a thread that will read, so the server begins no voice nobody plays', () async {
+      expect(await capabilities(true), contains('read_aloud'));
+      expect(await capabilities(false), isNot(contains('read_aloud')));
     });
   });
 

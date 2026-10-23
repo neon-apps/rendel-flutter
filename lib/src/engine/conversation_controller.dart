@@ -155,9 +155,17 @@ class ConversationController extends ChangeNotifier {
     this.user = _nobody,
     this.cardSources = const {},
     this.parallelReads = _always,
+    this.readsAloud = _never,
   });
 
   static bool _always() => true;
+  static bool _never() => false;
+
+  /// Whether this thread will read the answer aloud: declared as `read_aloud`,
+  /// so the server sends the opening the moment it is written and begins its
+  /// voice. False on a test key and with the speaker off, where a voice begun
+  /// would be paid for and never played.
+  final bool Function() readsAloud;
 
   /// Whether context providers and device reads run side by side, up to four
   /// at once, rather than one after another. On unless the app config says
@@ -1094,7 +1102,7 @@ class ConversationController extends ChangeNotifier {
         'sdk': sdkVersion,
         'catalog_version': catalogVersion,
         'components': supportedComponents,
-        'capabilities': clientCapabilities,
+        'capabilities': [...clientCapabilities, if (readsAloud()) 'read_aloud'],
         'actions': clientActions,
         if (manifestHash != null) 'manifest_hash': manifestHash,
         // The language this turn should be answered in.
