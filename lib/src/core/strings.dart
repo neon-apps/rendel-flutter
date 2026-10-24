@@ -1049,7 +1049,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Ne isterseniz sorun',
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
-    readAloud: 'Sesle sorduğun soruların cevabı kendiliğinden okunur',
+    readAloud: 'Sesle sorduğunuz soruların yanıtı kendiliğinden okunur',
     autoRead: 'Sesli yanıt',
     listen: 'Dinle',
     readAloudThis: 'Bu cevabı dinle',

@@ -5,6 +5,7 @@ import 'dart:ui' show FontFeature, ImageFilter;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, ValueListenable, defaultTargetPlatform, listEquals;
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
@@ -14,7 +15,7 @@ import '../core/read_aloud.dart';
 import '../core/config.dart'
     show RendelAttachIcon, RendelAttachment, RendelAttachSource, RendelSendIcon, RendelVoiceIcon;
 import '../engine/conversation_controller.dart';
-import '../protocol/protocol.dart' show NavigateAction, ReplyAction, UIAction;
+import '../protocol/protocol.dart' show NavigateAction, OpenUrlAction, ReplyAction, UIAction;
 import '../transport/api_client.dart' show RendelUploadFailure;
 import 'renderer/blocks.dart'
     show
@@ -265,12 +266,13 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   void _say(RendelMessage answer) {
     final voice = widget.voice;
     final speech = answer.speech;
-    final words = speech?.text ?? spokenLead(answer.blocks);
-    if (voice == null || speech == null || words == null) return;
     final c = widget.controller;
+    final lang = speech?.lang ?? resolveSpokenLocale(c.locale, c.languages);
+    final words = speech?.text ?? spokenLead(answer.blocks, lang: lang);
+    if (voice == null || speech == null || words == null) return;
     voice.speak(
       words,
-      speech.lang ?? resolveSpokenLocale(c.locale, c.languages),
+      lang,
       url: speech.token == null ? null : '${c.api.config.apiBaseUrl}/v1/speech/${speech.token}',
       key: _keyOf(answer),
     );
@@ -1187,6 +1189,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   subtitle: widget.subtitle,
                   suggestions: widget.suggestions,
                   onPick: _send,
+                  onOpen: (url) => controller.tapAction(OpenUrlAction(url)),
                 )
               : _page(controller, [shown], bar: head),
           builder: (context, dock, page) => shown == null
@@ -1841,7 +1844,9 @@ class _Header extends StatelessWidget {
   /// switch drops its word and shows a speaker on its knob instead. Decided
   /// from the header's own width, not the screen's (QA 2026-10-24), as the
   /// web SDK's `data-compact`. A logo is reckoned at 32 wide, a mark's usual
-  /// width at its 20 high.
+  /// width at its 20 high. Back and forward and start over are reckoned
+  /// before they are drawn, so the first answer, a turn running and the
+  /// second page share one header.
   bool _needsCompact(BuildContext context, RendelTheme theme, double width, bool hasLogo) {
     final direction = Directionality.of(context);
     double measure(String text, TextStyle style, TextScaler scaler) =>
@@ -1856,10 +1861,7 @@ class _Header extends StatelessWidget {
     );
     // The switch with its word: its insets, the word, the gap, the track, the hairline.
     final autoRead = 11 + word + 6 + 28 + 4 + 2;
-    final fixed = (paged ? 2 * 36 + 2 * 3 + 2 + theme.space.sm : 0) +
-        (hasLogo ? 32 + theme.space.sm : 0) +
-        (onReset != null ? 44 : 0) +
-        44;
+    final fixed = _PageSteps.width + theme.space.sm + (hasLogo ? 32 + theme.space.sm : 0) + 44 + 44;
     return measure(title, theme.text.heading, scaler) > width - fixed - autoRead;
   }
 
@@ -1946,7 +1948,7 @@ class _Header extends StatelessWidget {
           if (voice case final voice? when !fresh)
             ConstrainedBox(
               constraints: BoxConstraints(
-                maxWidth: math.max(46, box.maxWidth - (paged ? 2 * 44 + 2 * 3 + theme.space.sm : 0) - 2 * 44),
+                maxWidth: math.max(46, box.maxWidth - (paged ? _PageSteps.width + theme.space.sm : 0) - 2 * 44),
               ),
               child: _AutoRead(voice: voice, compact: compact),
             ),
@@ -2006,12 +2008,16 @@ class _Header extends StatelessWidget {
 }
 
 /// Back and forward through the pages a conversation has opened: a glass pill
-/// holding two round buttons, at the header's leading edge.
+/// holding two round buttons, at the header's leading edge. Each is 44 to the
+/// finger (QA 2026-10-24); the pill is drawn 40 high behind them.
 class _PageSteps extends StatelessWidget {
   const _PageSteps({required this.onBack, required this.onForward});
 
   final VoidCallback? onBack;
   final VoidCallback? onForward;
+
+  /// Two 44 steps side by side.
+  static const double width = 2 * 44;
 
   @override
   Widget build(BuildContext context) {
@@ -2027,36 +2033,41 @@ class _PageSteps extends StatelessWidget {
     final shape = BorderRadius.circular(theme.radius.control);
     // No drop shadow, for the reason `_Glass` gives: under a translucent
     // fill Flutter paints it through the glass as a smudge.
-    return ClipRRect(
-      borderRadius: shape,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: theme.colors.surfaceHigh.withValues(alpha: 0.72),
-            border: Border.all(color: theme.hairline),
+    return Stack(
+      children: [
+        Positioned.fill(
+          top: 2,
+          bottom: 2,
+          child: ClipRRect(
             borderRadius: shape,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _PageStep(
-                  icon: rtl ? forward : back,
-                  label: strings.previousPage,
-                  onTap: onBack,
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colors.surfaceHigh.withValues(alpha: 0.72),
+                  border: Border.all(color: theme.hairline),
+                  borderRadius: shape,
                 ),
-                _PageStep(
-                  icon: rtl ? back : forward,
-                  label: strings.nextPage,
-                  onTap: onForward,
-                ),
-              ],
+              ),
             ),
           ),
         ),
-      ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _PageStep(
+              icon: rtl ? forward : back,
+              label: strings.previousPage,
+              onTap: onBack,
+            ),
+            _PageStep(
+              icon: rtl ? back : forward,
+              label: strings.nextPage,
+              onTap: onForward,
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
@@ -2085,8 +2096,8 @@ class _PageStep extends StatelessWidget {
         child: Opacity(
           opacity: onTap == null ? 0.28 : 1,
           child: SizedBox(
-            width: 36,
-            height: 36,
+            width: 44,
+            height: 44,
             child: Icon(icon, size: 24, color: theme.colors.onSurface),
           ),
         ),
@@ -2263,6 +2274,72 @@ class _ErrorBar extends StatelessWidget {
   }
 }
 
+/// A link in words the brand wrote: `[words](https://…)`, an https address,
+/// or an address with no scheme and a path ("rendel.ai/privacy"); a stop or a
+/// comma after it is the sentence's. The web SDK's `LINKS`.
+final _links = RegExp(
+  r'''\[([^\]]+)\]\(([^)\s]+)\)|(https://[^\s<>()]*[^\s<>().,;:!?'"])|(?<![\p{L}\p{N}@./-])((?:[a-z0-9-]+\.)+[a-z]{2,}/[^\s<>()]*[^\s<>().,;:!?'"])''',
+  unicode: true,
+  caseSensitive: false,
+);
+
+/// Plain words with only their links live: the opening screen's subtitle
+/// (QA 2026-10-24). Only https opens; anything else stays words.
+class _LinkedText extends StatefulWidget {
+  const _LinkedText(this.text, {required this.style, required this.onOpen});
+
+  final String text;
+  final TextStyle style;
+  final void Function(String url) onOpen;
+
+  @override
+  State<_LinkedText> createState() => _LinkedTextState();
+}
+
+class _LinkedTextState extends State<_LinkedText> {
+  final _taps = <TapGestureRecognizer>[];
+
+  void _forget() {
+    for (final tap in _taps) {
+      tap.dispose();
+    }
+    _taps.clear();
+  }
+
+  @override
+  void dispose() {
+    _forget();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    _forget();
+    final spans = <InlineSpan>[];
+    var at = 0;
+    for (final m in _links.allMatches(widget.text)) {
+      if (m.start > at) spans.add(TextSpan(text: widget.text.substring(at, m.start)));
+      final words = m[1] ?? m[3] ?? m[4]!;
+      final url = Uri.tryParse(m[2] ?? m[3] ?? 'https://${m[4]}');
+      if (url != null && url.scheme == 'https' && url.host.isNotEmpty) {
+        final tap = TapGestureRecognizer()..onTap = () => widget.onOpen(url.toString());
+        _taps.add(tap);
+        spans.add(TextSpan(
+          text: words,
+          recognizer: tap,
+          style: TextStyle(decoration: TextDecoration.underline, decorationColor: theme.colors.lineStrong),
+        ));
+      } else {
+        spans.add(TextSpan(text: words));
+      }
+      at = m.end;
+    }
+    if (at < widget.text.length) spans.add(TextSpan(text: widget.text.substring(at)));
+    return Text.rich(TextSpan(children: spans), style: widget.style);
+  }
+}
+
 /// The empty thread teaches. Suggestions are the host's own, so they name
 /// things this app can actually do rather than advertising the category — and
 /// so does the line above them, which is why the default names no verbs the
@@ -2273,12 +2350,16 @@ class _EmptyState extends StatelessWidget {
     required this.subtitle,
     required this.suggestions,
     required this.onPick,
+    required this.onOpen,
   });
 
   final String? headline;
   final String? subtitle;
   final List<String> suggestions;
   final void Function(String) onPick;
+
+  /// A link in the subtitle, tapped: the host opens it, as a card's link.
+  final void Function(String url) onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -2309,9 +2390,10 @@ class _EmptyState extends StatelessWidget {
             // first renders nothing; the second renders the default.
             if (subtitle == null || subtitle!.isNotEmpty) ...[
               SizedBox(height: theme.space.sm),
-              Text(
+              _LinkedText(
                 subtitle ?? RendelStringsScope.of(context).emptyBody,
                 style: theme.text.body,
+                onOpen: onOpen,
               ),
             ],
             if (suggestions.isNotEmpty) ...[

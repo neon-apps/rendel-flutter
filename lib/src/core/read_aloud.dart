@@ -19,8 +19,10 @@ import 'platform.dart';
 /// An answer page opens with a sentence that says the answer ("Bugün hava
 /// ılık ama akşama doğru yağmur var") and goes on into cards and detail. The
 /// voice says that sentence, as Monogram's does (Tuna 2026-10-23), not the
-/// page. Null when the answer opens with no prose to say.
-String? spokenLead(List<WireBlock> blocks) {
+/// page. Null when the answer opens with no prose to say. A date is said in
+/// full in [lang] ("Mon 12 Oct" is "Monday 12 October"), as the web SDK's
+/// `spokenLead` says it.
+String? spokenLead(List<WireBlock> blocks, {String lang = ''}) {
   for (final block in blocks) {
     if (block.type != 'text') continue;
     final markdown = block.props['markdown'];
@@ -30,9 +32,79 @@ String? spokenLead(List<WireBlock> blocks) {
         .map(_plain)
         .firstWhere((p) => p.isNotEmpty, orElse: () => '');
     if (paragraph.isEmpty) continue;
-    return _short(paragraph);
+    return _short(spokenDates(paragraph, lang));
   }
   return null;
+}
+
+/// Weekdays and months as a page shortens them, and the words a voice says
+/// for them, in the SDK's languages: (weekdays, months). A month that is
+/// never shortened is listed as itself, so a weekday before it is known.
+/// Arabic writes them in full. The web SDK's `DATE_WORDS`.
+const _dateWords = <String, (Map<String, String>, Map<String, String>)>{
+  'en': (
+    {'Mon': 'Monday', 'Tue': 'Tuesday', 'Tues': 'Tuesday', 'Wed': 'Wednesday', 'Thu': 'Thursday', 'Thur': 'Thursday', 'Thurs': 'Thursday', 'Fri': 'Friday', 'Sat': 'Saturday', 'Sun': 'Sunday'},
+    {'Jan': 'January', 'Feb': 'February', 'Mar': 'March', 'Apr': 'April', 'May': 'May', 'Jun': 'June', 'Jul': 'July', 'Aug': 'August', 'Sep': 'September', 'Sept': 'September', 'Oct': 'October', 'Nov': 'November', 'Dec': 'December'},
+  ),
+  'tr': (
+    {'Pzt': 'Pazartesi', 'Sal': 'Salı', 'Çar': 'Çarşamba', 'Per': 'Perşembe', 'Cum': 'Cuma', 'Cmt': 'Cumartesi', 'Paz': 'Pazar'},
+    {'Oca': 'Ocak', 'Şub': 'Şubat', 'Mar': 'Mart', 'Nis': 'Nisan', 'May': 'Mayıs', 'Haz': 'Haziran', 'Tem': 'Temmuz', 'Ağu': 'Ağustos', 'Eyl': 'Eylül', 'Eki': 'Ekim', 'Kas': 'Kasım', 'Ara': 'Aralık'},
+  ),
+  'de': (
+    {'Mo': 'Montag', 'Di': 'Dienstag', 'Mi': 'Mittwoch', 'Do': 'Donnerstag', 'Fr': 'Freitag', 'Sa': 'Samstag', 'So': 'Sonntag'},
+    {'Jan': 'Januar', 'Feb': 'Februar', 'Mär': 'März', 'Apr': 'April', 'Mai': 'Mai', 'Jun': 'Juni', 'Jul': 'Juli', 'Aug': 'August', 'Sep': 'September', 'Sept': 'September', 'Okt': 'Oktober', 'Nov': 'November', 'Dez': 'Dezember'},
+  ),
+  'fr': (
+    {'lun': 'lundi', 'mar': 'mardi', 'mer': 'mercredi', 'jeu': 'jeudi', 'ven': 'vendredi', 'sam': 'samedi', 'dim': 'dimanche'},
+    {'janv': 'janvier', 'févr': 'février', 'mars': 'mars', 'avr': 'avril', 'mai': 'mai', 'juin': 'juin', 'juil': 'juillet', 'août': 'août', 'sept': 'septembre', 'oct': 'octobre', 'nov': 'novembre', 'déc': 'décembre'},
+  ),
+  'es': (
+    {'lun': 'lunes', 'mar': 'martes', 'mié': 'miércoles', 'jue': 'jueves', 'vie': 'viernes', 'sáb': 'sábado', 'dom': 'domingo'},
+    {'ene': 'enero', 'feb': 'febrero', 'mar': 'marzo', 'abr': 'abril', 'may': 'mayo', 'jun': 'junio', 'jul': 'julio', 'ago': 'agosto', 'sep': 'septiembre', 'sept': 'septiembre', 'oct': 'octubre', 'nov': 'noviembre', 'dic': 'diciembre'},
+  ),
+};
+
+String _upperFirst(String word) => word.isEmpty ? word : word[0].toUpperCase() + word.substring(1);
+
+/// [text] with the weekdays and months of its dates said in full, in [lang]:
+/// "Pzt 12 Eki" is "Pazartesi 12 Ekim", "Mon, Oct 12" is "Monday, October
+/// 12". Only beside a day's number or a month, so "May I" and "the Sun deck"
+/// stay as they are. A stop that was the abbreviation's own is dropped, and
+/// kept where it also ended the sentence. The web SDK's `spokenDates`.
+String spokenDates(String text, String lang) {
+  final words = _dateWords[lang.toLowerCase().split(RegExp('[-_]')).first];
+  if (words == null) return text;
+  final (days, months) = words;
+  String alternation(Iterable<String> keys) {
+    final all = {for (final k in keys) ...[k, _upperFirst(k)]}.toList()..sort((a, b) => b.length.compareTo(a.length));
+    return all.join('|');
+  }
+
+  String say(Map<String, String> map, String abbr) {
+    final word = map[abbr] ?? map[abbr[0].toLowerCase() + abbr.substring(1)]!;
+    return abbr[0] == abbr[0].toLowerCase() ? word : _upperFirst(word);
+  }
+
+  final sentenceGoesOn = RegExp(r'^(\s*$|\s+\p{Lu})', unicode: true);
+  String Function(Match) swap(Map<String, String> map, String all) => (m) {
+        final dot = m[3]!.isNotEmpty && sentenceGoesOn.hasMatch(all.substring(m.end)) ? '.' : '';
+        return '${m[1]}${say(map, m[2]!)}$dot';
+      };
+  final monthAbbr = alternation(months.keys);
+  final dayAbbr = alternation(days.keys);
+  final monthWord = alternation(months.values);
+  RegExp re(String source) => RegExp(source, unicode: true);
+  // A month after a day's number: "12 Oct", "12. Okt."; in English before it too: "Oct 12".
+  var out = text;
+  out = out.replaceAllMapped(re('(\\d\\.?\\s+)($monthAbbr)(\\.?)(?!\\p{L})'), swap(months, out));
+  if (lang.toLowerCase().startsWith('en')) {
+    out = out.replaceAllMapped(re('(^|[^\\p{L}\\p{N}])($monthAbbr)(\\.?)(?=\\s+\\d)'), swap(months, out));
+  }
+  // A weekday before a day's number or a month ("Pzt 12", "Mon, October 12"), or after a month ("12 Ekim Pzt").
+  out = out.replaceAllMapped(
+      re('(^|[^\\p{L}\\p{N}])($dayAbbr)(\\.?)(?=,?\\s+(?:\\d|(?:$monthWord)(?!\\p{L})))'), swap(days, out));
+  out = out.replaceAllMapped(re('((?:$monthWord)\\.?,?\\s+)($dayAbbr)(\\.?)(?!\\p{L})'), swap(days, out));
+  return out;
 }
 
 /// Markdown as it is heard: no marks, links by their words, a list as a line.

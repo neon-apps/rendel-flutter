@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.3
+
+- The name is whole from the first answer: the header compacts as if back and
+  forward were already shown, so page one and page two share one header.
+- Back and forward take a 44 pt tap.
+- Listen reads dates in full ("Monday 12 October", "Pazartesi 12 Ekim") in
+  English, Turkish, German, French and Spanish.
+- The opening text links an https address, a markdown link or an address
+  with a path; your `onOpenUrl` opens it.
+- The Turkish `readAloud` string says "siz" and "yanıt". No API changes.
+
 ## 0.59.2
 
 - The assistant's name always fits: the header checks its own width, and when
@@ -15,7 +26,8 @@ asks of you.
   does: answers to questions asked out loud play by themselves.
 - Ratings, review counts, progress, place cards and charts follow the panel's
   language ("4,6 (1.720)" in Turkish), and the stars' Semantics say the rating
-  in that language. Whole numbers have thousands separators in every language.
+  in that language. Whole numbers are grouped the way the panel's language
+  groups them ("6,400" in English, "6.400" in Turkish).
 - An answer that ends in a confirmation has a Listen button too: it reads the
   opening, then the card's question.
 - Scrolled text no longer shows behind the name; the send button is an

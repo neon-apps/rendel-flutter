@@ -1545,7 +1545,10 @@ class ConversationController extends ChangeNotifier {
       _readThisQuestion = true;
       final text = question == null
           ? null
-          : [spokenLead(answer.blocks), question].whereType<String>().where((s) => s.isNotEmpty).join(' ');
+          : [spokenLead(answer.blocks, lang: answerLang ?? resolveSpokenLocale(locale, languages)), question]
+              .whereType<String>()
+              .where((s) => s.isNotEmpty)
+              .join(' ');
       answer.speech = RendelAnswerSpeech(token: answerSpeech, text: text, lang: answerLang);
       answer.touch();
       onAnswered?.call(answer, text: text, lang: answerLang, speech: answerSpeech);

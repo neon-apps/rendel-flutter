@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
@@ -126,6 +127,31 @@ void main() {
       final card = WireBlock(id: 'c', type: 'info_card', fallbackText: 'A card', props: {})..ready = true;
       expect(spokenLead([card, _text('# \n\nYour order is on its way.')]), 'Your order is on its way.');
       expect(spokenLead([card]), isNull);
+    });
+  });
+
+  group('spokenDates', () {
+    test("says a date's weekday and month in full, in the panel's language (QA 2026-10-24)", () {
+      expect(spokenLead([_text('AutoFix Ataşehir starts on Mon 12 Oct and expects to finish by Fri 16 Oct.')], lang: 'en-US'),
+          'AutoFix Ataşehir starts on Monday 12 October and expects to finish by Friday 16 October.');
+      expect(
+          spokenLead([
+            _text('AutoFix Ataşehir servisi onarıma Pzt 12 Eki tarihinde başlıyor ve Cum 16 Eki tarihine kadar tamamlamayı öngörüyor.')
+          ], lang: 'tr'),
+          'AutoFix Ataşehir servisi onarıma Pazartesi 12 Ekim tarihinde başlıyor ve Cuma 16 Ekim tarihine kadar tamamlamayı öngörüyor.');
+      // Each language's own order, as the web SDK's test has them.
+      expect(spokenDates('Due Mon, Oct 12. Then Tue, May 13', 'en'), 'Due Monday, October 12. Then Tuesday, May 13');
+      expect(spokenDates('Teslimat 12 Eki Pzt, iade 3 Şub', 'tr'), 'Teslimat 12 Ekim Pazartesi, iade 3 Şubat');
+      expect(spokenDates('Ab Mo., 12. Okt. Danach frei.', 'de'), 'Ab Montag, 12. Oktober. Danach frei.');
+      expect(spokenDates('Livraison lun. 12 oct. à midi', 'fr'), 'Livraison lundi 12 octobre à midi');
+      expect(spokenDates('Llega el mar, 12 mar', 'es'), 'Llega el martes, 12 marzo');
+    });
+
+    test('leaves words that only look like a date alone', () {
+      expect(spokenDates('May I help? I sat 3 hours on the Sun deck in Marbella.', 'en'),
+          'May I help? I sat 3 hours on the Sun deck in Marbella.');
+      expect(spokenDates('Paz alanı 3 kat, Sal çantası', 'tr'), 'Paz alanı 3 kat, Sal çantası');
+      expect(spokenDates('Mon 12 Oct', 'ar'), 'Mon 12 Oct');
     });
   });
 
@@ -481,6 +507,68 @@ void main() {
         expect(find.bySemanticsLabel('Previous page'), findsNothing);
         await tester.pumpWidget(const SizedBox());
       }
+    });
+
+    testWidgets('the switch keeps one shape from the first answer to the second page, and the name is whole on the first (QA 2026-10-24)',
+        (tester) async {
+      addTearDown(tester.view.reset);
+      final shapes = <String>{};
+      for (final width in [390.0, 360.0, 700.0]) {
+        for (final title in ['Ava', 'Shieldwell', 'Shieldwell24']) {
+          tester.view.physicalSize = Size(width * 3, 2400);
+          tester.view.devicePixelRatio = 3;
+          final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'), title: title);
+          bool compact() => find.text('Voice replies').evaluate().isEmpty;
+          await type(tester, c, 'Weather?');
+          expect(tester.takeException(), isNull);
+          expect(tester.renderObject<RenderParagraph>(find.text(title)).didExceedMaxLines, isFalse,
+              reason: '$title whole on the first page at $width');
+          final first = compact();
+          await type(tester, c, 'And Friday?');
+          expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
+          expect(compact(), first, reason: '$title at $width: the same switch on the second page');
+          // Each step is 44 to the finger.
+          expect(tester.getSize(find.bySemanticsLabel('Previous page')), const Size(44, 44));
+          shapes.add('$first');
+          await tester.pumpWidget(const SizedBox());
+        }
+      }
+      expect(shapes, {'true', 'false'}, reason: 'a short name keeps the word, a long one gives it up');
+    });
+
+    testWidgets("the opening screen's subtitle has its addresses live, and the host opens them (QA 2026-10-24)", (tester) async {
+      final opened = <String>[];
+      final c = ConversationController(
+        api: _Api(const []),
+        actions: const {},
+        sdkVersion: 'flutter/test',
+        onOpenUrl: (url) async => opened.add(url),
+      );
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: ThreadScreen(
+            controller: c,
+            title: 'Rendel',
+            subtitle: 'Rendel keeps this chat to answer. Details: rendel.ai/tr/gizlilik. Or [the terms](https://rendel.ai/terms), '
+                'never [this](http://x.io/a) or support@rendel.ai/x.',
+          ),
+        ),
+      ));
+      await tester.pump();
+      final paragraph = tester.widget<RichText>(find.byWidgetPredicate(
+          (w) => w is RichText && w.text.toPlainText().startsWith('Rendel keeps this chat')));
+      final links = <String, TapGestureRecognizer>{};
+      paragraph.text.visitChildren((span) {
+        if (span is TextSpan && span.recognizer is TapGestureRecognizer) links[span.text!] = span.recognizer! as TapGestureRecognizer;
+        return true;
+      });
+      expect(links.keys, ['rendel.ai/tr/gizlilik', 'the terms']);
+      expect(paragraph.text.toPlainText(), contains('Details: rendel.ai/tr/gizlilik. Or the terms, never this or support@rendel.ai/x.'));
+      for (final tap in links.values) {
+        tap.onTap!();
+      }
+      await tester.pump();
+      expect(opened, ['https://rendel.ai/tr/gizlilik', 'https://rendel.ai/terms']);
     });
 
     testWidgets('back and forward come with the second page', (tester) async {
