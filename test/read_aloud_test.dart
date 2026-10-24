@@ -536,6 +536,30 @@ void main() {
       expect(shapes, {'true', 'false'}, reason: 'a short name keeps the word, a long one gives it up');
     });
 
+    testWidgets('a long name at 320 is set smaller to fit on one line, and cut short only past 70% (Tuna 2026-10-24)', (tester) async {
+      addTearDown(tester.view.reset);
+      tester.view.physicalSize = const Size(320 * 3, 2400);
+      tester.view.devicePixelRatio = 3;
+      // How much of its laid-out width the name is drawn at.
+      double scale(Finder name) => (tester.getBottomRight(name).dx - tester.getTopLeft(name).dx) / tester.getSize(name).width;
+      // The test font draws every letter a square, so at 320 five letters are a long name.
+      for (final (title, cut) in [('Mavis', false), ('Shieldwell Assistant', true)]) {
+        final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'), title: title);
+        final name = find.text(title);
+        await type(tester, c, 'Weather?');
+        await type(tester, c, 'And Friday?');
+        expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines, cut, reason: '$title: cut short only past 70%');
+        if (cut) {
+          expect(scale(name), closeTo(0.7, 0.001), reason: '$title: at the smallest');
+        } else {
+          expect(scale(name), inExclusiveRange(0.7, 1), reason: '$title: smaller, and whole');
+        }
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
+
     testWidgets("the opening screen's subtitle has its addresses live, and the host opens them (QA 2026-10-24)", (tester) async {
       final opened = <String>[];
       final c = ConversationController(

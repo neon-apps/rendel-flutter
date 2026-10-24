@@ -1931,16 +1931,9 @@ class _Header extends StatelessWidget {
             SizedBox(width: theme.space.sm),
           ],
           // The name in the heading style, as the console's phone and the web
-          // SDK's header set it.
+          // SDK's header set it, smaller where it would be cut short.
           Expanded(
-            child: fresh
-                ? const SizedBox.shrink()
-                : Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.text.heading,
-                  ),
+            child: fresh ? const SizedBox.shrink() : _HeaderName(title: title, style: theme.text.heading),
           ),
           // Nothing to read yet: Auto-read comes with the first answer. Never
           // wider than what the steps and the two buttons leave: at a large
@@ -2004,6 +1997,41 @@ class _Header extends StatelessWidget {
             )
           : row,
     );
+  }
+}
+
+/// The assistant's name in the header, on one line: set smaller to fit, down
+/// to [minScale] of the heading, and cut short only past that (Tuna,
+/// 2026-10-24), as the web SDK's `fitHeader`.
+class _HeaderName extends StatelessWidget {
+  const _HeaderName({required this.title, required this.style});
+
+  final String title;
+  final TextStyle style;
+
+  static const double minScale = 0.7;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, box) {
+      final room = box.maxWidth;
+      final painter = TextPainter(
+        text: TextSpan(text: title, style: style),
+        textDirection: Directionality.of(context),
+        maxLines: 1,
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final natural = painter.width;
+      painter.dispose();
+      final text = Text(title, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, style: style);
+      return FittedBox(
+        fit: BoxFit.scaleDown,
+        alignment: AlignmentDirectional.centerStart,
+        // Too long even at the smallest: laid out as wide as the room is at
+        // that size, so it is drawn at exactly [minScale] and cut there.
+        child: natural * minScale > room ? SizedBox(width: room / minScale, child: text) : text,
+      );
+    });
   }
 }
 
