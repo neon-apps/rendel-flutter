@@ -23,8 +23,10 @@ import 'theme.dart';
 /// which is withdrawn; a bolt is what every
 /// actually does.
 ///
-/// A follow-up waiting for this person (`Rendel.followup`) shows over it,
-/// anchored to it in the app's overlay, while the thread is closed.
+/// An "In the app" message waiting for this person (`Rendel.followup`) shows
+/// on the app's screen while the thread is closed, as its send chose: over the
+/// launcher, anchored to it in the app's overlay, or as a banner across the
+/// top of the screen.
 class RendelLauncher extends StatefulWidget {
   const RendelLauncher({super.key, this.label});
 
@@ -40,6 +42,7 @@ class RendelLauncher extends StatefulWidget {
 class _RendelLauncherState extends State<RendelLauncher> {
   final _link = LayerLink();
   OverlayEntry? _popup;
+  OverlayEntry? _banner;
   StreamSubscription<RendelEvent>? _events;
 
   @override
@@ -60,33 +63,64 @@ class _RendelLauncherState extends State<RendelLauncher> {
     _events?.cancel();
     _popup?.remove();
     _popup = null;
+    _banner?.remove();
+    _banner = null;
     super.dispose();
   }
 
   /// After the frame: an overlay is not changed while the tree builds.
   void _schedule() => WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
 
-  /// The popup is up while a follow-up waits and the thread is closed.
+  /// The popup or the banner is up while an "In the app" message waits and
+  /// the thread is closed; inside the thread it is one of the cards.
   void _sync() {
     if (!mounted) return;
-    final show = RendelFollowups.instance.current.value != null &&
-        Rendel.isInitialized &&
-        Rendel.isEnabled &&
-        !Rendel.isOpen &&
-        !Rendel.minimised.value;
-    if (!show) {
-      _popup?.remove();
-      _popup = null;
+    final waiting = RendelFollowups.instance.current.value;
+    final show = waiting != null && Rendel.isInitialized && Rendel.isEnabled && !Rendel.isOpen && !Rendel.minimised.value;
+    final banner = show && waiting.isBanner;
+    _place(show && !banner, () => _popup, (entry) => _popup = entry, _buildPopup);
+    _place(banner, () => _banner, (entry) => _banner = entry, _buildBanner);
+    if (show) RendelFollowups.instance.shown();
+  }
+
+  /// One overlay entry, up or down.
+  void _place(bool up, OverlayEntry? Function() entry, void Function(OverlayEntry?) keep, WidgetBuilder builder) {
+    final current = entry();
+    if (!up) {
+      current?.remove();
+      keep(null);
       return;
     }
-    if (_popup == null) {
-      final overlay = Overlay.maybeOf(context);
-      if (overlay == null) return;
-      overlay.insert(_popup = OverlayEntry(builder: _buildPopup));
-    } else {
-      _popup!.markNeedsBuild();
-    }
-    RendelFollowups.instance.shown();
+    if (current != null) return current.markNeedsBuild();
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+    final added = OverlayEntry(builder: builder);
+    keep(added);
+    overlay.insert(added);
+  }
+
+  /// Across the top of the app's screen, below the status bar.
+  Widget _buildBanner(BuildContext overlayContext) {
+    final waiting = RendelFollowups.instance.current.value;
+    if (waiting == null || !mounted) return const SizedBox.shrink();
+    final theme = context.dependOnInheritedWidgetOfExactType<RendelThemeScope>()?.theme ?? Rendel.themeOf(context);
+    final top = MediaQuery.paddingOf(overlayContext).top;
+    return Positioned(
+      top: top + theme.space.sm,
+      left: theme.space.lg,
+      right: theme.space.lg,
+      child: Material(
+        type: MaterialType.transparency,
+        child: RendelFollowupCard(
+          followup: waiting,
+          theme: theme,
+          raised: true,
+          closeLabel: Rendel.strings.closeDetail,
+          onOpen: () => unawaited(Rendel.openFollowup(context)),
+          onDismiss: Rendel.dismissFollowup,
+        ),
+      ),
+    );
   }
 
   Widget _buildPopup(BuildContext overlayContext) {

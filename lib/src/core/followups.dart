@@ -12,6 +12,8 @@ class RendelFollowup {
     required this.title,
     required this.body,
     required this.button,
+    this.channel = 'in_app',
+    this.style = 'popup',
   });
 
   final String id;
@@ -23,53 +25,114 @@ class RendelFollowup {
   final String body;
   final String button;
 
-  /// One from `GET /v1/followups/next`, or null when it is not whole.
+  /// The channel it went on: `in_app`, `push` or `email`. Whatever it was, it
+  /// also waits inside Rendel as a card.
+  final String channel;
+
+  /// How an "In the app" message shows on the app's screens while Rendel is
+  /// closed: `popup` by the launcher, or `banner` across the top.
+  final String style;
+
+  bool get isBanner => style == 'banner';
+
+  /// One from `GET /v1/followups/next` or `/inbox`, or null when it is not whole.
   static RendelFollowup? tryParse(Object? raw) {
     if (raw is! Map) return null;
     final id = raw['id'], title = raw['title'], body = raw['body'], button = raw['button'];
     if (id is! String || title is! String || body is! String || button is! String) return null;
-    final type = raw['type'];
-    return RendelFollowup(id: id, type: type is String ? type : '', title: title, body: body, button: button);
+    final type = raw['type'], channel = raw['channel'], style = raw['style'];
+    return RendelFollowup(
+      id: id,
+      type: type is String ? type : '',
+      title: title,
+      body: body,
+      button: button,
+      channel: channel is String ? channel : 'in_app',
+      style: style == 'banner' ? 'banner' : 'popup',
+    );
   }
 }
 
-/// The SDK's own follow-up state, shared by [Rendel], the launcher's popup and
-/// the card at the top of the thread. Not exported: an app reads
-/// `Rendel.followup` and acts through `Rendel.openFollowup` /
-/// `Rendel.dismissFollowup`.
+/// The SDK's own follow-up state (Tuna, 2026-10-24), in two places:
+///
+/// - [current]: the one "In the app" message, shown on the app's screens
+///   while Rendel is closed, by the launcher or as a banner.
+/// - [cards]: every message waiting inside Rendel for this person, whatever
+///   channel it went on, at the top of its first page: [current] while it
+///   waits, then what `/v1/followups/inbox` read when Rendel opened.
+///
+/// Not exported: an app reads `Rendel.followup` / `Rendel.followupCards` and
+/// acts through `Rendel.openFollowup` / `Rendel.dismissFollowup`.
 class RendelFollowups {
-  RendelFollowups._();
+  RendelFollowups._() {
+    current.addListener(_recompute);
+  }
 
   static final RendelFollowups instance = RendelFollowups._();
 
-  /// The follow-up waiting to be seen, or null.
+  /// How many cards wait inside Rendel at once, as the server keeps them.
+  static const inboxSize = 3;
+
+  /// The "In the app" message waiting to be seen, or null.
   final ValueNotifier<RendelFollowup?> current = ValueNotifier<RendelFollowup?>(null);
+
+  /// The cards inside Rendel, newest first, none put away.
+  final ValueNotifier<List<RendelFollowup>> cards = ValueNotifier<List<RendelFollowup>>(const []);
+
+  List<RendelFollowup> _inbox = const [];
+  final Set<String> _gone = {};
+  final Set<String> _counted = {};
 
   /// Where `followup_shown` and `followup_dismiss` go; set by `Rendel.init`.
   void Function(Map<String, dynamic> event)? send;
 
-  String? _counted;
-
-  /// It is on screen, as the popup or the card: counted once a follow-up,
-  /// however often it is drawn.
-  void shown() {
-    final followup = current.value;
-    if (followup == null || _counted == followup.id) return;
-    _counted = followup.id;
-    send?.call({'type': 'followup_shown', 'followup_id': followup.id});
+  /// What `/v1/followups/inbox` read when Rendel opened.
+  void setInbox(List<RendelFollowup> inbox) {
+    _inbox = inbox;
+    _recompute();
   }
 
-  /// Put away for good with the cross.
-  void dismiss() {
-    final followup = current.value;
-    if (followup == null) return;
-    current.value = null;
-    send?.call({'type': 'followup_dismiss', 'followup_id': followup.id});
+  void _recompute() {
+    final seen = <String>{};
+    cards.value = [if (current.value case final waiting?) waiting, ..._inbox]
+        .where((card) => !_gone.contains(card.id) && seen.add(card.id))
+        .take(inboxSize)
+        .toList(growable: false);
+  }
+
+  /// On screen, as the popup, the banner or a card: counted once a message,
+  /// however often it is drawn. [id] is [current]'s when not given.
+  void shown([String? id]) {
+    final shownId = id ?? current.value?.id;
+    if (shownId == null || !_counted.add(shownId)) return;
+    send?.call({'type': 'followup_shown', 'followup_id': shownId});
+  }
+
+  /// Gone from wherever it was: the app's screen and Rendel alike.
+  void forget(String id) {
+    _gone.add(id);
+    _inbox = _inbox.where((card) => card.id != id).toList(growable: false);
+    if (current.value?.id == id) {
+      current.value = null;
+    } else {
+      _recompute();
+    }
+  }
+
+  /// Put away for good with the cross. [id] is [current]'s when not given.
+  void dismiss([String? id]) {
+    final dismissed = id ?? current.value?.id;
+    if (dismissed == null) return;
+    forget(dismissed);
+    send?.call({'type': 'followup_dismiss', 'followup_id': dismissed});
   }
 
   void clear() {
+    _inbox = const [];
+    _gone.clear();
+    _counted.clear();
     current.value = null;
-    _counted = null;
+    _recompute();
   }
 }
 

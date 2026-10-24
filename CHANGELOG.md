@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.7
+
+- Every follow-up also waits as a card at the top of the thread when the
+  person opens Rendel, whichever channel carried it: up to three from the last
+  seven days that they have not opened or put away (`GET /v1/followups/inbox`).
+- `Rendel.followupCards` lists those cards for an app that draws its own;
+  `openFollowup(context, id: …)` and `dismissFollowup(id)` act on one.
+- An "In the app" message shows as a banner across the top of the screen when
+  the send chose Banner, and as the popup over `RendelLauncher` otherwise.
+- `RendelFollowup` carries `channel` and `style`.
+
 ## 0.59.6
 
 - A long assistant name is set as small as 65% of the heading, not 70%, before

@@ -68,7 +68,7 @@ class ThreadScreen extends StatefulWidget {
     this.dictationStarted,
     this.onNavigate,
     this.voice,
-    this.followup,
+    this.followups,
     this.onFollowupOpen,
   });
 
@@ -152,11 +152,12 @@ class ThreadScreen extends StatefulWidget {
   /// turn it off. Null reads nothing and draws no speaker.
   final RendelVoice? voice;
 
-  /// A follow-up waiting for this person, drawn at the top of the thread
-  /// (design/plans/marketing-channels.md §3.10); [onFollowupOpen] opens the
-  /// conversation the server wrote for it. Null draws none.
-  final ValueListenable<RendelFollowup?>? followup;
-  final VoidCallback? onFollowupOpen;
+  /// The messages waiting for this person, whatever channel they went on,
+  /// drawn as cards at the top of the thread (Tuna, 2026-10-24);
+  /// [onFollowupOpen] opens the conversation the server wrote for one. Null
+  /// draws none.
+  final ValueListenable<List<RendelFollowup>>? followups;
+  final void Function(String id)? onFollowupOpen;
 
   @override
   State<ThreadScreen> createState() => _ThreadScreenState();
@@ -1102,25 +1103,45 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           ),
         ),
       ),
-      if (widget.followup case final followup?)
-        ValueListenableBuilder<RendelFollowup?>(
-          valueListenable: followup,
+      if (widget.followups case final followups?)
+        ValueListenableBuilder<List<RendelFollowup>>(
+          valueListenable: followups,
           builder: (context, waiting, _) {
             // Positioned even when empty: a sized child would size the stack.
-            if (waiting == null) return const Positioned(top: 0, left: 0, child: SizedBox.shrink());
-            WidgetsBinding.instance.addPostFrameCallback((_) => RendelFollowups.instance.shown());
+            if (waiting.isEmpty) return const Positioned(top: 0, left: 0, child: SizedBox.shrink());
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              for (final card in waiting) {
+                RendelFollowups.instance.shown(card.id);
+              }
+            });
             return ValueListenableBuilder<double>(
               valueListenable: _head,
               builder: (context, head, _) => Positioned(
                 top: head + theme.space.sm,
                 left: theme.space.lg,
                 right: theme.space.lg,
-                child: RendelFollowupCard(
-                  followup: waiting,
-                  theme: theme,
-                  closeLabel: widget.strings.closeDetail,
-                  onOpen: widget.onFollowupOpen ?? () {},
-                  onDismiss: RendelFollowups.instance.dismiss,
+                // Three long ones on a small phone stay in reach: they scroll on their own past 58% of the screen.
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.58),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        for (final card in waiting)
+                          Padding(
+                            padding: EdgeInsets.only(bottom: theme.space.sm),
+                            child: RendelFollowupCard(
+                              key: ValueKey(card.id),
+                              followup: card,
+                              theme: theme,
+                              closeLabel: widget.strings.closeDetail,
+                              onOpen: () => widget.onFollowupOpen?.call(card.id),
+                              onDismiss: () => RendelFollowups.instance.dismiss(card.id),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
             );

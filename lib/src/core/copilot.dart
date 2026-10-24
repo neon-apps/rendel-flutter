@@ -448,6 +448,8 @@ class Rendel {
   static Future<void> open(BuildContext context) async {
     final api = _api;
     if (api == null || !isEnabled) return;
+    // The messages waiting for this person, as cards at the top of what opens.
+    unawaited(_refreshInbox());
     // Already presented: in the bubble while a screen it opened is in front,
     // the launcher does what the bubble does. Over the app, a second sheet of
     // the same thread is not drawn.
@@ -537,8 +539,8 @@ class Rendel {
           // her own app heard nothing (Tuna 2026-10-23). Not at all where the
           // host or the app's console turned voice off.
           voice: _config.readAloud ? _voice : null,
-          followup: RendelFollowups.instance.current,
-          onFollowupOpen: () => unawaited(openFollowup(context)),
+          followups: RendelFollowups.instance.cards,
+          onFollowupOpen: (id) => unawaited(openFollowup(context, id: id)),
         ),
       ),
     );
@@ -624,25 +626,31 @@ class Rendel {
 
   // ————————————————————————— follow-ups —————————————————————————
 
-  /// The follow-up waiting for this person, or null (design/plans/
-  /// marketing-channels.md §3.10). [RendelLauncher] shows it over itself and
-  /// the thread at its top; an app with its own launcher can listen here and
-  /// draw its own, with [openFollowup] and [dismissFollowup].
+  /// The "In the app" message waiting for this person, or null (design/plans/
+  /// marketing-channels.md §3.10). [RendelLauncher] shows it on the app's
+  /// screen while Rendel is closed, as a popup over itself or a banner across
+  /// the top; an app with its own launcher can listen here and draw its own,
+  /// with [openFollowup] and [dismissFollowup].
   static ValueListenable<RendelFollowup?> get followup => RendelFollowups.instance.current;
+
+  /// Every message waiting for this person inside Rendel, whatever channel it
+  /// went on: the thread shows them as cards at its top when it opens.
+  static ValueListenable<List<RendelFollowup>> get followupCards => RendelFollowups.instance.cards;
 
   /// Whether the thread is on screen, in its sheet or in the bubble.
   static bool get isOpen => _presentation != null;
 
-  /// Opens the conversation the server wrote for the waiting follow-up. False
-  /// when there is none, or it could not be opened.
-  static Future<bool> openFollowup(BuildContext context) async {
-    final waiting = RendelFollowups.instance.current.value;
-    if (waiting == null) return false;
-    return _openFollowupById(context, waiting.id);
+  /// Opens the conversation the server wrote for a follow-up: the waiting
+  /// "In the app" one, or the card [id] from [followupCards]. False when there
+  /// is none, or it could not be opened.
+  static Future<bool> openFollowup(BuildContext context, {String? id}) async {
+    final opening = id ?? RendelFollowups.instance.current.value?.id;
+    if (opening == null) return false;
+    return _openFollowupById(context, opening);
   }
 
-  /// Puts the waiting follow-up away; it is not shown again.
-  static void dismissFollowup() => RendelFollowups.instance.dismiss();
+  /// Puts a follow-up away, the waiting one or the card [id]; it is not shown again.
+  static void dismissFollowup([String? id]) => RendelFollowups.instance.dismiss(id);
 
   /// A push from Rendel, tapped: opens the conversation it is about and
   /// returns true. False for a push that is not Rendel's, which the app
@@ -718,6 +726,22 @@ class Rendel {
 
   static const _followupEvery = Duration(minutes: 10);
   static DateTime? _followupAsked;
+
+  /// How often opening Rendel reads its cards again; a quick close and reopen does not.
+  static const _inboxEvery = Duration(seconds: 30);
+  static DateTime? _inboxAsked;
+
+  /// The messages waiting inside Rendel for this person, read when it opens.
+  static Future<void> _refreshInbox() async {
+    final api = _api;
+    if (api == null || !isEnabled) return;
+    final now = DateTime.now();
+    final asked = _inboxAsked;
+    if (asked != null && now.difference(asked) < _inboxEvery) return;
+    _inboxAsked = now;
+    final cards = await api.followupInbox();
+    if (identical(api, _api)) RendelFollowups.instance.setInbox(cards);
+  }
   static AppLifecycleListener? _foreground;
 
   /// Asks whether there is a follow-up for this device: after init, and when
@@ -755,7 +779,8 @@ class Rendel {
         // Opened, but not readable now: the thread opens as it was.
       }
     }
-    if (RendelFollowups.instance.current.value?.id == id) RendelFollowups.instance.current.value = null;
+    // Opened: gone from the app's screen and from Rendel's cards.
+    RendelFollowups.instance.forget(id);
     final loaded = conversationId != null && history.isNotEmpty;
     if (loaded) {
       controller.loadHistory(conversationId, history);
@@ -773,8 +798,9 @@ class Rendel {
     _identity = null;
     if (forget) {
       unawaited(_storeUser(''));
-      // A follow-up was for whoever was signed in.
+      // A follow-up was for whoever was signed in, on the app's screen and inside Rendel.
       RendelFollowups.instance.clear();
+      _inboxAsked = null;
     }
     final controller = _controller;
     if (controller == null) return;
@@ -837,6 +863,7 @@ class Rendel {
       ..clear()
       ..send = null;
     _followupAsked = null;
+    _inboxAsked = null;
     _foreground?.dispose();
     _foreground = null;
   }

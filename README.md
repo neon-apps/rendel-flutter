@@ -1,6 +1,6 @@
 # rendel
 
-Rendel is a Generative UI SDK for Flutter and web apps. It turns what users
+Rendel is a Generative UI SDK for mobile and web apps. It turns what users
 say, type and tap into native screens in your app: it answers with your own
 native widgets rather than a wall of text, and it runs the functions you
 register rather than describing what it would do, while your team controls
@@ -13,7 +13,7 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.59.6
+      ref: v0.59.7
 ```
 
 ## Three lines to a running assistant

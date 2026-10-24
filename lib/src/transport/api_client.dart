@@ -591,6 +591,24 @@ class RendelApiClient {
     }
   }
 
+  /// GET /v1/followups/inbox: the messages waiting inside Rendel for this
+  /// person, whatever channel they went on, newest first. Empty on any
+  /// failure: a card is never worth an error.
+  Future<List<RendelFollowup>> followupInbox() async {
+    try {
+      final response = await _http
+          .get(Uri.parse('${config.apiBaseUrl}/v1/followups/inbox'), headers: _headers)
+          .timeout(config.requestTimeout);
+      if (response.statusCode != 200) return const [];
+      final body = jsonDecode(response.body);
+      final cards = body is Map ? body['cards'] : null;
+      if (cards is! List) return const [];
+      return cards.map(RendelFollowup.tryParse).whereType<RendelFollowup>().toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
   /// POST /v1/followups/:id/open: the conversation the server wrote for a
   /// tapped follow-up, or null. The server counts the tap itself.
   Future<String?> openFollowup(String id) async {

@@ -41,7 +41,9 @@ class _Server {
   final opened = <String>[];
   final tokens = <Map<String, dynamic>>[];
   var asked = 0;
+  var read = 0;
   Map<String, dynamic>? next = _followup;
+  List<Map<String, dynamic>> inbox = const [];
 
   static http.Response _json(Object body) => http.Response(jsonEncode(body), 200, headers: {'content-type': 'application/json'});
 
@@ -51,6 +53,10 @@ class _Server {
       asked++;
       final card = next;
       return card == null ? http.Response('', 204) : _json({'followup': card});
+    }
+    if (path.endsWith('/v1/followups/inbox')) {
+      read++;
+      return _json({'cards': inbox});
     }
     if (path.endsWith('/open')) {
       opened.add(path.split('/')[3]);
@@ -73,9 +79,15 @@ class _Server {
   List<Map<String, dynamic>> of(String type) => events.where((e) => e['type'] == type).toList();
 }
 
-Future<_Server> _init(WidgetTester tester, {Map<String, dynamic>? next = const {}}) async {
+Future<_Server> _init(
+  WidgetTester tester, {
+  Map<String, dynamic>? next = const {},
+  List<Map<String, dynamic>> inbox = const [],
+}) async {
   final server = _Server();
   if (next == null) server.next = null;
+  if (next != null && next.isNotEmpty) server.next = next;
+  server.inbox = inbox;
   await tester.runAsync(() async {
     await Rendel.init(appKey: _key, config: RendelConfig(remoteConfig: false, httpClient: server.client));
     await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -158,6 +170,82 @@ void main() {
     expect(server.of('followup_dismiss'), [
       {'type': 'followup_dismiss', 'followup_id': _id},
     ]);
+  });
+
+  // Tuna, 2026-10-24: whatever the channel, the message waits inside Rendel as a card.
+  const pushed = {'id': '1c9e4d2f-6a7b-4c8d-9e0f-1a2b3c4d5e6f', 'type': 'offer_match', 'channel': 'push', 'title': 'Kasım indirimi', 'body': 'Koşu ayakkabılarında %20.', 'button': 'Bak'};
+  const mailed = {'id': '2d0f5e3a-7b8c-4d9e-8f1a-2b3c4d5e6f70', 'type': 'group_send', 'channel': 'email', 'title': 'Yeni sezon', 'body': 'Patika ayakkabıları geldi.', 'button': 'Göz at'};
+
+  testWidgets('every message waiting for the person shows as a card at the top of the thread when it opens', (tester) async {
+    final server = await _init(tester, next: null, inbox: [pushed, mailed]);
+    await tester.pumpWidget(_app());
+    await tester.pump();
+    await tester.tap(find.byType(RendelLauncher));
+    await _settle(tester);
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+    expect(server.read, 1);
+    expect(Rendel.followupCards.value.map((c) => [c.title, c.channel]), [
+      ['Kasım indirimi', 'push'],
+      ['Yeni sezon', 'email'],
+    ]);
+    expect(find.text('Kasım indirimi'), findsOneWidget);
+    expect(find.text('Yeni sezon'), findsOneWidget);
+    await _settle(tester);
+    expect(server.of('followup_shown').map((e) => e['followup_id']).toSet(), {pushed['id'], mailed['id']});
+
+    // The cross puts one away; the other's button opens its conversation.
+    await tester.tap(find.bySemanticsLabel('Close').last);
+    await tester.pump();
+    expect(find.text('Yeni sezon'), findsNothing);
+    await tester.tap(find.text('Bak'));
+    await _settle(tester);
+    await _settle(tester);
+    expect(server.opened, [pushed['id']]);
+    expect(Rendel.followupCards.value, isEmpty);
+    expect(server.of('followup_dismiss'), [
+      {'type': 'followup_dismiss', 'followup_id': mailed['id']},
+    ]);
+    Navigator.of(tester.element(find.byType(Scaffold).first)).maybePop();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('three long cards on a small phone stay in reach, scrolling on their own', (tester) async {
+    tester.view.physicalSize = const Size(640, 1136);
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final long = 'A light shell for the rain that folds into its own pocket, ' * 3;
+    await _init(tester, next: null, inbox: [
+      for (final n in [1, 2, 3]) {...pushed, 'id': '${pushed['id']}'.replaceFirst('1c', '$n' 'c'), 'title': 'Card $n', 'body': long, 'button': 'Open $n'},
+    ]);
+    await tester.pumpWidget(_app());
+    await tester.pump();
+    await tester.tap(find.byType(RendelLauncher));
+    await _settle(tester);
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+    expect(tester.takeException(), isNull);
+    final box = tester.getRect(find.ancestor(of: find.text('Card 1'), matching: find.byType(SingleChildScrollView)).first);
+    expect(box.height, lessThanOrEqualTo(568 * 0.58 + 0.5));
+    await tester.ensureVisible(find.text('Open 3'));
+    await tester.pump();
+    expect(tester.getBottomLeft(find.text('Open 3')).dy, lessThanOrEqualTo(box.bottom + 0.5));
+    Navigator.of(tester.element(find.byType(Scaffold).first)).maybePop();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a banner across the top of the screen while Rendel is closed, when the send chose one', (tester) async {
+    await _init(tester, next: {..._followup, 'style': 'banner'});
+    await tester.pumpWidget(_app());
+    await tester.pump();
+    await tester.pump();
+    expect(Rendel.followup.value?.isBanner, isTrue);
+    expect(find.text('Pegasus 41 indirimde'), findsOneWidget);
+    // Not the popup anchored to the launcher.
+    expect(find.ancestor(of: find.text('Pegasus 41 indirimde'), matching: find.byType(CompositedTransformFollower)), findsNothing);
+    final top = tester.getTopLeft(find.text('Pegasus 41 indirimde')).dy;
+    expect(top, lessThan(tester.getTopLeft(find.byType(RendelLauncher)).dy));
+    expect(top, lessThan(200));
   });
 
   testWidgets('nothing is drawn when there is none', (tester) async {
