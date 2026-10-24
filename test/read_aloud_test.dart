@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -238,7 +239,7 @@ void main() {
     late Completer<String?> heard;
 
     Future<(ConversationController, _Voice)> open(WidgetTester tester, List<RendelWireEvent> script,
-        {String? locale, Future<void>? hold, bool voiced = true}) async {
+        {String? locale, Future<void>? hold, bool voiced = true, String title = 'Rendel'}) async {
       final c = ConversationController(
         api: _Api(script, hold: hold),
         actions: const {},
@@ -250,6 +251,7 @@ void main() {
         home: Scaffold(
           body: ThreadScreen(
             controller: c,
+            title: title,
             voice: voiced ? voice : null,
             onDictate: (onPartial) {
               heard = Completer<String?>();
@@ -418,17 +420,22 @@ void main() {
       await say(tester, 'Weather?');
       expect(voice.said, hasLength(1));
 
-      // Its own word and a switch, not a speaker glyph (QA 2026-10-24).
-      expect(find.text('Auto-read'), findsOneWidget);
+      // Its own word and a switch; a speaker only when the word gives way (QA 2026-10-24).
+      expect(find.text('Voice replies'), findsOneWidget);
       expect(find.byIcon(Icons.volume_up_rounded), findsNothing);
       expect(
-        tester.getSemantics(find.bySemanticsLabel('Auto-read')),
-        isSemantics(hasToggledState: true, isToggled: true, isButton: true, hint: 'Read answers aloud'),
+        tester.getSemantics(find.bySemanticsLabel('Voice replies')),
+        isSemantics(
+          hasToggledState: true,
+          isToggled: true,
+          isButton: true,
+          hint: 'Answers to questions you ask out loud play by themselves',
+        ),
       );
-      await tester.tap(find.bySemanticsLabel('Auto-read'));
+      await tester.tap(find.bySemanticsLabel('Voice replies'));
       await tester.pump();
       expect(voice.on.value, isFalse);
-      expect(tester.getSemantics(find.bySemanticsLabel('Auto-read')), isSemantics(hasToggledState: true, isToggled: false));
+      expect(tester.getSemantics(find.bySemanticsLabel('Voice replies')), isSemantics(hasToggledState: true, isToggled: false));
 
       final stopsBefore = voice.stops;
       await say(tester, 'And Friday?');
@@ -436,7 +443,8 @@ void main() {
       expect(voice.said, hasLength(1), reason: 'muted, a spoken question is not read by itself');
     });
 
-    testWidgets('Auto-read fits the header on a narrow phone, and at 320 is the switch alone, still named', (tester) async {
+    testWidgets('Voice replies fits the header on a narrow phone, and gives up its word only when the name needs the room',
+        (tester) async {
       addTearDown(tester.view.reset);
       for (final (width, scale) in [(390.0, 1.0), (360.0, 1.0), (360.0, 1.3), (320.0, 1.0), (320.0, 1.6)]) {
         tester.view.physicalSize = Size(width * 3, 2400);
@@ -445,18 +453,77 @@ void main() {
         final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok30'));
         await type(tester, c, 'Weather?');
         expect(tester.takeException(), isNull, reason: 'no overflow at $width x$scale');
-        expect(find.bySemanticsLabel('Auto-read'), findsOneWidget);
-        expect(find.text('Auto-read'), width < 360 ? findsNothing : findsOneWidget, reason: '$width');
+        expect(find.bySemanticsLabel('Voice replies'), findsOneWidget);
+        final name = tester.renderObject<RenderParagraph>(find.text('Rendel'));
+        expect(name.didExceedMaxLines, isFalse, reason: 'the name whole at $width x$scale');
+        // Word or speaker, never neither.
+        expect(
+          find.text('Voice replies').evaluate().length + find.byIcon(Icons.volume_up_rounded).evaluate().length,
+          1,
+          reason: '$width x$scale',
+        );
         tester.platformDispatcher.clearTextScaleFactorTestValue();
         await tester.pumpWidget(const SizedBox());
       }
+    });
+
+    testWidgets('a 12-character name is never cut short by the switch, at 390 or 360 (QA 2026-10-24)', (tester) async {
+      addTearDown(tester.view.reset);
+      for (final width in [390.0, 360.0]) {
+        tester.view.physicalSize = Size(width * 3, 2400);
+        tester.view.devicePixelRatio = 3;
+        final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok31'), title: 'Shieldwell24');
+        await type(tester, c, 'Weather?');
+        expect(tester.takeException(), isNull);
+        final name = tester.renderObject<RenderParagraph>(find.text('Shieldwell24'));
+        expect(name.didExceedMaxLines, isFalse, reason: 'the name whole at $width');
+        // One page: back and forward are not drawn yet.
+        expect(find.bySemanticsLabel('Previous page'), findsNothing);
+        await tester.pumpWidget(const SizedBox());
+      }
+    });
+
+    testWidgets('back and forward come with the second page', (tester) async {
+      final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
+      await type(tester, c, 'Weather?');
+      expect(find.bySemanticsLabel('Previous page'), findsNothing);
+      await type(tester, c, 'And Friday?');
+      expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
+    });
+
+    testWidgets("an answer that ends in a confirmation has a Listen pill, reading its lede and the card's question",
+        (tester) async {
+      final (c, voice) = await open(tester, [
+        const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
+        BlockReady(index: 0, block: _text('Your card ending 4821 can be frozen now.')),
+        BlockReady(
+          index: 1,
+          block: WireBlock(id: 'c', type: 'confirm_card', fallbackText: '', props: {
+            'invocation_id': 'i1',
+            'summary': 'Freeze the card ending 4821?',
+            'risk': 'write',
+            'params_display': <Map<String, dynamic>>[],
+            'params': <String, dynamic>{},
+            'confirm': {'kind': 'confirm', 'invocation_id': 'i1'},
+            'cancel': {'kind': 'cancel', 'invocation_id': 'i1'},
+          })
+            ..ready = true,
+        ),
+        const TurnEnd(status: 'awaiting_confirmation', pending: []),
+      ]);
+      await type(tester, c, 'Freeze my card');
+      expect(c.phase, RendelPhase.awaitingConfirmation);
+      expect(find.bySemanticsLabel('Listen to this answer'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Listen to this answer'));
+      await tester.pump();
+      expect(voice.said.single.$1, 'Your card ending 4821 can be frozen now. Freeze the card ending 4821?');
     });
 
     testWidgets('draws no speaker at all where the host or the console turned voice off', (tester) async {
       final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok3'), voiced: false);
       await type(tester, c, 'Weather?');
       expect(find.bySemanticsLabel('Listen to this answer'), findsNothing);
-      expect(find.bySemanticsLabel('Auto-read'), findsNothing);
+      expect(find.bySemanticsLabel('Voice replies'), findsNothing);
     });
   });
 

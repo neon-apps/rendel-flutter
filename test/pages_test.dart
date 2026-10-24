@@ -353,10 +353,8 @@ void main() {
       await settle(tester);
       expect(c.pages, isEmpty);
       expect(c.page, -1);
-      expect(
-        tester.getSemantics(find.bySemanticsLabel('Previous page')),
-        isSemantics(isEnabled: false),
-      );
+      // No second page, so back and forward are not drawn (QA 2026-10-24).
+      expect(find.bySemanticsLabel('Previous page'), findsNothing);
     });
   });
 

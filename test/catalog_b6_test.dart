@@ -500,15 +500,15 @@ void main() {
       expect(tester.widget<Text>(find.text('64%')).style?.fontSize, 15);
       expect(tester.widget<Text>(find.text('Steps')).style?.fontSize, 13);
       expect(
-        tester.getSemantics(find.bySemanticsLabel('Steps, 6400 / 10000')),
-        isSemantics(label: 'Steps, 6400 / 10000', value: '64%'),
+        tester.getSemantics(find.bySemanticsLabel('Steps, 6,400 / 10,000')),
+        isSemantics(label: 'Steps, 6,400 / 10,000', value: '64%'),
       );
     });
 
     testWidgets('more than three fall back to bars', (tester) async {
       await pump(tester, [_fourGoals]);
       expect(find.text('64%'), findsNothing);
-      expect(find.text('6400 / 10000'), findsOneWidget);
+      expect(find.text('6,400 / 10,000'), findsOneWidget);
       expect(find.byType(FractionallySizedBox), findsNWidgets(4));
     });
   });

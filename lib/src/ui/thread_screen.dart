@@ -1095,6 +1095,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
             onForward: idle && controller.page < controller.pages.length - 1
                 ? () => _step(1)
                 : null,
+            paged: controller.pages.length > 1,
             voice: widget.voice,
           ),
         ),
@@ -1515,16 +1516,17 @@ class _ListenPillState extends State<_ListenPill> {
   }
 }
 
-/// The header's Auto-read switch (QA 2026-10-24): whether an answer to a
+/// The header's Voice replies switch (QA 2026-10-24): whether an answer to a
 /// spoken question is read by itself. Its word and a switch on the glass the
-/// page steps sit on, not a speaker glyph, which under an answer meant
-/// something else. 36 drawn, 44 to the finger. On a phone narrower than 360
-/// the switch alone, its word still its name. Mirrors the web SDK's
-/// `.rd-autoread`.
+/// page steps sit on. 36 drawn, 44 to the finger. [compact], when the name
+/// needs the room (`_Header._needsCompact`), is the switch alone, 46 wide,
+/// with a speaker on its knob saying what it turns on; its word is still its
+/// name. Mirrors the web SDK's `.rd-autoread`.
 class _AutoRead extends StatelessWidget {
-  const _AutoRead({required this.voice});
+  const _AutoRead({required this.voice, this.compact = false});
 
   final RendelVoice voice;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -1532,7 +1534,7 @@ class _AutoRead extends StatelessWidget {
     final strings = RendelStringsScope.of(context);
     final still = MediaQuery.disableAnimationsOf(context);
     final shape = BorderRadius.circular(theme.radius.control);
-    final compact = MediaQuery.sizeOf(context).width < 360;
+    final knob = compact ? 16.0 : 12.0;
     return ValueListenableBuilder<bool>(
       valueListenable: voice.on,
       builder:
@@ -1551,6 +1553,7 @@ class _AutoRead extends StatelessWidget {
                     filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
                     child: Container(
                       height: 36,
+                      constraints: const BoxConstraints(minWidth: 44),
                       padding: EdgeInsetsDirectional.fromSTEB(compact ? 4 : 11, 0, 4, 0),
                       decoration: BoxDecoration(
                         color: theme.colors.surfaceHigh.withValues(alpha: 0.72),
@@ -1582,21 +1585,22 @@ class _AutoRead extends StatelessWidget {
                           AnimatedContainer(
                             key: const ValueKey('rendel-autoread-switch'),
                             duration: still ? Duration.zero : const Duration(milliseconds: 200),
-                            width: 28,
-                            height: 18,
+                            width: compact ? 36 : 28,
+                            height: compact ? 22 : 18,
                             padding: const EdgeInsets.all(3),
                             decoration: BoxDecoration(
                               color: on ? theme.colors.accent : theme.colors.onSurface.withValues(alpha: 0.16),
                               border: Border.all(color: on ? theme.colors.accent : theme.hairline, width: 0.5),
-                              borderRadius: BorderRadius.circular(9),
+                              borderRadius: BorderRadius.circular(compact ? 11 : 9),
                             ),
                             child: AnimatedAlign(
                               duration: still ? Duration.zero : const Duration(milliseconds: 220),
                               curve: theme.motion.curve,
                               alignment: on ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                               child: Container(
-                                width: 12,
-                                height: 12,
+                                width: knob,
+                                height: knob,
+                                alignment: Alignment.center,
                                 decoration: BoxDecoration(
                                   color: on ? theme.colors.onAccent : theme.colors.surfaceRaised,
                                   shape: BoxShape.circle,
@@ -1604,6 +1608,13 @@ class _AutoRead extends StatelessWidget {
                                     BoxShadow(color: Color(0x38000000), blurRadius: 3, offset: Offset(0, 1)),
                                   ],
                                 ),
+                                child: compact
+                                    ? Icon(
+                                        Icons.volume_up_rounded,
+                                        size: 11,
+                                        color: on ? theme.colors.accent : theme.colors.onSurfaceSoft,
+                                      )
+                                    : null,
                               ),
                             ),
                           ),
@@ -1790,6 +1801,7 @@ class _Header extends StatelessWidget {
     this.logoHeaders = const {},
     this.onBack,
     this.onForward,
+    this.paged = false,
     this.fresh = false,
     this.onReset,
     this.voice,
@@ -1797,6 +1809,10 @@ class _Header extends StatelessWidget {
 
   final String title;
   final bool sandbox;
+
+  /// A second page to step to. Until there is one, back and forward are not
+  /// drawn, and the name has their room (QA 2026-10-24).
+  final bool paged;
 
   /// The speaker: answers read aloud, or not. Null draws none.
   final RendelVoice? voice;
@@ -1820,6 +1836,32 @@ class _Header extends StatelessWidget {
   /// logo was possible.
   final String? logoUrl;
   final Map<String, String> logoHeaders;
+
+  /// Whether the name would be cut short beside Auto-read's word: then the
+  /// switch drops its word and shows a speaker on its knob instead. Decided
+  /// from the header's own width, not the screen's (QA 2026-10-24), as the
+  /// web SDK's `data-compact`. A logo is reckoned at 32 wide, a mark's usual
+  /// width at its 20 high.
+  bool _needsCompact(BuildContext context, RendelTheme theme, double width, bool hasLogo) {
+    final direction = Directionality.of(context);
+    double measure(String text, TextStyle style, TextScaler scaler) =>
+        (TextPainter(text: TextSpan(text: text, style: style), textDirection: direction, maxLines: 1, textScaler: scaler)
+              ..layout())
+            .width;
+    final scaler = MediaQuery.textScalerOf(context);
+    final word = measure(
+      RendelStringsScope.of(context).autoRead,
+      theme.text.label.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1),
+      scaler.clamp(maxScaleFactor: 1.2),
+    );
+    // The switch with its word: its insets, the word, the gap, the track, the hairline.
+    final autoRead = 11 + word + 6 + 28 + 4 + 2;
+    final fixed = (paged ? 2 * 36 + 2 * 3 + 2 + theme.space.sm : 0) +
+        (hasLogo ? 32 + theme.space.sm : 0) +
+        (onReset != null ? 44 : 0) +
+        44;
+    return measure(title, theme.text.heading, scaler) > width - fixed - autoRead;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1852,12 +1894,17 @@ class _Header extends StatelessWidget {
       ),
     );
     final row = LayoutBuilder(
-      builder: (context, box) => Row(
+      builder: (context, box) {
+        final hasLogo = logoUrl != null && !fresh;
+        final compact = voice != null && !fresh && _needsCompact(context, theme, box.maxWidth, hasLogo);
+        return Row(
         children: [
-          // Back and forward at the leading edge. No rule under the header:
-          // the page fades out beneath it instead.
-          _PageSteps(onBack: onBack, onForward: onForward),
-          SizedBox(width: theme.space.sm),
+          // Back and forward at the leading edge, once there is a second
+          // page. No rule under the header: the page fades out beneath it.
+          if (paged) ...[
+            _PageSteps(onBack: onBack, onForward: onForward),
+            SizedBox(width: theme.space.sm),
+          ],
           // The mark before the name, and never instead of it.
           //
           // A logo is a picture of a word at best and a picture of a shape
@@ -1898,8 +1945,10 @@ class _Header extends StatelessWidget {
           // text size its word gives way rather than the row overflowing.
           if (voice case final voice? when !fresh)
             ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: math.max(36, box.maxWidth - 2 * 44 - 2 * 44 - 2 * 3 - theme.space.sm)),
-              child: _AutoRead(voice: voice),
+              constraints: BoxConstraints(
+                maxWidth: math.max(46, box.maxWidth - (paged ? 2 * 44 + 2 * 3 + theme.space.sm : 0) - 2 * 44),
+              ),
+              child: _AutoRead(voice: voice, compact: compact),
             ),
           if (onReset != null)
             RendelPressable(
@@ -1930,7 +1979,8 @@ class _Header extends StatelessWidget {
             ),
           ),
         ],
-      ),
+      );
+      },
     );
     return Container(
       // Directional: the leading inset is the 16pt edge every block in the
@@ -2917,18 +2967,21 @@ class _ComposerState extends State<_Composer> {
                               height: 38,
                               decoration: BoxDecoration(
                                 shape: BoxShape.circle,
+                                // Nothing to send: a ghost ring, never a
+                                // grey filled disc (QA 2026-10-24).
                                 color: enabled
                                     ? theme.colors.accent
-                                    : theme.onComposerFaint
-                                        .withValues(alpha: 0.35),
+                                    : Colors.transparent,
                                 // The rim every accent fill in the catalog
                                 // carries: an icon-only button is identified
                                 // by its fill alone, which is what WCAG
                                 // 1.4.11 asks 3:1 of.
                                 border: Border.all(
+                                  width: enabled ? 1 : 1.5,
                                   color: enabled
                                       ? theme.accentEdge
-                                      : Colors.transparent,
+                                      : theme.onComposerFaint
+                                          .withValues(alpha: 0.45),
                                 ),
                               ),
                               // The glyph eases with its own plate.
@@ -2939,7 +2992,8 @@ class _ComposerState extends State<_Composer> {
                                 tween: ColorTween(
                                   end: enabled
                                       ? theme.colors.onAccent
-                                      : theme.colors.composer,
+                                      : theme.onComposerFaint
+                                          .withValues(alpha: 0.6),
                                 ),
                                 builder: (context, ink, _) => Icon(
                                   switch (widget.sendIcon) {

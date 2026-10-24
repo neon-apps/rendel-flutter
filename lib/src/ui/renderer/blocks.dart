@@ -13,6 +13,7 @@ import 'package:flutter/services.dart' show LogicalKeyboardKey, StandardMessageC
 import '../../engine/conversation_controller.dart'
     show RendelDetail, RendelSubmitOutcome;
 import '../../protocol/protocol.dart';
+import '../../core/numbers.dart';
 import '../../core/strings.dart';
 import '../../core/config.dart' show RendelAttachment, RendelAttachSource;
 import '../../transport/api_client.dart' show RendelUploadFailure;
@@ -1086,9 +1087,12 @@ class _Stars extends StatelessWidget {
     // The stars and the words beside them are two parts of a product card.
     final style = theme.part('stars', theme.text.caption.copyWith(letterSpacing: 0.6, height: 1));
     final star = theme.parts['stars']?.color ?? theme.colors.onSurface;
-    final label = count == null
-        ? '${clamped.toStringAsFixed(1)} out of 5'
-        : '${clamped.toStringAsFixed(1)} out of 5, from $count reviews';
+    final strings = RendelStringsScope.of(context);
+    final said = rendelNumber(clamped, strings.numberLocale, digits: 1);
+    final reviews = count == null ? null : rendelNumber(count!, strings.numberLocale, digits: 0);
+    final label = reviews == null
+        ? strings.ratingStars.replaceAll('{n}', said)
+        : strings.ratingFromOf(said, reviews);
 
     return Semantics(
       label: label,
@@ -1123,9 +1127,7 @@ class _Stars extends StatelessWidget {
             ),
             SizedBox(width: theme.space.xs),
             Text(
-              count == null
-                  ? clamped.toStringAsFixed(1)
-                  : '${clamped.toStringAsFixed(1)} ($count)',
+              reviews == null ? said : '$said ($reviews)',
               style: theme.part('reviews', theme.text.caption),
             ),
           ],
@@ -1294,7 +1296,9 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
       // The pressable excludes its subtree, so the stars' own Semantics
       // node is invisible to a screen reader once the card is tappable.
       if (_dbl(item['rating']) case final score?)
-        '${score.toStringAsFixed(1)} out of 5',
+        RendelStringsScope.of(context)
+            .ratingStars
+            .replaceAll('{n}', rendelNumber(score, RendelStringsScope.of(context).numberLocale, digits: 1)),
       _str(item['price']),
     ]);
     // On a page the card opens over it (`design/DETAIL.md`).
@@ -2522,7 +2526,8 @@ class _ProgressRow extends StatelessWidget {
     final value = _dbl(item['value']) ?? 0;
     final max = _dbl(item['max']) ?? 0;
     final fraction = max > 0 ? (value / max).clamp(0.0, 1.0) : 0.0;
-    final valueLabel = _str(item['value_label']) ?? '${_num(value)} / ${_num(max)}';
+    final numbers = RendelStringsScope.of(context).numberLocale;
+    final valueLabel = _str(item['value_label']) ?? '${_num(value, numbers)} / ${_num(max, numbers)}';
     final caption = _str(item['caption']);
 
     return Semantics(
@@ -3500,7 +3505,7 @@ Widget buildChart(BuildContext context, WireBlock block, RendelDispatcher dispat
   // missing would be an unnamed region. Describing it from its own data beats
   // announcing nothing.
   final description = block.fallbackText.isEmpty
-      ? _describeChart(kind, labels, series, unit)
+      ? _describeChart(kind, labels, series, unit, RendelStringsScope.of(context).numberLocale)
       : block.fallbackText;
 
   // A legend exists to attach names to swatches. With no names there is
@@ -3556,6 +3561,7 @@ String _describeChart(
   List<String> labels,
   List<_Series> series,
   String? unit,
+  String locale,
 ) {
   var high = series.first.data.first;
   var low = series.first.data.first;
@@ -3565,7 +3571,7 @@ String _describeChart(
       low = math.min(low, v);
     }
   }
-  String said(double v) => _withUnit(_num(v), unit);
+  String said(double v) => _withUnit(_num(v, locale), unit);
   final points = series.first.data.length;
   if (kind == 'donut') {
     final total = series.first.data.fold<double>(0, (sum, v) => sum + math.max(0, v));
@@ -3644,7 +3650,7 @@ class _Plot extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _withUnit(_num(maxValue), unit),
+          _withUnit(_num(maxValue, RendelStringsScope.of(context).numberLocale), unit),
           style: theme.text.captionTabular,
           // The two axis labels below this are capped; this was the only
           // caption in the catalog that could wrap to three lines and push
@@ -3779,7 +3785,7 @@ class _BarsState extends State<_Bars> {
     final latest = data[last];
     final latestLabel = last < labels.length ? labels[last] : '';
     final height = theme.size.plotHeight;
-    final said = _chartFormat(data, unit);
+    final said = _chartFormat(data, unit, RendelStringsScope.of(context).numberLocale);
 
     Widget bar(int i) {
       final value = data[i];
@@ -4178,7 +4184,7 @@ class _Donut extends StatelessWidget {
                       // for a trailing value.
                       _TrailingSlot(
                         child: Text(
-                          total > 0 ? '${percents[i]}%' : _num(positive[i]),
+                          total > 0 ? '${percents[i]}%' : _num(positive[i], RendelStringsScope.of(context).numberLocale),
                           style: theme.text.captionTabular,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -9589,11 +9595,11 @@ IconData? _iconFor(String? name) => name == null ? null : _icons[name.toLowerCas
 
 /// Whole numbers stay whole. A "12.0 orders" axis label is a rounding artefact
 /// wearing a decimal point.
-String _num(double value) {
+String _num(double value, String locale) {
   if (value == value.roundToDouble() && value.abs() < 1e9) {
-    return value.toInt().toString();
+    return rendelNumber(value.toInt(), locale, digits: 0);
   }
-  return value.toStringAsFixed(1);
+  return rendelNumber(value, locale, digits: 1);
 }
 
 /// A currency as a chart's unit: a sign like € or ₺, one with letters like
@@ -9616,7 +9622,7 @@ String _withUnit(String said, String? unit) {
 /// How a chart writes its values, as the web SDK does: all with as many
 /// decimals as the most precise of them has, at most two, so 53.4 beside
 /// 48.25 reads 53.40; and money with cents anywhere always with two.
-String Function(double) _chartFormat(List<double> values, String? unit) {
+String Function(double) _chartFormat(List<double> values, String? unit, String locale) {
   int own(double v) {
     if (v == v.roundToDouble()) return 0;
     final text = v.toString();
@@ -9627,7 +9633,7 @@ String Function(double) _chartFormat(List<double> values, String? unit) {
   final fractional = values.any((v) => v != v.roundToDouble());
   final money = unit != null && _currencyUnit.hasMatch(unit.trim());
   final places = money && fractional ? 2 : math.min(2, values.map(own).fold(0, math.max));
-  return (value) => value.toStringAsFixed(places);
+  return (value) => rendelNumber(value, locale, digits: places);
 }
 
 /// Whether a chart's [label] is itself a when ("Today", "This week",
@@ -12222,7 +12228,8 @@ Widget buildPlaceCard(BuildContext context, WireBlock block, RendelDispatcher di
   final count = _dbl(props['rating_count'])?.round();
   final line = <String>[
     if (_str(props['hours_today']) case final today? when today.isNotEmpty) today,
-    if (rating != null) '★ ${rating.toStringAsFixed(1)}${count == null ? '' : ' ($count)'}',
+    if (rating != null)
+      '★ ${rendelNumber(rating, strings.numberLocale, digits: 1)}${count == null ? '' : ' (${rendelNumber(count, strings.numberLocale, digits: 0)})'}',
   ];
   final hours = [
     for (final day in _maps(props['hours_week']))
@@ -13658,7 +13665,7 @@ class _ProgressRing extends StatelessWidget {
     return Semantics(
       label: [
         label,
-        valueLabel ?? '${_num(value)} / ${_num(max)}',
+        valueLabel ?? '${_num(value, RendelStringsScope.of(context).numberLocale)} / ${_num(max, RendelStringsScope.of(context).numberLocale)}',
         if (caption != null) caption,
       ].where((part) => part.isNotEmpty).join(', '),
       value: percent,
@@ -13790,7 +13797,7 @@ class _HBars extends StatelessWidget {
       }
     }
     final top = peak > 0 ? peak : 1.0;
-    final said = _chartFormat([for (final s in series) ...s.data], unit);
+    final said = _chartFormat([for (final s in series) ...s.data], unit, RendelStringsScope.of(context).numberLocale);
     final thickness = one ? 14.0 : 8.0;
     // One series has no legend to match, so it takes the readout's fill; more
     // take the inks their legend names.

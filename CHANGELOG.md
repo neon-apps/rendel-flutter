@@ -5,6 +5,24 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.2
+
+- The assistant's name always fits: the header checks its own width, and when
+  the name would be cut short the switch drops its word and shows a speaker on
+  its knob. Back and forward appear once there is a second page. Start over,
+  close and the compact switch take a 44 pt tap.
+- The header switch is now "Voice replies", and screen readers hear what it
+  does: answers to questions asked out loud play by themselves.
+- Ratings, review counts, progress, place cards and charts follow the panel's
+  language ("4,6 (1.720)" in Turkish), and the stars' Semantics say the rating
+  in that language. Whole numbers have thousands separators in every language.
+- An answer that ends in a confirmation has a Listen button too: it reads the
+  opening, then the card's question.
+- Scrolled text no longer shows behind the name; the send button is an
+  outlined circle until there is something to send.
+- New strings `ratingFrom` and `numberLocale`; `autoRead` and `readAloud` have
+  new wording in all six languages. No API changes.
+
 ## 0.59.1
 
 - Every answer has a "▶ Listen" button under its first paragraph, before its

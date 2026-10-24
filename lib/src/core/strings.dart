@@ -51,8 +51,8 @@ class RendelStrings {
     this.composerHint = 'Ask anything',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
-    this.readAloud = 'Read answers aloud',
-    this.autoRead = 'Auto-read',
+    this.readAloud = 'Answers to questions you ask out loud play by themselves',
+    this.autoRead = 'Voice replies',
     this.listen = 'Listen',
     this.readAloudThis = 'Listen to this answer',
     this.stopReading = 'Stop reading',
@@ -155,6 +155,8 @@ class RendelStrings {
     this.fieldOnOrBefore = 'Pick {date} or earlier.',
     this.ratingThanks = 'Thanks for telling us',
     this.ratingStars = '{n} of 5',
+    this.ratingFrom = '{n} of 5, from {count} reviews',
+    this.numberLocale = 'en',
     this.thumbsUp = 'Good',
     this.thumbsDown = 'Not good',
     this.helpful = 'Helpful?',
@@ -512,6 +514,15 @@ class RendelStrings {
   /// and open.
   final String ratingThanks;
   final String ratingStars;
+
+  /// A rating with its count, to a screen reader: `{n}` the rating and
+  /// `{count}` the reviews, both written as [numberLocale] writes numbers.
+  final String ratingFrom;
+
+  /// The language the panel writes its numbers in (QA 2026-10-24): "4,6" and
+  /// "1.720" for `tr`, "4.6" and "1,720" for `en`. Set by each shipped table;
+  /// see `rendelNumber`.
+  final String numberLocale;
   final String thumbsUp;
   final String thumbsDown;
 
@@ -620,6 +631,7 @@ class RendelStrings {
   String fieldOnOrAfterOf(String date) => fieldOnOrAfter.replaceAll('{date}', date);
   String fieldOnOrBeforeOf(String date) => fieldOnOrBefore.replaceAll('{date}', date);
   String ratingStarsOf(int n) => ratingStars.replaceAll('{n}', '$n');
+  String ratingFromOf(String n, String count) => ratingFrom.replaceAll('{n}', n).replaceAll('{count}', count);
   String validUntilDate(String date) => validUntil.replaceAll('{date}', date);
 
   /// The heading for a day, from a local time.
@@ -782,6 +794,8 @@ class RendelStrings {
     String? fieldOnOrBefore,
     String? ratingThanks,
     String? ratingStars,
+    String? ratingFrom,
+    String? numberLocale,
     String? thumbsUp,
     String? thumbsDown,
     String? helpful,
@@ -951,6 +965,8 @@ class RendelStrings {
       fieldOnOrBefore: fieldOnOrBefore ?? this.fieldOnOrBefore,
       ratingThanks: ratingThanks ?? this.ratingThanks,
       ratingStars: ratingStars ?? this.ratingStars,
+      ratingFrom: ratingFrom ?? this.ratingFrom,
+      numberLocale: numberLocale ?? this.numberLocale,
       thumbsUp: thumbsUp ?? this.thumbsUp,
       thumbsDown: thumbsDown ?? this.thumbsDown,
       helpful: helpful ?? this.helpful,
@@ -1033,8 +1049,8 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Ne isterseniz sorun',
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
-    readAloud: 'Cevapları sesli oku',
-    autoRead: 'Sesli oku',
+    readAloud: 'Sesle sorduğun soruların cevabı kendiliğinden okunur',
+    autoRead: 'Sesli yanıt',
     listen: 'Dinle',
     readAloudThis: 'Bu cevabı dinle',
     stopReading: 'Okumayı durdur',
@@ -1137,6 +1153,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldOnOrBefore: '{date} veya öncesini seçin.',
     ratingThanks: 'Bildirdiğin için teşekkürler',
     ratingStars: '5 üzerinden {n}',
+    ratingFrom: '{count} değerlendirmeye göre 5 üzerinden {n}',
+    numberLocale: 'tr',
     thumbsUp: 'İyi',
     thumbsDown: 'İyi değil',
     helpful: 'Faydalı mı?',
@@ -1206,8 +1224,8 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Stellen Sie Ihre Frage',
     sendMessage: 'Nachricht senden',
     newConversation: 'Neue Unterhaltung beginnen',
-    readAloud: 'Antworten vorlesen',
-    autoRead: 'Auto-Vorlesen',
+    readAloud: 'Antworten auf laut gestellte Fragen werden von selbst vorgelesen',
+    autoRead: 'Sprachantworten',
     listen: 'Anhören',
     readAloudThis: 'Diese Antwort anhören',
     stopReading: 'Vorlesen beenden',
@@ -1312,6 +1330,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldOnOrBefore: 'Wählen Sie {date} oder früher.',
     ratingThanks: 'Danke für Ihre Rückmeldung',
     ratingStars: '{n} von 5',
+    ratingFrom: '{n} von 5, aus {count} Bewertungen',
+    numberLocale: 'de',
     thumbsUp: 'Gut',
     thumbsDown: 'Nicht gut',
     helpful: 'Hilfreich?',
@@ -1381,8 +1401,8 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Posez votre question',
     sendMessage: 'Envoyer le message',
     newConversation: 'Démarrer une nouvelle conversation',
-    readAloud: 'Lire les réponses à voix haute',
-    autoRead: 'Lecture auto',
+    readAloud: 'Les réponses aux questions posées à voix haute se lisent d’elles-mêmes',
+    autoRead: 'Réponses vocales',
     listen: 'Écouter',
     readAloudThis: 'Écouter cette réponse',
     stopReading: 'Arrêter la lecture',
@@ -1486,6 +1506,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldOnOrBefore: 'Choisissez le {date} ou plus tôt.',
     ratingThanks: 'Merci de nous l’avoir dit',
     ratingStars: '{n} sur 5',
+    ratingFrom: '{n} sur 5, d’après {count} avis',
+    numberLocale: 'fr',
     thumbsUp: 'Bien',
     thumbsDown: 'Pas bien',
     helpful: 'Utile ?',
@@ -1555,8 +1577,8 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Pregunta lo que quieras',
     sendMessage: 'Enviar mensaje',
     newConversation: 'Iniciar una conversación nueva',
-    readAloud: 'Leer las respuestas en voz alta',
-    autoRead: 'Lectura auto',
+    readAloud: 'Las respuestas a lo que preguntas en voz alta se leen solas',
+    autoRead: 'Respuestas por voz',
     listen: 'Escuchar',
     readAloudThis: 'Escuchar esta respuesta',
     stopReading: 'Dejar de leer',
@@ -1659,6 +1681,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldOnOrBefore: 'Elige el {date} o una fecha anterior.',
     ratingThanks: 'Gracias por contárnoslo',
     ratingStars: '{n} de 5',
+    ratingFrom: '{n} de 5, con {count} reseñas',
+    numberLocale: 'es',
     thumbsUp: 'Bien',
     thumbsDown: 'Mal',
     helpful: '¿Te ha servido?',
@@ -1728,8 +1752,8 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'اسأل عن أي شيء',
     sendMessage: 'إرسال الرسالة',
     newConversation: 'بدء محادثة جديدة',
-    readAloud: 'قراءة الإجابات بصوت عالٍ',
-    autoRead: 'قراءة تلقائية',
+    readAloud: 'تُقرأ الإجابات عن الأسئلة التي تطرحها بصوتك تلقائيًا',
+    autoRead: 'ردود صوتية',
     listen: 'استمع',
     readAloudThis: 'استمع إلى هذه الإجابة',
     stopReading: 'أوقف القراءة',
@@ -1831,6 +1855,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldOnOrBefore: 'اختر {date} أو تاريخًا سابقًا.',
     ratingThanks: 'شكرًا لإخبارنا',
     ratingStars: '{n} من 5',
+    ratingFrom: '{n} من 5، من {count} تقييم',
+    numberLocale: 'ar',
     thumbsUp: 'جيد',
     thumbsDown: 'غير جيد',
     helpful: 'هل كان هذا مفيدًا؟',

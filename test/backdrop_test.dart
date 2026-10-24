@@ -133,6 +133,13 @@ void main() {
       onOpenUrl: (_) async => true,
     );
     addTearDown(controller.dispose);
+    // Two pages: back and forward are drawn only once there is a second (QA 2026-10-24).
+    for (final words in ['First answer.', 'Second answer.']) {
+      controller.pages.add(RendelMessage.history('assistant', [
+        WireBlock(id: words, type: 'text', fallbackText: words, props: {'markdown': words})..ready = true,
+      ]));
+    }
+    controller.page = 1;
     await tester.pumpWidget(MaterialApp(
       home: RendelThemeScope(
         theme: theme,

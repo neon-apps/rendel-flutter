@@ -12,6 +12,7 @@ import '../core/locale.dart';
 import '../core/log.dart';
 import '../core/memory.dart';
 import '../core/platform.dart';
+import '../core/read_aloud.dart' show spokenLead;
 import '../core/route.dart';
 import '../protocol/protocol.dart';
 import '../transport/api_client.dart';
@@ -1533,11 +1534,21 @@ class ConversationController extends ChangeNotifier {
     if (phase == RendelPhase.awaitingConfirmation) _lastPayload = null;
     _notify();
 
-    if (completed && errorText == null && answer != null && messages.contains(answer) && !_readThisQuestion) {
+    // An answer that ends in a confirmation is heard too (QA 2026-10-24): its
+    // lede, then the card's own question. Mirrors the web SDK's engine.
+    final question = answer != null && phase == RendelPhase.awaitingConfirmation ? _confirmQuestion(answer) : null;
+    if ((completed || question != null) &&
+        errorText == null &&
+        answer != null &&
+        messages.contains(answer) &&
+        !_readThisQuestion) {
       _readThisQuestion = true;
-      answer.speech = RendelAnswerSpeech(token: answerSpeech, lang: answerLang);
+      final text = question == null
+          ? null
+          : [spokenLead(answer.blocks), question].whereType<String>().where((s) => s.isNotEmpty).join(' ');
+      answer.speech = RendelAnswerSpeech(token: answerSpeech, text: text, lang: answerLang);
       answer.touch();
-      onAnswered?.call(answer, lang: answerLang, speech: answerSpeech);
+      onAnswered?.call(answer, text: text, lang: answerLang, speech: answerSpeech);
     }
   }
 
@@ -1582,6 +1593,18 @@ class ConversationController extends ChangeNotifier {
 
   /// True when the last turn ended on a confirm card the user has not yet
   /// answered, which is a wait on the user rather than on us.
+  /// The question an open confirmation card in [answer] asks (its summary),
+  /// or null when it has none open.
+  String? _confirmQuestion(RendelMessage answer) {
+    for (final block in answer.blocks) {
+      if (block.type == 'confirm_card' && block.props[RendelLocalKeys.resolved] == null) {
+        final summary = block.props['summary'];
+        return summary is String ? summary.trim() : '';
+      }
+    }
+    return null;
+  }
+
   bool _hasOpenConfirmCard() {
     for (final message in messages.reversed) {
       for (final block in message.blocks) {
