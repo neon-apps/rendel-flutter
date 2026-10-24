@@ -1840,8 +1840,11 @@ class _Header extends StatelessWidget {
   final String? logoUrl;
   final Map<String, String> logoHeaders;
 
-  /// Whether the name would be cut short beside Auto-read's word: then the
-  /// switch drops its word and shows a speaker on its knob instead. Decided
+  /// Whether the name would be cut short beside Auto-read's word even at its
+  /// smallest ([_HeaderName.minScale]): then the switch drops its word and
+  /// shows a speaker on its knob instead, and the name is fitted again in the
+  /// room that frees. Short of that the name is set smaller and the word
+  /// stays (Tuna, 2026-10-24). Decided
   /// from the header's own width, not the screen's (QA 2026-10-24), as the
   /// web SDK's `data-compact`. A logo is reckoned at 32 wide, a mark's usual
   /// width at its 20 high. Back and forward and start over are reckoned
@@ -1862,7 +1865,7 @@ class _Header extends StatelessWidget {
     // The switch with its word: its insets, the word, the gap, the track, the hairline.
     final autoRead = 11 + word + 6 + 28 + 4 + 2;
     final fixed = _PageSteps.width + theme.space.sm + (hasLogo ? 32 + theme.space.sm : 0) + 44 + 44;
-    return measure(title, theme.text.heading, scaler) > width - fixed - autoRead;
+    return measure(title, theme.text.heading, scaler) * _HeaderName.minScale > width - fixed - autoRead;
   }
 
   @override
