@@ -536,7 +536,7 @@ void main() {
       expect(shapes, {'true', 'false'}, reason: 'a short name keeps the word, a long one gives it up');
     });
 
-    testWidgets("a long name is set smaller beside the switch's word first; only past 70% does the word go, and the name takes the room it frees (Tuna 2026-10-24)",
+    testWidgets("a long name is set smaller beside the switch's word first; only past 65% does the word go, and the name takes the room it frees (Tuna 2026-10-24)",
         (tester) async {
       addTearDown(tester.view.reset);
       // Wide enough for the test font's square letters to keep the word at all.
@@ -549,14 +549,14 @@ void main() {
         await type(tester, c, 'And Friday?');
         expect(tester.takeException(), isNull);
         final name = find.text(title);
-        expect(find.text('Voice replies').evaluate().isNotEmpty, kept, reason: '$title: the word kept while the name fits at 70% beside it');
+        expect(find.text('Voice replies').evaluate().isNotEmpty, kept, reason: '$title: the word kept while the name fits at 65% beside it');
         expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines, isFalse, reason: '$title: whole');
-        expect(scale(name), inExclusiveRange(0.7, 1), reason: '$title: smaller, not at the floor');
+        expect(scale(name), inExclusiveRange(0.65, 1), reason: '$title: smaller, not at the floor');
         await tester.pumpWidget(const SizedBox());
       }
     });
 
-    testWidgets('a long name at 320 is set smaller to fit on one line, and cut short only past 70% (Tuna 2026-10-24)', (tester) async {
+    testWidgets('a long name at 320 is set smaller to fit on one line, and cut short only past 65% (Tuna 2026-10-24)', (tester) async {
       addTearDown(tester.view.reset);
       tester.view.physicalSize = const Size(320 * 3, 2400);
       tester.view.devicePixelRatio = 3;
@@ -570,11 +570,11 @@ void main() {
         await type(tester, c, 'And Friday?');
         expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines, cut, reason: '$title: cut short only past 70%');
+        expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines, cut, reason: '$title: cut short only past 65%');
         if (cut) {
-          expect(scale(name), closeTo(0.7, 0.001), reason: '$title: at the smallest');
+          expect(scale(name), closeTo(0.65, 0.001), reason: '$title: at the smallest');
         } else {
-          expect(scale(name), inExclusiveRange(0.7, 1), reason: '$title: smaller, and whole');
+          expect(scale(name), inExclusiveRange(0.65, 1), reason: '$title: smaller, and whole');
         }
         await tester.pumpWidget(const SizedBox());
       }

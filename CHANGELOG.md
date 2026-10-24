@@ -5,6 +5,13 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.6
+
+- A long assistant name is set as small as 65% of the heading, not 70%, before
+  it is cut or the Voice replies switch gives up its word.
+- The header measures the name and the switch's word in the app's own font,
+  as they are drawn.
+
 ## 0.59.5
 
 - The Voice replies switch keeps its word beside a long assistant name: the

@@ -1852,9 +1852,14 @@ class _Header extends StatelessWidget {
   /// second page share one header.
   bool _needsCompact(BuildContext context, RendelTheme theme, double width, bool hasLogo) {
     final direction = Directionality.of(context);
-    double measure(String text, TextStyle style, TextScaler scaler) =>
-        (TextPainter(text: TextSpan(text: text, style: style), textDirection: direction, maxLines: 1, textScaler: scaler)
-              ..layout())
+    // In the font they are drawn in: `Text` merges the app's own text style.
+    final ambient = DefaultTextStyle.of(context).style;
+    double measure(String text, TextStyle style, TextScaler scaler) => (TextPainter(
+          text: TextSpan(text: text, style: ambient.merge(style)),
+          textDirection: direction,
+          maxLines: 1,
+          textScaler: scaler,
+        )..layout())
             .width;
     final scaler = MediaQuery.textScalerOf(context);
     final word = measure(
@@ -2012,14 +2017,15 @@ class _HeaderName extends StatelessWidget {
   final String title;
   final TextStyle style;
 
-  static const double minScale = 0.7;
+  static const double minScale = 0.65;
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, box) {
       final room = box.maxWidth;
       final painter = TextPainter(
-        text: TextSpan(text: title, style: style),
+        // In the font it is drawn in: `Text` merges the app's own text style.
+        text: TextSpan(text: title, style: DefaultTextStyle.of(context).style.merge(style)),
         textDirection: Directionality.of(context),
         maxLines: 1,
         textScaler: MediaQuery.textScalerOf(context),
