@@ -465,12 +465,14 @@ void main() {
       expect(marks, findsNothing);
     });
 
-    test('the mark role is the yellow on light and a mix of it on deep', () {
-      expect(RendelTheme.paper().mark, const Color(0xFFFEF7AF));
+    test('the mark role is Toprak mixed into the ground', () {
+      final paper = RendelTheme.paper();
+      expect(paper.mark,
+          Color.lerp(paper.colors.surface, const Color(0xFFB5532B), 0.18));
       final deep = RendelTheme.deep();
       expect(
         deep.mark,
-        Color.lerp(deep.colors.surface, const Color(0xFFFEF7AF), 0.22),
+        Color.lerp(deep.colors.surface, const Color(0xFFB5532B), 0.3),
       );
     });
   });

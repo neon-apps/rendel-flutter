@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.8
+
+- Rendel's own colours follow its new brand. A marked phrase on an answer
+  page, the best value in a comparison, a chosen option and a person's own
+  items in a list sit on the brand's Toprak mixed into the app's ground (18%
+  on a light ground, 30% on a dark one) instead of the yellow.
+- `RendelTheme.deep()`, and the dark theme derived from Rendel's own light
+  palette, act in a lightened Toprak (`#C87E60`, the black label on it at
+  6.2:1) instead of the yellow. An app that sets its own accent keeps it.
+
 ## 0.59.7
 
 - Every follow-up also waits as a card at the top of the thread when the

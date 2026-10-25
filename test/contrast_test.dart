@@ -500,17 +500,16 @@ void main() {
 
     test('the action takes one brand colour per ground', () {
       // v4 held one brand fill on both grounds, an ultramarine that needed a
-      // lifted rim to be read in the dark. The v5 brand is two colours, and
-      // each ground takes the one it can carry: black on paper, where the
-      // yellow is 1.1:1 and would not even read as a button, and the yellow
-      // on the deep ground, where black would vanish. It is the split the
-      // landing page draws between its light sections and its dark band.
+      // lifted rim to be read in the dark. The brand is two colours, and each
+      // ground takes the one it can carry: black on paper, and the brand's
+      // Toprak lightened to #C87E60 on the deep ground, where black would
+      // vanish (2026-10-25; it was the yellow until then).
       final light = RendelTheme.paper();
       final deep = RendelTheme.deep();
       expect(light.colors.accent, const Color(0xFF0A0A0A),
           reason: 'the action on paper is the brand black');
-      expect(deep.colors.accent, const Color(0xFFFEF7AF),
-          reason: 'the action on the deep ground is the brand yellow');
+      expect(deep.colors.accent, const Color(0xFFC87E60),
+          reason: 'the action on the deep ground is the lightened Toprak');
 
       for (final (name, theme) in [('light', light), ('deep', deep)]) {
         for (final ground in [

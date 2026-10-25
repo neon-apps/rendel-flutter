@@ -952,12 +952,11 @@ class RendelTheme {
   late final Color rail = colors.onSurface.withValues(alpha: 0.16);
 
   /// What a marked phrase sits on (`==x==` in a text block) and the round
-  /// behind a way-on card's mark (`design/PAGES.md`): the brand's yellow on a
-  /// light ground, mixed 22% into the surface on a deep one. A fill only; the
-  /// words on it keep the ink, so their contrast is the ink's.
-  late final Color mark = _lightOnDark
-      ? Color.lerp(colors.surface, const Color(0xFFFEF7AF), 0.22)!
-      : const Color(0xFFFEF7AF);
+  /// behind a way-on card's mark (`design/PAGES.md`): the brand's Toprak
+  /// mixed into the surface, 18% on a light ground and 30% on a deep one. A
+  /// fill only; the words on it keep the ink, so their contrast is the ink's.
+  late final Color mark = Color.lerp(
+      colors.surface, const Color(0xFFB5532B), _lightOnDark ? 0.3 : 0.18)!;
 
   /// What a readout is filled with — a progress value, the tracker's current
   /// mark: the ink 72% of the way from the ground. Soft, never the solid ink.
@@ -1238,17 +1237,18 @@ class RendelTheme {
           onSurface: Color(0xFFF4F2EE),
           onSurfaceSoft: Color(0xFFB8B5AE),
           onSurfaceFaint: Color(0xFF9A978F),
-          accent: Color(0xFFFEF7AF),
-          // The brand black on the brand yellow, at 18.0.
+          // The brand's Toprak, lightened to read on this ground.
+          accent: Color(0xFFC87E60),
+          // The brand black on it, at 6.2.
           onAccent: Color(0xFF0A0A0A),
           line: Color(0x24F4F2EE),
           lineStrong: Color(0x33F4F2EE),
           shadow: Color(0xFF000000),
         ),
-        // The yellow does all three jobs on this ground, as the black does on
-        // paper: 14.85 at worst as type and as a boundary.
-        accentText: const Color(0xFFFEF7AF),
-        accentEdge: const Color(0xFFFEF7AF),
+        // The accent does all three jobs on this ground, as the black does on
+        // paper: 5.13 at worst as type and as a boundary.
+        accentText: const Color(0xFFC87E60),
+        accentEdge: const Color(0xFFC87E60),
         // 8.12 at worst across the four deep surfaces.
         danger: const Color(0xFFFF9AAC),
       );
@@ -1550,7 +1550,7 @@ class RendelTheme {
 }) {
   const deepSurface = Color(0xFF12110F);
   const deepInk = Color(0xFFF4F2EE);
-  const brandYellow = Color(0xFFFEF7AF);
+  const brandAccent = Color(0xFFC87E60);
   const nearBlack = Color(0xFF0A0A0A);
   const white = Color(0xFFFFFFFF);
 
@@ -1567,7 +1567,7 @@ class RendelTheme {
       (alreadyDark
           ? accent
           : brandDefault
-              ? brandYellow
+              ? brandAccent
               : _darkAccent(accent, ground, ink));
   final label = darkOnAccent ??
       (contrastRatio(onAccent, action) >= 4.5

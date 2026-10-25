@@ -114,6 +114,50 @@ void main() {
       expect(find.text('This cannot be undone'), findsNothing);
     });
 
+    // Halden, 2026-10-25: the card the owner wants everywhere. Parity with
+    // the web SDK's confirm.test.ts.
+    testWidgets('the item\'s picture sits at 64pt beside the sentence, over the rows and two buttons',
+        (tester) async {
+      const picture = 'https://cdn.halden.example/court-low.jpg';
+      final props = card()
+        ..['summary'] = 'Add the Court Low to your bag?'
+        ..['image_url'] = picture
+        ..['confirm_label'] = 'Add to bag'
+        ..['params_display'] = [
+          {'label': 'Item', 'value': 'Court Low'},
+          {'label': 'Size', 'value': '42'},
+          {'label': 'Price', 'value': '€89'},
+          {'label': 'Arrives', 'value': 'Thu 29 Oct'},
+        ];
+      for (final scale in [1.0, 2.0]) {
+        await pump(tester, props, scale: scale);
+        expect(tester.takeException(), isNull);
+      }
+      final image = find.byWidgetPredicate((w) {
+        if (w is! Image) return false;
+        final provider = w.image;
+        final inner = provider is ResizeImage ? provider.imageProvider : provider;
+        return inner is NetworkImage && inner.url == picture;
+      });
+      expect(image, findsOneWidget);
+      expect(tester.getSize(image), const Size(64, 64));
+      // Beside the sentence, in one row, not above it.
+      final summary = find.text('Add the Court Low to your bag?');
+      expect(find.ancestor(of: image, matching: find.byType(Row)).evaluate().toSet()
+          .intersection(find.ancestor(of: summary, matching: find.byType(Row)).evaluate().toSet()), isNotEmpty);
+      for (final value in ['Court Low', '42', '€89', 'Thu 29 Oct']) {
+        expect(find.text(value), findsOneWidget);
+      }
+      expect(find.text('Add to bag'), findsOneWidget);
+      expect(find.text('Go back'), findsOneWidget);
+    });
+
+    testWidgets('no picture, no thumbnail', (tester) async {
+      await pump(tester, card());
+      expect(find.byType(Image), findsNothing);
+      expect(find.text('Cancel order 1042?'), findsOneWidget);
+    });
+
     testWidgets('a long value is read whole, at any scale', (tester) async {
       final props = card()
         ..['params_display'] = [

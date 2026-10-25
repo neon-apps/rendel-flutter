@@ -43,7 +43,7 @@ void main() {
   group('the dark roles, as the protocol derives them', () {
     test('the brand palette derives to exactly deep()', () {
       expect(_roles('#F4F2EE', '#171615', '#0A0A0A', '#FFFFFF'),
-          ['#12110F', '#F4F2EE', '#FEF7AF', '#0A0A0A']);
+          ['#12110F', '#F4F2EE', '#C87E60', '#0A0A0A']);
     });
 
     test('an accent that reads on the dark ground is kept', () {

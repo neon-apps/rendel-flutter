@@ -22,12 +22,12 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.59.7
+      ref: v0.59.8
   rendel_push:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
       path: rendel_push
-      ref: v0.59.7
+      ref: v0.59.8
 ```
 
 4. After `Firebase.initializeApp()` and `Rendel.init(...)`:
