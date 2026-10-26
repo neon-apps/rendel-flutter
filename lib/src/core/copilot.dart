@@ -14,6 +14,7 @@ import '../ui/presentation.dart';
 import '../ui/theme.dart';
 import '../ui/thread_screen.dart';
 import 'action.dart';
+import 'analytics.dart';
 import 'batteries.dart';
 import 'read_aloud.dart';
 import 'config.dart';
@@ -27,6 +28,7 @@ import 'pairing.dart';
 import 'platform.dart';
 import 'route.dart';
 import 'screens.dart';
+import 'taps.dart';
 import 'strings.dart';
 import 'remote_config.dart';
 
@@ -71,6 +73,11 @@ class Rendel {
   /// do not show is not one that works when the dependency is in.
   static RendelConfigStore? _userStore;
   static RendelConfigStore get _users => _userStore ??= _defaultStore('nc_user');
+
+  /// Where the analytics switch, the super properties and the session are
+  /// kept: the same kind of store as the device id, under its own key.
+  static RendelConfigStore? _analyticsStore;
+  static RendelConfigStore get _analytics => _analyticsStore ??= _defaultStore('nc_analytics');
 
   /// The last [identify] body, for an [identify] that arrived before [init]
   /// had a client to send it with.
@@ -239,8 +246,15 @@ class Rendel {
     );
     _handOverClient(_api);
     RendelFollowups.instance.send = (event) => unawaited(_api?.sendEvent(event));
-    // The screens shown since launch go now that there is a device to count them against.
-    RendelScreens.instance.send = (views) => unawaited(_api?.sendEvents(views));
+    // Whether this device counts at all, and what it registered, before
+    // anything counted since launch leaves.
+    await RendelAnalytics.instance.load(_analytics);
+    // The screens, events and taps since launch go now that there is a device
+    // to count them against, as whoever is signed in when they leave.
+    RendelScreens.instance.send = (items) => unawaited(_api?.sendEvents(items, user: _user));
+    RendelTaps.instance
+      ..deviceId = (() => _deviceId)
+      ..attach();
     unawaited(_syncManifest());
     // An app that restores its session before initialising the copilot calls
     // `identify` first. That call used to go nowhere, silently.
@@ -344,6 +358,9 @@ class Rendel {
     String? userHmac,
   }) async {
     final previous = _user?['id'];
+    // Another person from here on: what waits goes as who it was, and a new
+    // session starts.
+    if (previous != userId) _rotateSession();
     final user = {'id': userId, if (userHmac != null) 'hmac': userHmac};
     _user = user;
     unawaited(_storeUser(jsonEncode(user)));
@@ -625,7 +642,16 @@ class Rendel {
 
   /// Call on logout: clears the thread and the user. The next turn from this
   /// phone is anonymous until the next [identify].
-  static void reset() => _endSession(forget: true);
+  static void reset() {
+    // Somebody was signed in: what waits goes as them, and a new session starts.
+    if (_user != null) _rotateSession();
+    _endSession(forget: true);
+  }
+
+  static void _rotateSession() {
+    RendelScreens.instance.flush();
+    RendelAnalytics.instance.rotate();
+  }
 
   // ————————————————————————— follow-ups —————————————————————————
 
@@ -740,19 +766,25 @@ class Rendel {
   ///
   /// `'purchase'` takes `{'value': 549.9, 'currency': 'TRY', 'items': [...]}`,
   /// which Follow-ups credits to the follow-up they last opened (R2). Any
-  /// other name is a goal, something the app counts as a success: lowercase
-  /// letters, digits and `_`, a letter first, at most 40 characters, with an
-  /// optional value and its currency (screens-goals.md):
+  /// other name is an event: lowercase letters, digits and `_`, a letter
+  /// first, at most 40 characters, with flat properties (product-analytics.md
+  /// §2.2):
   ///
   /// ```dart
   /// Rendel.track('signup');
+  /// Rendel.track('add_to_cart', {'product': 'Espresso', 'price': 3.5});
   /// Rendel.track('booking', {'value': 120, 'currency': 'TRY'});
   /// ```
   ///
-  /// The console shows a goal sent from here as reported by the app. Never a
-  /// throw: a malformed call is logged and not counted.
+  /// At most 20 properties, each a String (255 characters at most), a number,
+  /// a bool or null; a string that looks like an email, a phone or a card
+  /// number is sent as `[masked]`. `value` with its `currency` is the event's
+  /// worth. The console marks which events are goals. Nothing is sent while
+  /// [setAnalyticsEnabled] is off. Never a throw: a malformed call is logged,
+  /// and a property that is not kept is named in the log.
   static void track(String name, [Map<String, dynamic> props = const {}]) {
-    if (name != 'purchase') return _trackGoal(name, props);
+    if (!RendelAnalytics.instance.enabled) return;
+    if (name != 'purchase') return _trackEvent(name, props);
     final value = props['value'];
     final given = props['currency'];
     final currency = given is String ? given.trim().toUpperCase() : '';
@@ -764,7 +796,8 @@ class Rendel {
       return;
     }
     final items = props['items'];
-    unawaited(_whenClient().then((api) => api?.sendEvent({
+    // Checked again once init has read the switch this device kept.
+    unawaited(_whenClient().then((api) => !RendelAnalytics.instance.enabled ? null : api?.sendEvent({
           'type': 'purchase',
           'value': value,
           'currency': currency,
@@ -772,37 +805,67 @@ class Rendel {
         })));
   }
 
-  static final _goalName = RegExp(r'^[a-z][a-z0-9_]{0,39}$');
-
-  static void _trackGoal(String name, Map<String, dynamic> props) {
-    if (!_goalName.hasMatch(name)) {
+  static void _trackEvent(String name, Map<String, dynamic> props) {
+    if (!analyticsName.hasMatch(name)) {
       RendelLog.warn(
         'invalid_goal',
-        'track("$name") is not counted: a goal\'s name is lowercase letters, digits and _, starting with a letter, at most 40 characters',
+        'track("$name") is not counted: an event\'s name is lowercase letters, digits and _, starting with a letter, at most 40 characters',
       );
       return;
     }
     final value = props['value'];
-    if (value == null) {
-      unawaited(_whenClient().then((api) => api?.sendEvent({'type': 'goal', 'name': name})));
-      return;
-    }
     final given = props['currency'];
     final currency = given is String ? given.trim().toUpperCase() : '';
-    if (value is! num || !value.isFinite || value < 0 || value > 1000000000 || !RegExp(r'^[A-Z]{3}$').hasMatch(currency)) {
+    if (value != null &&
+        (value is! num || !value.isFinite || value < 0 || value > 1000000000 || !RegExp(r'^[A-Z]{3}$').hasMatch(currency))) {
       RendelLog.warn(
         'invalid_goal',
         'track("$name") with a value needs a value of 0 or more and a three-letter currency code such as "TRY"',
       );
       return;
     }
-    unawaited(_whenClient().then((api) => api?.sendEvent({
-          'type': 'goal',
-          'name': name,
-          'value': value,
-          'currency': currency,
-        })));
+    final dropped = <String>[];
+    final clean = cleanProps({
+      for (final MapEntry(:key, :value) in props.entries)
+        if (key != 'value' && key != 'currency') key: value,
+    }, dropped: dropped);
+    if (dropped.isNotEmpty) {
+      RendelLog.warn(
+        'invalid_prop',
+        'track("$name") kept no ${dropped.map((k) => '"$k"').join(', ')}: a name is lowercase letters, digits and _, '
+            'a value a string, number, boolean or null, and 20 at most',
+      );
+    }
+    RendelScreens.instance.add({
+      'type': 'event',
+      'name': name,
+      if (clean.isNotEmpty) 'props': clean,
+      if (value != null) ...{'value': value, 'currency': currency},
+      'at': DateTime.now().toUtc().toIso8601String(),
+    });
   }
+
+  /// Super properties: sent once per session rather than on every event, and
+  /// kept on the device across launches. Set or replace, at most 20 in all,
+  /// the same rules as [track]'s properties. A change in the middle of a
+  /// session applies to the whole of it.
+  ///
+  /// ```dart
+  /// Rendel.register({'plan': 'pro', 'beta': true});
+  /// ```
+  static void register(Map<String, dynamic> props) => RendelAnalytics.instance.register(props);
+
+  /// Removes one super property; see [register].
+  static void unregister(String key) => RendelAnalytics.instance.unregister(key);
+
+  /// Whether this device counts screen views, taps, events and sessions;
+  /// on unless the app turns it off. Wire it to your consent setting: off
+  /// drops what waits and sends nothing more, and the choice is kept across
+  /// launches. The assistant keeps working either way.
+  static void setAnalyticsEnabled(bool enabled) => RendelAnalytics.instance.setEnabled(enabled);
+
+  /// Whether this device counts screen views, taps, events and sessions.
+  static bool get analyticsEnabled => RendelAnalytics.instance.enabled;
 
   static const _followupEvery = Duration(minutes: 10);
   static DateTime? _followupAsked;
@@ -947,6 +1010,10 @@ class Rendel {
     _foreground?.dispose();
     _foreground = null;
     RendelScreens.instance.resetForTest();
+    RendelAnalytics.instance.resetForTest();
+    RendelTaps.instance.resetForTest();
+    // A relaunch keeps what the device kept, as for the signed-in user.
+    if (!relaunch) _analyticsStore = null;
   }
 
   // ————————————————————————— remote config —————————————————————————
@@ -1070,6 +1137,7 @@ class Rendel {
     // Before the empty check: an app that published no look can still be
     // switched to one read at a time.
     _parallelReads = remote.parallelReads;
+    RendelAnalytics.instance.capture = remote.capture;
     if (remote.isEmpty) return;
     // Compared by PAYLOAD, not by object identity. `copyWith` always
     // allocates, so an identity check never held and the launcher rebuilt on

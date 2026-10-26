@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../ui/theme.dart';
+import 'analytics.dart' show RendelCapture;
 import 'config.dart';
 
 /// Where the SDK keeps the last config it fetched successfully.
@@ -59,7 +60,13 @@ class RendelRemoteConfig {
     required this.etag,
     this.themeDark = const {},
     this.parallelReads = true,
+    this.capture = RendelCapture.defaults,
   });
+
+  /// What the server says about tap capture (`capture`, sent only when it is
+  /// not the default): kept in the cache like [parallelReads], so a 304 keeps
+  /// it too.
+  final RendelCapture capture;
 
   /// False while the server has parallel reads off (`parallel_reads: false`):
   /// context providers and device reads then run one after another. Its
@@ -103,6 +110,7 @@ class RendelRemoteConfig {
         // header's.
         etag: etag ?? (map['_etag'] as String?),
         parallelReads: map['parallel_reads'] != false,
+        capture: RendelCapture.parse(map['capture']),
       );
     } catch (_) {
       return null;
@@ -116,6 +124,7 @@ class RendelRemoteConfig {
         'version': version,
         if (etag != null) '_etag': etag,
         if (!parallelReads) 'parallel_reads': false,
+        if (!capture.isDefault) 'capture': capture.toJson(),
         'config': {
           if (theme.isNotEmpty) 'theme': theme,
           if (themeDark.isNotEmpty) 'themeDark': themeDark,

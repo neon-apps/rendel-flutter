@@ -4,6 +4,7 @@ import 'dart:ui' show lerpDouble;
 
 import 'package:flutter/material.dart';
 
+import '../core/taps.dart' show RendelIgnore;
 import '../protocol/protocol.dart' show NavigateAction;
 import 'theme.dart';
 
@@ -149,12 +150,15 @@ class RendelPresentation extends ChangeNotifier {
           : null,
       builder: (context) {
         if (show == _shows) _sheet = context;
-        return LayoutBuilder(
-          // Below the safe area already (`useSafeArea`); the gap is the
-          // page sheet's own, so the app shows behind its top edge.
-          builder: (context, box) => SizedBox(
-            height: math.max(0.0, box.maxHeight - _gap),
-            child: _seated(aloft: false, show: show),
+        // Taps inside Rendel are not the app's to count.
+        return RendelIgnore(
+          child: LayoutBuilder(
+            // Below the safe area already (`useSafeArea`); the gap is the
+            // page sheet's own, so the app shows behind its top edge.
+            builder: (context, box) => SizedBox(
+              height: math.max(0.0, box.maxHeight - _gap),
+              child: _seated(aloft: false, show: show),
+            ),
           ),
         );
       },
@@ -195,7 +199,7 @@ class RendelPresentation extends ChangeNotifier {
     }
     _from = box.localToGlobal(Offset.zero, ancestor: ground) & box.size;
     _phase = _Phase.leaving;
-    final entry = _entry = OverlayEntry(builder: (_) => _Aloft(presentation: this));
+    final entry = _entry = OverlayEntry(builder: (_) => RendelIgnore(child: _Aloft(presentation: this)));
     _overlay.insert(entry);
     _aloft.value = true;
     _sheet = null;

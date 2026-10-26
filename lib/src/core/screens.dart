@@ -3,10 +3,15 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/widgets.dart';
 
+import 'analytics.dart';
+
 /// Which screen of the app the person is on (design/plans/screens-goals.md):
 /// a view for every screen the app shows, whether or not Rendel is opened,
 /// and the name each turn carries as `context.current_screen`. The screen's
-/// name only, with its ids taken out. Never a tap.
+/// name only, with its ids taken out.
+///
+/// Its queue is the one analytics queue (product-analytics.md §2.1): screen
+/// views, `track` events, taps and sessions, each stamped with its session.
 ///
 /// The rules are the web SDK's (`sdk/web/src/screens.ts`), so a screen is
 /// called the same thing whichever SDK counted it.
@@ -14,14 +19,18 @@ import 'package:flutter/widgets.dart';
 /// The server keeps 120 characters of a name.
 const int maxScreenName = 120;
 
-/// Views wait at most this long to go, and go at once at this many (the
+/// Items wait at most this long to go, and go at once at this many (the
 /// server takes 50).
 const Duration _flushEvery = Duration(seconds: 15);
 const int _batch = 40;
 
-/// What waits for `init` at most: one batch the server takes whole. The
-/// oldest go first.
+/// What waits at most once `init` has run: one batch the server takes
+/// whole. The oldest go first.
 const int _held = 50;
+
+/// What waits for `init` at most: a `track` or the screens shown at launch,
+/// sent in batches of [_batch] once it has run.
+const int _early = 200;
 
 /// A route pushed this soon after Rendel opened a registered screen is that
 /// screen.
@@ -76,16 +85,20 @@ String? screenName(String? routeName) {
 /// The screen on top of the app's navigator, the views waiting to go, and
 /// when they go.
 class RendelScreens {
-  RendelScreens._();
+  RendelScreens._() {
+    RendelAnalytics.instance
+      ..onSession = _push
+      ..onDisabled = _drop;
+  }
 
   static final RendelScreens instance = RendelScreens._();
 
   /// Sends one batch to `/v1/events`, fire and forget: a batch that did not
   /// land is only a count. Wired by `init` once the client has its device
   /// id; until then views wait, so nothing leaves before it.
-  void Function(List<Map<String, dynamic>> views)? _send;
+  void Function(List<Map<String, dynamic>> items)? _send;
 
-  set send(void Function(List<Map<String, dynamic>> views)? send) {
+  set send(void Function(List<Map<String, dynamic>> items)? send) {
     _send = send;
     if (send != null && _queue.isNotEmpty) _queued();
   }
@@ -206,10 +219,46 @@ class RendelScreens {
     final screen = current;
     if (screen == null || screen == _last) return;
     _last = screen;
-    _queue.add({'type': 'screen_view', 'screen': screen, 'at': DateTime.now().toUtc().toIso8601String()});
-    if (_queue.length > _held) _queue.removeAt(0);
+    add({'type': 'screen_view', 'screen': screen, 'at': DateTime.now().toUtc().toIso8601String()});
+  }
+
+  /// One item for the next batch, in the current session; nothing while
+  /// analytics is off. A session starting goes in first.
+  void add(Map<String, dynamic> item) {
+    final analytics = RendelAnalytics.instance;
+    if (!analytics.enabled) return;
+    item['session'] = analytics.touch();
+    _push(item);
+  }
+
+  /// A session's item still waiting is replaced rather than repeated, so a
+  /// batch never carries more than the server's two.
+  void _push(Map<String, dynamic> item) {
+    if (item['type'] == 'session') {
+      final waiting = _queue.indexWhere((i) => i['type'] == 'session' && i['session'] == item['session']);
+      if (waiting >= 0) {
+        _queue[waiting] = item;
+        return;
+      }
+    }
+    _queue.add(item);
+    if (_queue.length > (_send == null ? _early : _held)) _queue.removeAt(0);
     _listen();
     _queued();
+  }
+
+  /// Analytics switched off: what waits is not sent.
+  void _drop() {
+    _queue.clear();
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  /// What runs as the app goes to the background, before what waits is
+  /// sent: taps not read yet.
+  final List<VoidCallback> _hiding = [];
+  void whenHidden(VoidCallback fn) {
+    if (!_hiding.contains(fn)) _hiding.add(fn);
   }
 
   void _queued() {
@@ -226,12 +275,14 @@ class RendelScreens {
     _timer = null;
     final send = _send;
     if (send == null || _queue.isEmpty) return;
-    final views = List.of(_queue);
+    final items = List.of(_queue);
     _queue.clear();
-    try {
-      send(views);
-    } catch (_) {
-      // Only a count.
+    for (var i = 0; i < items.length; i += _batch) {
+      try {
+        send(items.sublist(i, i + _batch > items.length ? items.length : i + _batch));
+      } catch (_) {
+        // Only a count.
+      }
     }
   }
 
@@ -241,8 +292,17 @@ class RendelScreens {
     if (_lifecycle != null) return;
     try {
       _lifecycle = AppLifecycleListener(onStateChange: (state) {
+        if (state == AppLifecycleState.resumed) RendelAnalytics.instance.resumed();
         if (state != AppLifecycleState.hidden && state != AppLifecycleState.paused) return;
         if (_settling) _record();
+        for (final fn in List.of(_hiding)) {
+          try {
+            fn();
+          } catch (_) {
+            // Whatever it held is lost; the rest still leaves.
+          }
+        }
+        RendelAnalytics.instance.hidden();
         flush();
       });
     } catch (_) {
@@ -265,6 +325,7 @@ class RendelScreens {
     _timer?.cancel();
     _timer = null;
     _settling = false;
+    _hiding.clear();
     _lifecycle?.dispose();
     _lifecycle = null;
   }

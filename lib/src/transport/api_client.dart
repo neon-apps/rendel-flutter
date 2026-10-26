@@ -428,15 +428,16 @@ class RendelApiClient {
   /// on it; the server ignores an event it does not know.
   Future<void> sendEvent(Map<String, dynamic> event) => sendEvents([event]);
 
-  /// POST /v1/events with several, as [sendEvent] sends one: screen views go
-  /// in batches (screens-goals.md), at most 50 to a request.
-  Future<void> sendEvents(List<Map<String, dynamic>> events) async {
+  /// POST /v1/events with several, as [sendEvent] sends one: the analytics
+  /// queue goes in batches (product-analytics.md §2.1), at most 50 to a
+  /// request, with who is signed in as a turn carries them.
+  Future<void> sendEvents(List<Map<String, dynamic>> events, {Map<String, String>? user}) async {
     try {
       await _http
           .post(
             Uri.parse('${config.apiBaseUrl}/v1/events'),
             headers: _headers,
-            body: jsonEncode({'events': events}),
+            body: jsonEncode({'events': events, if (user != null) 'user': user}),
           )
           .timeout(config.requestTimeout);
     } catch (_) {

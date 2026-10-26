@@ -18,6 +18,8 @@ export 'src/core/remote_config.dart'
 export 'src/core/batteries.dart' show RendelDictationDenied;
 export 'src/core/copilot.dart' show Rendel;
 export 'src/core/pairing.dart' show RendelPairResult, RendelPairFailure;
+// Tap autocapture's markers: a stable name, no text, not counted.
+export 'src/core/taps.dart' show RendelName, RendelMask, RendelIgnore;
 export 'src/core/events.dart' show RendelEvent;
 export 'src/core/followups.dart' show RendelFollowup;
 export 'src/core/schema.dart' show RendelSchema;

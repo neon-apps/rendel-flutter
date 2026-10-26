@@ -104,7 +104,7 @@ void main() {
   /// What has been counted so far, sent now.
   List<String> viewed() {
     _screens.flush();
-    return [for (final view in sent) view['screen'] as String];
+    return [for (final view in sent) if (view['type'] == 'screen_view') view['screen'] as String];
   }
 
   group('a screen\'s name', () {
@@ -158,8 +158,11 @@ void main() {
       _nav.pushNamedAndRemoveUntil('/home', (_) => false);
       await tester.pumpAndSettle();
       expect(viewed(), ['/', '/orders/:id', '/', '/profile', '/settings', '/home']);
-      expect(sent.first, {'type': 'screen_view', 'screen': '/', 'at': isA<String>()});
-      expect(DateTime.parse(sent.first['at'] as String).isUtc, isTrue);
+      // The session's item first, then each view in it.
+      final session = sent.first['session'];
+      expect(sent.first, {'type': 'session', 'session': session, 'started_at': isA<String>()});
+      expect(sent[1], {'type': 'screen_view', 'screen': '/', 'at': isA<String>(), 'session': session});
+      expect(DateTime.parse(sent[1]['at'] as String).isUtc, isTrue);
     });
 
     testWidgets('a dialog or a sheet is not a screen: the page under it still is', (tester) async {
@@ -236,30 +239,36 @@ void main() {
   });
 
   group('views go', () {
-    testWidgets('not before init, and then the ones that waited', (tester) async {
+    testWidgets('not before init, and then the ones that waited, 40 to a batch', (tester) async {
       await tester.pumpWidget(_app());
-      for (var i = 0; i < 55; i++) {
+      for (var i = 0; i < 205; i++) {
         Rendel.setScreen('s$i');
         await tester.pump();
       }
       _screens.flush();
-      // At most one batch waits; the oldest go first.
-      capture();
-      expect(viewed(), [for (var i = 5; i < 55; i++) 's$i']);
+      // At most 200 wait; the oldest go first (the session's item and '/' too).
+      final batches = <int>[];
+      _screens.send = (items) {
+        batches.add(items.length);
+        sent.addAll(items);
+      };
+      expect(viewed(), [for (var i = 5; i < 205; i++) 's$i']);
+      expect(batches, [40, 40, 40, 40, 40]);
     });
 
     testWidgets('at 40', (tester) async {
       capture();
       await tester.pumpWidget(_app());
-      // '/' and 38 more.
-      for (var i = 0; i < 38; i++) {
+      // The session's item, '/' and 37 more.
+      for (var i = 0; i < 37; i++) {
         Rendel.setScreen('s$i');
         await tester.pump();
       }
       expect(sent, isEmpty);
-      Rendel.setScreen('s38');
+      Rendel.setScreen('s37');
       await tester.pump();
       expect(sent, hasLength(40));
+      expect(sent.first['type'], 'session');
     });
 
     testWidgets('every 15 seconds', (tester) async {
@@ -271,7 +280,7 @@ void main() {
       await tester.pump(const Duration(seconds: 14));
       expect(sent, isEmpty);
       await tester.pump(const Duration(seconds: 1));
-      expect(sent.map((v) => v['screen']), ['/', 'Cart']);
+      expect(viewed(), ['/', 'Cart']);
     });
 
     testWidgets('when the app goes to the background', (tester) async {
@@ -282,7 +291,7 @@ void main() {
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       expect(sent, isEmpty);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
-      expect(sent.map((v) => v['screen']), ['/', 'Cart']);
+      expect(viewed(), ['/', 'Cart']);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
       tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     });
@@ -296,8 +305,9 @@ void main() {
         _screens.flush();
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
+      final session = server.of('session').single['session'];
       expect(server.of('screen_view'), [
-        {'type': 'screen_view', 'screen': 'Before init', 'at': isA<String>()},
+        {'type': 'screen_view', 'screen': 'Before init', 'at': isA<String>(), 'session': session},
       ]);
       expect(server.devices.last, Rendel.deviceId);
     });
@@ -337,7 +347,7 @@ void main() {
   });
 
   group('track', () {
-    testWidgets('sends a goal by name, with a value when it has its currency', (tester) async {
+    testWidgets('sends an event by name, with a value when it has its currency; never a goal', (tester) async {
       final server = _Server();
       await tester.runAsync(() async {
         await Rendel.init(
@@ -353,11 +363,14 @@ void main() {
         Rendel.track('booking', {'value': 2e9, 'currency': 'TRY'});
         Rendel.track('purchase', {'value': 549.9, 'currency': 'TRY'});
         Rendel.track('purchase');
+        _screens.flush();
         await Future<void>.delayed(const Duration(milliseconds: 50));
       });
-      expect(server.of('goal'), [
-        {'type': 'goal', 'name': 'signup'},
-        {'type': 'goal', 'name': 'booking_made', 'value': 120, 'currency': 'TRY'},
+      expect(server.of('goal'), isEmpty);
+      final session = server.of('session').single['session'];
+      expect(server.of('event'), [
+        {'type': 'event', 'name': 'signup', 'at': isA<String>(), 'session': session},
+        {'type': 'event', 'name': 'booking_made', 'value': 120, 'currency': 'TRY', 'at': isA<String>(), 'session': session},
       ]);
       expect(server.of('purchase'), [
         {'type': 'purchase', 'value': 549.9, 'currency': 'TRY'},

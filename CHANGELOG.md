@@ -5,6 +5,25 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.63.0
+
+- Taps are counted on their own: a global pointer route sees each tap
+  without joining the gesture arena, and after the frame finds the control
+  (Semantics, the nearest button, tab, field or list row), its caption for
+  buttons, links and tabs (masked; never a field's text; never a list
+  row's text) and a locator. Under 0.2 ms on the route per tap.
+- `Rendel.track(name, [props])` sends any event with up to 20 flat
+  properties; `Rendel.register` / `Rendel.unregister` set properties for
+  the session; `Rendel.setAnalyticsEnabled(false)` stops screen views, taps,
+  events, sessions and purchases on the device.
+- Sessions: a new one after 30 minutes idle or in the background, and when
+  the signed-in person changes. Every item carries it.
+- `RendelName`, `RendelMask` and `RendelIgnore` widgets steer what a tap
+  records. Rendel's own sheet is never recorded.
+- A goal is an event name you mark in the console; the old `goal` kind is
+  no longer sent.
+- The iOS privacy manifest adds Other Usage Data (linked, not tracking).
+
 ## 0.62.2
 
 - Back and forward are 24-point arrows in a 40-point pill again, as before

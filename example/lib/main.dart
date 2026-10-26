@@ -496,6 +496,8 @@ class ProductScreen extends StatelessWidget {
                   label: Text('$size'),
                   onPressed: () {
                     KicksStore.instance.addToCart(product, size);
+                    // An event for Analytics, with flat properties. Taps are counted by themselves.
+                    Rendel.track('add_to_cart', {'product': product.name, 'size': size});
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('${product.name} ($size) is in your cart')),
                     );
