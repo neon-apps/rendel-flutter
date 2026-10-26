@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.60.3
+
+- Nothing is drawn around the microphone: no ring of the composer's ground
+  and no drop shadow, at rest or held.
+- The header's reset and close are drawn in a thin line, 20 and 22 points,
+  as the console's Appearance phone shows them, instead of Material's
+  heavier rounded glyphs at the display size.
+
 ## 0.60.2
 
 - The held microphone swells once. When the recogniser opened and

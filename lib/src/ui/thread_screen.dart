@@ -1887,12 +1887,8 @@ class _Header extends StatelessWidget {
               child: SizedBox(
                 height: 44,
                 width: 44,
-                child: Icon(
-                  // Counter-clockwise: start over, which is what it does.
-                  Icons.replay_rounded,
-                  size: theme.type.display - 2,
-                  color: theme.colors.onSurfaceSoft,
-                ),
+                // Counter-clockwise: start over, which is what it does.
+                child: _HeaderGlyph.reset(color: theme.colors.onSurfaceSoft),
               ),
             ),
           RendelPressable(
@@ -1901,11 +1897,7 @@ class _Header extends StatelessWidget {
             child: SizedBox(
               height: 44,
               width: 44,
-              child: Icon(
-                Icons.close_rounded,
-                size: theme.type.display,
-                color: theme.colors.onSurfaceFaint,
-              ),
+              child: _HeaderGlyph.close(color: theme.colors.onSurfaceFaint),
             ),
           ),
         ],
@@ -3120,14 +3112,76 @@ class _Round extends StatelessWidget {
   }
 }
 
-/// The microphone: the one filled control at rest, in the app's accent, set
-/// in a ring of the composer's own ground.
+/// The header's reset and close, drawn in a thin line at the sizes the
+/// console's Appearance phone shows them (reset 20, close 22), rather than
+/// Material's heavier filled glyphs (Özlem 2026-10-26). The paths are the web
+/// SDK's `reset` and `close`, on its 24-point grid.
+class _HeaderGlyph extends StatelessWidget {
+  const _HeaderGlyph.reset({required this.color})
+      : close = false,
+        size = 20;
+  const _HeaderGlyph.close({required this.color})
+      : close = true,
+        size = 22;
+
+  final bool close;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: CustomPaint(
+          size: Size.square(size),
+          painter: _HeaderGlyphPainter(close: close, color: color),
+        ),
+      );
+}
+
+class _HeaderGlyphPainter extends CustomPainter {
+  const _HeaderGlyphPainter({required this.close, required this.color});
+
+  final bool close;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.scale(size.width / 24);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    final path = Path();
+    if (close) {
+      path
+        ..moveTo(6, 6)
+        ..lineTo(18, 18)
+        ..moveTo(18, 6)
+        ..lineTo(6, 18);
+    } else {
+      path
+        ..moveTo(4.5, 12)
+        ..arcToPoint(const Offset(6.7, 6.7), radius: const Radius.circular(7.5), largeArc: true, clockwise: false)
+        ..lineTo(4.5, 9)
+        ..moveTo(4.5, 4.5)
+        ..lineTo(4.5, 9)
+        ..lineTo(9, 9);
+    }
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(_HeaderGlyphPainter old) => old.close != close || old.color != color;
+}
+
+/// The microphone: the one filled control at rest, in the app's accent, with
+/// nothing drawn around it — no ring, no shadow (Özlem 2026-10-26).
 ///
 /// With [onDown] it is held to speak: the press starts voice mode and letting
 /// go ([onUp]) ends it, and [onTap] is left to a screen reader, which cannot
 /// hold. [held] draws it as it is under the finger, as Monogram's is: in
-/// 150ms the ring goes and the pill swells a fifth into the room it took,
-/// overshooting a little, in its own colour.
+/// 150ms the pill swells a fifth, overshooting a little, in its own colour.
 class _MicPill extends StatelessWidget {
   const _MicPill({
     super.key,
@@ -3148,30 +3202,9 @@ class _MicPill extends StatelessWidget {
   final bool held;
   final double width;
 
-  /// [ring] is how much of the composer's ring is drawn, 0 to 1.
-  BoxDecoration _decoration(RendelTheme theme, double ring) => BoxDecoration(
+  static BoxDecoration _decoration(RendelTheme theme) => BoxDecoration(
         color: theme.colors.accent,
         borderRadius: BorderRadius.circular(26),
-        // Painted in order: the drop shadow, the edge, then the ring.
-        boxShadow: [
-          BoxShadow(
-            color: theme.colors.shadow.withValues(alpha: 0.35),
-            offset: const Offset(0, 14),
-            blurRadius: 28,
-            spreadRadius: -14,
-          ),
-          if (ring > 0) ...[
-            BoxShadow(
-              color: theme.composerEdge.withValues(alpha: theme.composerEdge.a * ring),
-              spreadRadius: 5 * ring,
-            ),
-            // The composer's glass, as the box is drawn.
-            BoxShadow(
-              color: theme.colors.composer.withValues(alpha: _Glass.tintAlpha * ring),
-              spreadRadius: 4 * ring,
-            ),
-          ],
-        ],
       );
 
   @override
@@ -3188,7 +3221,7 @@ class _MicPill extends StatelessWidget {
           child: Container(
             width: width,
             height: 52,
-            decoration: _decoration(theme, 1 - t),
+            decoration: _decoration(theme),
             child: child,
           ),
         ),
@@ -3205,7 +3238,7 @@ class _MicPill extends StatelessWidget {
       curve: theme.motion.curve,
       width: width,
       height: 52,
-      decoration: _decoration(theme, 1),
+      decoration: _decoration(theme),
       child: glyph,
     );
     if (onDown == null && onUp == null) {
