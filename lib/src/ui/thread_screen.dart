@@ -1942,7 +1942,7 @@ class _HeaderName extends StatelessWidget {
 
 /// Back and forward through the pages a conversation has opened: a glass pill
 /// holding two round buttons, at the header's leading edge. Each is 44 to the
-/// finger (QA 2026-10-24); the pill is drawn 38 high behind them.
+/// finger (QA 2026-10-24); the pill is drawn 40 high behind them.
 class _PageSteps extends StatelessWidget {
   const _PageSteps({required this.onBack, required this.onForward});
 
@@ -1962,9 +1962,10 @@ class _PageSteps extends StatelessWidget {
     };
     return Stack(
       children: [
+        // 40 high, as in 0.60 (Özlem 2026-10-26): 38 read as too small.
         Positioned.fill(
-          top: 3,
-          bottom: 3,
+          top: 2,
+          bottom: 2,
           child: _StepsGlass(shape: BorderRadius.circular(theme.radius.control)),
         ),
         Row(
@@ -2013,8 +2014,8 @@ class _PageStep extends StatelessWidget {
           child: SizedBox(
             width: 44,
             height: 44,
-            // 20, not 24: smaller in their pill (Özlem 2026-10-26).
-            child: Icon(icon, size: 20, color: theme.colors.onSurface),
+            // 24 again, as in 0.60 (Özlem 2026-10-26): 20 read as too small.
+            child: Icon(icon, size: 24, color: theme.colors.onSurface),
           ),
         ),
       ),

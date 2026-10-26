@@ -5,6 +5,11 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.62.2
+
+- Back and forward are 24-point arrows in a 40-point pill again, as before
+  0.61.0 (were 20 in 38).
+
 ## 0.62.1
 
 - The iOS privacy manifest declares everything the SDK sends: Other User
