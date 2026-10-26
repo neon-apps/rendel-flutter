@@ -2897,13 +2897,19 @@ class _ComposerState extends State<_Composer> {
                     maxLines: 5,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => widget.onSend(),
+                    // At the body size, as the web's box is: the size an
+                    // app's own fields are written in. The heading size the
+                    // thread's prose takes was 22 points in Protein Ocean,
+                    // beside its 14-point fields.
                     style: theme.text.prose.copyWith(
+                      fontSize: theme.type.body,
                       color: theme.colors.onComposer,
                     ),
                     decoration: InputDecoration(
                       hintText:
                           busy ? strings.working : (widget.hint ?? strings.composerHint),
                       hintStyle: theme.text.prose.copyWith(
+                        fontSize: theme.type.body,
                         color: theme.onComposerFaint,
                       ),
                       border: InputBorder.none,

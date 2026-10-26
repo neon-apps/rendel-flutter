@@ -5,6 +5,13 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.61.1
+
+- The message box is written at the theme's body size (`type.body`), as
+  the web's is, instead of the thread's heading size: the size an app's own
+  fields use. Its family is unchanged: the console's `fontFamily`, else
+  `RendelConfig.fontFamily`, else the host theme's.
+
 ## 0.61.0
 
 - The header's Voice replies, start over and close sit in one glass capsule,

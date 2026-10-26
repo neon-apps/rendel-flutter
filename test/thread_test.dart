@@ -1031,6 +1031,33 @@ void main() {
     );
   });
 
+  testWidgets("the message box is in the host's font, at the body size",
+      (tester) async {
+    // Protein Ocean: its fields are 14-point Futura PT; the box was the
+    // prose's heading size, 22 points there.
+    final c = controller();
+    addTearDown(c.dispose);
+    final theme = RendelTheme.paper();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(fontFamily: 'HostSans'),
+        home: RendelThemeScope(
+          theme: theme,
+          child: Scaffold(body: ThreadScreen(controller: c, onDictate: (_) async => null)),
+        ),
+      ),
+    );
+    await tester.tap(find.bySemanticsLabel('Type a message'));
+    await tester.pumpAndSettle();
+    final field = tester.widget<EditableText>(find.byType(EditableText));
+    expect(field.style.fontFamily, 'HostSans');
+    expect(field.style.fontSize, theme.type.body);
+    final decorator = tester.widget<InputDecorator>(
+      find.descendant(of: find.byType(TextField), matching: find.byType(InputDecorator)),
+    );
+    expect(decorator.decoration.hintStyle?.fontSize, theme.type.body);
+  });
+
   group('the attachment remove control', () {
     testWidgets('is a small circle on a full-size target', (tester) async {
       final c = ConversationController(
