@@ -278,6 +278,11 @@ void main() {
 
     testWidgets('multi sends the picked ids from the button, held to min and max',
         (tester) async {
+      // Tall enough that the button clears the composer under the header's
+      // 24pt top (Özlem 2026-10-26).
+      tester.view.physicalSize = const Size(800, 700);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
       final api = _LiveApi();
       final c = controller(api);
       addTearDown(c.dispose);

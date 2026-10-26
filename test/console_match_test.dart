@@ -50,6 +50,7 @@ void main() {
 
     final name = tester.widget<Text>(find.text('Asistan'));
     expect(name.style?.fontSize, theme.text.heading.fontSize);
-    expect(name.style?.fontWeight, theme.text.heading.fontWeight);
+    // A weight lighter than a heading, as the console's phone sets it (Özlem 2026-10-26).
+    expect(name.style?.fontWeight, FontWeight.w500);
   });
 }

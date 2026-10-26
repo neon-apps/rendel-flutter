@@ -422,9 +422,9 @@ void main() {
       await say(tester, 'Weather?');
       expect(voice.said, hasLength(1));
 
-      // Its own word and a switch; a speaker only when the word gives way (QA 2026-10-24).
-      expect(find.text('Voice replies'), findsOneWidget);
-      expect(find.byIcon(Icons.volume_up_rounded), findsNothing);
+      // A switch with a speaker on its knob, no word beside it; the word is its name (Özlem 2026-10-26).
+      expect(find.text('Voice replies'), findsNothing);
+      expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget);
       expect(
         tester.getSemantics(find.bySemanticsLabel('Voice replies')),
         isSemantics(
@@ -445,7 +445,7 @@ void main() {
       expect(voice.said, hasLength(1), reason: 'muted, nothing is read by itself');
     });
 
-    testWidgets('Voice replies fits the header on a narrow phone, and gives up its word only when the name needs the room',
+    testWidgets('Voice replies fits the header on a narrow phone, the switch always its speaker and no word',
         (tester) async {
       addTearDown(tester.view.reset);
       for (final (width, scale) in [(390.0, 1.0), (360.0, 1.0), (360.0, 1.3), (320.0, 1.0), (320.0, 1.6)]) {
@@ -458,12 +458,8 @@ void main() {
         expect(find.bySemanticsLabel('Voice replies'), findsOneWidget);
         final name = tester.renderObject<RenderParagraph>(find.text('Rendel'));
         expect(name.didExceedMaxLines, isFalse, reason: 'the name whole at $width x$scale');
-        // Word or speaker, never neither.
-        expect(
-          find.text('Voice replies').evaluate().length + find.byIcon(Icons.volume_up_rounded).evaluate().length,
-          1,
-          reason: '$width x$scale',
-        );
+        expect(find.text('Voice replies'), findsNothing, reason: '$width x$scale');
+        expect(find.byIcon(Icons.volume_up_rounded), findsOneWidget, reason: '$width x$scale');
         tester.platformDispatcher.clearTextScaleFactorTestValue();
         await tester.pumpWidget(const SizedBox());
       }
@@ -485,50 +481,39 @@ void main() {
       }
     });
 
-    testWidgets('the switch keeps one shape from the first answer to the second page, and the name is whole on the first (QA 2026-10-24)',
+    testWidgets('the name is whole on the first page, and the steps come with the second, each 44 to the finger (QA 2026-10-24)',
         (tester) async {
       addTearDown(tester.view.reset);
-      final shapes = <String>{};
       for (final width in [390.0, 360.0, 700.0]) {
         for (final title in ['Ava', 'Shieldwell', 'Shieldwell24']) {
           tester.view.physicalSize = Size(width * 3, 2400);
           tester.view.devicePixelRatio = 3;
           final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'), title: title);
-          bool compact() => find.text('Voice replies').evaluate().isEmpty;
           await type(tester, c, 'Weather?');
           expect(tester.takeException(), isNull);
           expect(tester.renderObject<RenderParagraph>(find.text(title)).didExceedMaxLines, isFalse,
               reason: '$title whole on the first page at $width');
-          final first = compact();
           await type(tester, c, 'And Friday?');
           expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
-          expect(compact(), first, reason: '$title at $width: the same switch on the second page');
-          // Each step is 44 to the finger.
+          expect(tester.takeException(), isNull);
           expect(tester.getSize(find.bySemanticsLabel('Previous page')), const Size(44, 44));
-          shapes.add('$first');
           await tester.pumpWidget(const SizedBox());
         }
       }
-      expect(shapes, {'true', 'false'}, reason: 'a short name keeps the word, a long one gives it up');
     });
 
-    testWidgets("a long name is set smaller beside the switch's word first; only past 65% does the word go, and the name takes the room it frees (Tuna 2026-10-24)",
+    testWidgets('Voice replies, start over and close share one capsule in that order, each 44 high (Özlem 2026-10-26)',
         (tester) async {
-      addTearDown(tester.view.reset);
-      // Wide enough for the test font's square letters to keep the word at all.
-      tester.view.physicalSize = const Size(700 * 3, 2400);
-      tester.view.devicePixelRatio = 3;
-      double scale(Finder name) => (tester.getBottomRight(name).dx - tester.getTopLeft(name).dx) / tester.getSize(name).width;
-      for (final (title, kept) in [('Shieldwell Assistant', true), ('Shieldwell Home Insurance Assistant', false)]) {
-        final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'), title: title);
-        await type(tester, c, 'Weather?');
-        await type(tester, c, 'And Friday?');
-        expect(tester.takeException(), isNull);
-        final name = find.text(title);
-        expect(find.text('Voice replies').evaluate().isNotEmpty, kept, reason: '$title: the word kept while the name fits at 65% beside it');
-        expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines, isFalse, reason: '$title: whole');
-        expect(scale(name), inExclusiveRange(0.65, 1), reason: '$title: smaller, not at the floor');
-        await tester.pumpWidget(const SizedBox());
+      final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
+      await type(tester, c, 'Weather?');
+      final voice = tester.getRect(find.bySemanticsLabel('Voice replies'));
+      final reset = tester.getRect(find.bySemanticsLabel('Start a new conversation'));
+      final close = tester.getRect(find.bySemanticsLabel('Close the assistant'));
+      expect(voice.right, lessThanOrEqualTo(reset.left));
+      expect(reset.right, lessThanOrEqualTo(close.left));
+      expect(close.left - voice.right, lessThan(44 + 3), reason: 'side by side, a hairline apart');
+      for (final r in [voice, reset, close]) {
+        expect(r.height, 44);
       }
     });
 

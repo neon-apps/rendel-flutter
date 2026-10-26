@@ -1447,24 +1447,20 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 }
 
 /// The header's Voice replies switch (QA 2026-10-24): whether answers are
-/// read aloud as they come. Its word and a switch on the glass the
-/// page steps sit on. 36 drawn, 44 to the finger. [compact], when the name
-/// needs the room (`_Header._needsCompact`), is the switch alone, 46 wide,
-/// with a speaker on its knob saying what it turns on; its word is still its
-/// name. Mirrors the web SDK's `.rd-autoread`.
+/// read aloud as they come. The first thing in the header's capsule
+/// ([_HeaderControls]): a switch with a speaker on its knob saying what it
+/// turns on, no word beside it; its word is still its name (Özlem
+/// 2026-10-26). 44 to the finger. Mirrors the web SDK's `.rd-autoread`.
 class _AutoRead extends StatelessWidget {
-  const _AutoRead({required this.voice, this.compact = false});
+  const _AutoRead({required this.voice});
 
   final RendelVoice voice;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final strings = RendelStringsScope.of(context);
     final still = MediaQuery.disableAnimationsOf(context);
-    final shape = BorderRadius.circular(theme.radius.control);
-    final knob = compact ? 16.0 : 12.0;
     return ValueListenableBuilder<bool>(
       valueListenable: voice.on,
       builder:
@@ -1474,81 +1470,40 @@ class _AutoRead extends StatelessWidget {
             child: RendelPressable(
               semanticLabel: strings.autoRead,
               onTap: () => voice.setOn(!on),
-              child: Center(
-                widthFactor: 1,
-                // No drop shadow, for the reason `_PageSteps` gives.
-                child: ClipRRect(
-                  borderRadius: shape,
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+              child: Container(
+                height: 44,
+                alignment: Alignment.center,
+                padding: const EdgeInsetsDirectional.fromSTEB(6, 0, 4, 0),
+                child: AnimatedContainer(
+                  key: const ValueKey('rendel-autoread-switch'),
+                  duration: still ? Duration.zero : const Duration(milliseconds: 200),
+                  width: 36,
+                  height: 22,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: on ? theme.colors.accent : theme.colors.onSurface.withValues(alpha: 0.16),
+                    border: Border.all(color: on ? theme.colors.accent : theme.hairline, width: 0.5),
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: AnimatedAlign(
+                    duration: still ? Duration.zero : const Duration(milliseconds: 220),
+                    curve: theme.motion.curve,
+                    alignment: on ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
                     child: Container(
-                      height: 36,
-                      constraints: const BoxConstraints(minWidth: 44),
-                      padding: EdgeInsetsDirectional.fromSTEB(compact ? 4 : 11, 0, 4, 0),
+                      width: 16,
+                      height: 16,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: theme.colors.surfaceHigh.withValues(alpha: 0.72),
-                        border: Border.all(color: theme.hairline),
-                        borderRadius: shape,
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (!compact) ...[
-                            Flexible(
-                              child: Text(
-                                strings.autoRead,
-                                maxLines: 1,
-                                softWrap: false,
-                                overflow: TextOverflow.ellipsis,
-                                // The header has no room to grow into: the word scales a little, not with the page.
-                                textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.2),
-                                style: theme.text.label.copyWith(
-                                  fontSize: 12.5,
-                                  fontWeight: FontWeight.w600,
-                                  height: 1,
-                                  color: on ? theme.colors.onSurface : theme.colors.onSurfaceSoft,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                          ],
-                          AnimatedContainer(
-                            key: const ValueKey('rendel-autoread-switch'),
-                            duration: still ? Duration.zero : const Duration(milliseconds: 200),
-                            width: compact ? 36 : 28,
-                            height: compact ? 22 : 18,
-                            padding: const EdgeInsets.all(3),
-                            decoration: BoxDecoration(
-                              color: on ? theme.colors.accent : theme.colors.onSurface.withValues(alpha: 0.16),
-                              border: Border.all(color: on ? theme.colors.accent : theme.hairline, width: 0.5),
-                              borderRadius: BorderRadius.circular(compact ? 11 : 9),
-                            ),
-                            child: AnimatedAlign(
-                              duration: still ? Duration.zero : const Duration(milliseconds: 220),
-                              curve: theme.motion.curve,
-                              alignment: on ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
-                              child: Container(
-                                width: knob,
-                                height: knob,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: on ? theme.colors.onAccent : theme.colors.surfaceRaised,
-                                  shape: BoxShape.circle,
-                                  boxShadow: const [
-                                    BoxShadow(color: Color(0x38000000), blurRadius: 3, offset: Offset(0, 1)),
-                                  ],
-                                ),
-                                child: compact
-                                    ? Icon(
-                                        Icons.volume_up_rounded,
-                                        size: 11,
-                                        color: on ? theme.colors.accent : theme.colors.onSurfaceSoft,
-                                      )
-                                    : null,
-                              ),
-                            ),
-                          ),
+                        color: on ? theme.colors.onAccent : theme.colors.surfaceRaised,
+                        shape: BoxShape.circle,
+                        boxShadow: const [
+                          BoxShadow(color: Color(0x38000000), blurRadius: 3, offset: Offset(0, 1)),
                         ],
+                      ),
+                      child: Icon(
+                        Icons.volume_up_rounded,
+                        size: 11,
+                        color: on ? theme.colors.accent : theme.colors.onSurfaceSoft,
                       ),
                     ),
                   ),
@@ -1767,39 +1722,6 @@ class _Header extends StatelessWidget {
   final String? logoUrl;
   final Map<String, String> logoHeaders;
 
-  /// Whether the name would be cut short beside Auto-read's word even at its
-  /// smallest ([_HeaderName.minScale]): then the switch drops its word and
-  /// shows a speaker on its knob instead, and the name is fitted again in the
-  /// room that frees. Short of that the name is set smaller and the word
-  /// stays (Tuna, 2026-10-24). Decided
-  /// from the header's own width, not the screen's (QA 2026-10-24), as the
-  /// web SDK's `data-compact`. A logo is reckoned at 32 wide, a mark's usual
-  /// width at its 20 high. Back and forward and start over are reckoned
-  /// before they are drawn, so the first answer, a turn running and the
-  /// second page share one header.
-  bool _needsCompact(BuildContext context, RendelTheme theme, double width, bool hasLogo) {
-    final direction = Directionality.of(context);
-    // In the font they are drawn in: `Text` merges the app's own text style.
-    final ambient = DefaultTextStyle.of(context).style;
-    double measure(String text, TextStyle style, TextScaler scaler) => (TextPainter(
-          text: TextSpan(text: text, style: ambient.merge(style)),
-          textDirection: direction,
-          maxLines: 1,
-          textScaler: scaler,
-        )..layout())
-            .width;
-    final scaler = MediaQuery.textScalerOf(context);
-    final word = measure(
-      RendelStringsScope.of(context).autoRead,
-      theme.text.label.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600, height: 1),
-      scaler.clamp(maxScaleFactor: 1.2),
-    );
-    // The switch with its word: its insets, the word, the gap, the track, the hairline.
-    final autoRead = 11 + word + 6 + 28 + 4 + 2;
-    final fixed = _PageSteps.width + theme.space.sm + (hasLogo ? 32 + theme.space.sm : 0) + 44 + 44;
-    return measure(title, theme.text.heading, scaler) * _HeaderName.minScale > width - fixed - autoRead;
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
@@ -1830,87 +1752,85 @@ class _Header extends StatelessWidget {
         maxLines: 1,
       ),
     );
-    final row = LayoutBuilder(
-      builder: (context, box) {
-        final hasLogo = logoUrl != null && !fresh;
-        final compact = voice != null && !fresh && _needsCompact(context, theme, box.maxWidth, hasLogo);
-        return Row(
-        children: [
-          // Back and forward at the leading edge, once there is a second
-          // page. No rule under the header: the page fades out beneath it.
-          if (paged) ...[
-            _PageSteps(onBack: onBack, onForward: onForward),
-            SizedBox(width: theme.space.sm),
-          ],
-          // The mark before the name, and never instead of it.
-          //
-          // A logo is a picture of a word at best and a picture of a shape
-          // usually, so a header that replaced the name with one would be a
-          // header a screen reader reads as nothing. `errorBuilder` collapses
-          // it to zero width: a 404 from the API — no logo published, an
-          // object that went missing — has to leave the header looking the way
-          // it did before anyone uploaded anything, not leave a broken frame
-          // in it.
-          if (logoUrl != null && !fresh) ...[
-            Image.network(
-              logoUrl!,
-              headers: logoHeaders,
-              height: 20,
-              fit: BoxFit.contain,
-              excludeFromSemantics: true,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              loadingBuilder: (context, child, progress) => progress == null
-                  ? child
-                  : const SizedBox(width: 20, height: 20),
-            ),
-            SizedBox(width: theme.space.sm),
-          ],
-          // The name in the heading style, as the console's phone and the web
-          // SDK's header set it, smaller where it would be cut short.
-          Expanded(
-            child: fresh ? const SizedBox.shrink() : _HeaderName(title: title, style: theme.text.heading),
+    final row = Row(
+      children: [
+        // Back and forward at the leading edge, once there is a second
+        // page. No rule under the header: the page fades out beneath it.
+        if (paged) ...[
+          _PageSteps(onBack: onBack, onForward: onForward),
+          SizedBox(width: theme.space.sm),
+        ],
+        // The mark before the name, and never instead of it.
+        //
+        // A logo is a picture of a word at best and a picture of a shape
+        // usually, so a header that replaced the name with one would be a
+        // header a screen reader reads as nothing. `errorBuilder` collapses
+        // it to zero width: a 404 from the API — no logo published, an
+        // object that went missing — has to leave the header looking the way
+        // it did before anyone uploaded anything, not leave a broken frame
+        // in it.
+        if (logoUrl != null && !fresh) ...[
+          Image.network(
+            logoUrl!,
+            headers: logoHeaders,
+            height: 20,
+            fit: BoxFit.contain,
+            excludeFromSemantics: true,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : const SizedBox(width: 20, height: 20),
           ),
-          // Nothing to read yet: Auto-read comes with the first answer. Never
-          // wider than what the steps and the two buttons leave: at a large
-          // text size its word gives way rather than the row overflowing.
-          if (voice case final voice? when !fresh)
-            ConstrainedBox(
-              constraints: BoxConstraints(
-                maxWidth: math.max(46, box.maxWidth - (paged ? _PageSteps.width + theme.space.sm : 0) - 2 * 44),
+          SizedBox(width: theme.space.sm),
+        ],
+        // The name in the heading style, as the console's phone and the web
+        // SDK's header set it, a weight lighter (Özlem 2026-10-26), and
+        // smaller where it would be cut short.
+        Expanded(
+          child: fresh
+              ? const SizedBox.shrink()
+              : _HeaderName(title: title, style: theme.text.heading.copyWith(fontWeight: FontWeight.w500)),
+        ),
+        SizedBox(width: theme.space.xs),
+        // Voice replies, start over and close in one capsule (Özlem
+        // 2026-10-26). Nothing to read yet: Voice replies comes with the
+        // first answer.
+        _HeaderControls(
+          children: [
+            if (voice case final voice? when !fresh) _AutoRead(voice: voice),
+            if (onReset != null)
+              RendelPressable(
+                semanticLabel: RendelStringsScope.of(context).newConversation,
+                onTap: onReset!,
+                child: SizedBox(
+                  height: 44,
+                  width: 44,
+                  // Counter-clockwise: start over, which is what it does.
+                  child: _HeaderGlyph.reset(color: theme.colors.onSurface),
+                ),
               ),
-              child: _AutoRead(voice: voice, compact: compact),
-            ),
-          if (onReset != null)
             RendelPressable(
-              semanticLabel: RendelStringsScope.of(context).newConversation,
-              onTap: onReset!,
+              semanticLabel: RendelStringsScope.of(context).closeCopilot,
+              onTap: () => Navigator.of(context).maybePop(),
               child: SizedBox(
                 height: 44,
                 width: 44,
-                // Counter-clockwise: start over, which is what it does.
-                child: _HeaderGlyph.reset(color: theme.colors.onSurfaceSoft),
+                child: _HeaderGlyph.close(color: theme.colors.onSurface),
               ),
             ),
-          RendelPressable(
-            semanticLabel: RendelStringsScope.of(context).closeCopilot,
-            onTap: () => Navigator.of(context).maybePop(),
-            child: SizedBox(
-              height: 44,
-              width: 44,
-              child: _HeaderGlyph.close(color: theme.colors.onSurfaceFaint),
-            ),
-          ),
-        ],
-      );
-      },
+          ],
+        ),
+      ],
     );
     return Container(
       // Directional: the leading inset is the 16pt edge every block in the
       // thread shares, and physically pinned it landed on the wrong side in
       // RTL, putting the title 8pt out of line with the body underneath it.
+      // 24 above, not 16: the controls stood too close to the sheet's top
+      // edge (Özlem 2026-10-26).
       padding: EdgeInsetsDirectional.fromSTEB(
         theme.space.plate,
-        theme.space.lg,
+        theme.space.xl,
         theme.space.sm,
         theme.space.md,
       ),
@@ -1923,6 +1843,63 @@ class _Header extends StatelessWidget {
               children: [row, SizedBox(height: theme.space.xs), badge],
             )
           : row,
+    );
+  }
+}
+
+/// The header's trailing controls in one glass capsule, as the page steps
+/// sit in theirs, with a hairline between each (Özlem 2026-10-26). Each is
+/// 44 to the finger; the capsule is drawn 38 high behind them.
+class _HeaderControls extends StatelessWidget {
+  const _HeaderControls({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final shape = BorderRadius.circular(theme.radius.control);
+    final divider = Container(width: 1, height: 16, color: theme.hairline);
+    return Stack(
+      children: [
+        Positioned.fill(top: 3, bottom: 3, child: _StepsGlass(shape: shape)),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              if (i > 0) divider,
+              children[i],
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// The frosted pill the page steps and the header's capsule sit on. No drop
+/// shadow, for the reason `_Glass` gives: under a translucent fill Flutter
+/// paints it through the glass as a smudge.
+class _StepsGlass extends StatelessWidget {
+  const _StepsGlass({required this.shape});
+
+  final BorderRadius shape;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return ClipRRect(
+      borderRadius: shape,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colors.surfaceHigh.withValues(alpha: 0.72),
+            border: Border.all(color: theme.hairline),
+            borderRadius: shape,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1965,15 +1942,12 @@ class _HeaderName extends StatelessWidget {
 
 /// Back and forward through the pages a conversation has opened: a glass pill
 /// holding two round buttons, at the header's leading edge. Each is 44 to the
-/// finger (QA 2026-10-24); the pill is drawn 40 high behind them.
+/// finger (QA 2026-10-24); the pill is drawn 38 high behind them.
 class _PageSteps extends StatelessWidget {
   const _PageSteps({required this.onBack, required this.onForward});
 
   final VoidCallback? onBack;
   final VoidCallback? onForward;
-
-  /// Two 44 steps side by side.
-  static const double width = 2 * 44;
 
   @override
   Widget build(BuildContext context) {
@@ -1986,27 +1960,12 @@ class _PageSteps extends StatelessWidget {
       RendelArrowStyle.arrow => (Icons.arrow_back_rounded, Icons.arrow_forward_rounded),
       RendelArrowStyle.ios => (Icons.arrow_back_ios_new_rounded, Icons.arrow_forward_ios_rounded),
     };
-    final shape = BorderRadius.circular(theme.radius.control);
-    // No drop shadow, for the reason `_Glass` gives: under a translucent
-    // fill Flutter paints it through the glass as a smudge.
     return Stack(
       children: [
         Positioned.fill(
-          top: 2,
-          bottom: 2,
-          child: ClipRRect(
-            borderRadius: shape,
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colors.surfaceHigh.withValues(alpha: 0.72),
-                  border: Border.all(color: theme.hairline),
-                  borderRadius: shape,
-                ),
-              ),
-            ),
-          ),
+          top: 3,
+          bottom: 3,
+          child: _StepsGlass(shape: BorderRadius.circular(theme.radius.control)),
         ),
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -2054,7 +2013,8 @@ class _PageStep extends StatelessWidget {
           child: SizedBox(
             width: 44,
             height: 44,
-            child: Icon(icon, size: 24, color: theme.colors.onSurface),
+            // 20, not 24: smaller in their pill (Özlem 2026-10-26).
+            child: Icon(icon, size: 20, color: theme.colors.onSurface),
           ),
         ),
       ),

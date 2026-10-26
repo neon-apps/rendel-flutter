@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.61.0
+
+- The header's Voice replies, start over and close sit in one glass capsule,
+  a hairline between each. Voice replies is always the switch with a speaker
+  on its knob; its word is its semantic label, no longer drawn beside it, and
+  the header no longer measures whether it fits.
+- Back and forward are 20 points in a 38-point pill (were 24 in 40); reset
+  and close are drawn in `onSurface` instead of the soft and faint greys.
+- The assistant's name is the heading at weight 500, and the header has 24
+  points above it (was 16).
+
 ## 0.60.3
 
 - Nothing is drawn around the microphone: no ring of the composer's ground
