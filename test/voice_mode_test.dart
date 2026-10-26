@@ -84,7 +84,8 @@ void main() {
       ),
     );
     await tester.pump();
-    await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+    // Held, as a finger holds it while it speaks.
+    await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
     await tester.pump();
     return (done, say);
   }
@@ -100,7 +101,9 @@ void main() {
         .widgetList<DecoratedBox>(find.byType(DecoratedBox))
         .map((box) => (box.decoration as BoxDecoration?)?.gradient)
         .whereType<RadialGradient>()
-        .singleWhere((gradient) => gradient.stops?.length == 4);
+        // The sphere's own, not the faint shade around its edge.
+        .singleWhere((gradient) =>
+            gradient.stops?.length == 4 && gradient.colors.first.toARGB32() >> 24 == 0xFF);
     final ink = corvo.colors.onSurface;
     expect(dome.colors.first, voiceGlow(corvo.colors.surface, ink));
     expect(contrastRatio(ink, dome.colors.first), greaterThanOrEqualTo(4.5));

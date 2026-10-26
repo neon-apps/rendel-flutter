@@ -321,7 +321,8 @@ void main() {
 
     /// A question asked out loud: the microphone, and its words heard whole.
     Future<void> say(WidgetTester tester, String words) async {
-      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      // Held, as a finger holds it while it speaks.
+      await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump();
       heard.complete(words);
       await tester.pump();

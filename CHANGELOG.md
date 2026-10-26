@@ -5,6 +5,21 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.60.0
+
+- The microphone is held to speak, as on Monogram. Pressed, the "+" and the
+  keyboard step aside, the microphone grows and greys, the page dims and a
+  frosted sphere rises from under the microphone, blurring what it covers;
+  the words are written over it as they are heard. Let go, the question is
+  sent: the pill says "Thinking…" while the sphere falls away. A tap sends
+  nothing and says to hold the microphone (`RendelStrings.holdToSpeak`, new,
+  in all six languages). A screen reader, which cannot hold, still opens
+  voice mode with a tap and sends with the pill.
+- The built-in recogniser no longer ends after three seconds of silence: a
+  pause while the microphone is held does not send half a question.
+  `onStopDictating` is what letting go calls; a host's recogniser without it
+  ends by itself, as before.
+
 ## 0.59.9
 
 - The voice is clean. It came through with loud static on a real iPhone: a

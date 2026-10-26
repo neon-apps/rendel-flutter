@@ -434,7 +434,8 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      // Held, as a finger holds it while it speaks.
+      await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump();
     }
 
@@ -472,7 +473,8 @@ void main() {
       );
       await tester.pump();
       // Voice mode opens over the page, waiting for the first word.
-      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      // Held, as a finger holds it while it speaks.
+      await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump();
       expect(find.text('Listening…'), findsOneWidget);
 
@@ -510,7 +512,8 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      // Held, as a finger holds it while it speaks.
+      await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump();
       return done;
     }
@@ -675,6 +678,139 @@ void main() {
       debugDefaultTargetPlatformOverride = null;
     });
 
+    /// Held to speak, as Monogram's is (Tuna 2026-10-26): a tap that opened
+    /// it is gone.
+    testWidgets('listens while it is held and sends when it is let go',
+        (tester) async {
+      final c = ConversationController(
+        api: RendelApiClient(
+          appKey: 'nc_pk_test_x',
+          deviceId: 'd',
+          config: const RendelConfig(),
+          httpClient: MockClient((_) => Completer<http.Response>().future),
+        ),
+        actions: const {},
+        sdkVersion: 'flutter/test',
+      );
+      addTearDown(c.dispose);
+      final done = Completer<String?>();
+      final stops = <String>[];
+      late void Function(String) say;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                onDictate: (onPartial) {
+                  say = onPartial;
+                  return done.future;
+                },
+                onStopDictating: () => stops.add('stopped'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final finger = await tester
+          .startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
+      await tester.pump(const Duration(milliseconds: 500));
+      say('merhaba');
+      await tester.pump();
+      expect(stops, isEmpty);
+
+      await finger.up();
+      await tester.pump();
+      // Let go: the recogniser is stopped, and the pill thinks while the last
+      // words are made out.
+      expect(stops, ['stopped']);
+      expect(find.bySemanticsLabel('Thinking…'), findsOneWidget);
+      expect(c.messages, isEmpty);
+
+      done.complete('merhaba');
+      await tester.pump();
+      expect(c.messages.where((m) => m.role == 'user'), hasLength(1));
+      expect(find.text('merhaba'), findsOneWidget);
+
+      // Past the copilot's own time limit, which ends the turn it is holding.
+      await tester.pump(const Duration(minutes: 2));
+      await tester.pump(const Duration(seconds: 1));
+    });
+
+    testWidgets('a tap sends nothing, and says to hold it', (tester) async {
+      final c = controller();
+      addTearDown(c.dispose);
+      final done = Completer<String?>();
+      final stops = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                strings: RendelStrings.forLocale('tr'),
+                onDictate: (_) => done.future,
+                onStopDictating: () => stops.add('stopped'),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.bySemanticsLabel('Yazmak yerine konuşun'));
+      await tester.pump();
+      expect(stops, ['stopped']);
+      expect(find.text('Konuşurken mikrofona basılı tutun'), findsOneWidget);
+
+      // What the recogniser made of it afterwards is not sent.
+      done.complete('merh');
+      await tester.pump(const Duration(seconds: 1));
+      expect(c.messages, isEmpty);
+    });
+
+    testWidgets('let go before the microphone opened, it closes it unheard',
+        (tester) async {
+      final c = controller();
+      addTearDown(c.dispose);
+      final started = ValueNotifier<bool>(false);
+      final done = Completer<String?>();
+      final stops = <String>[];
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                onDictate: (_) => done.future,
+                onStopDictating: () => stops.add('stopped'),
+                dictationStarted: started,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      // Held through a permission prompt, and let go before it was answered.
+      final finger = await tester
+          .startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
+      await tester.pump(const Duration(seconds: 1));
+      await finger.up();
+      await tester.pump();
+      expect(stops, ['stopped']);
+
+      // Answered afterwards: the microphone that opens is shut again at once.
+      started.value = true;
+      await tester.pump();
+      expect(stops, ['stopped', 'stopped']);
+      done.complete(null);
+      await tester.pump(const Duration(seconds: 1));
+      expect(c.messages, isEmpty);
+    });
+
     testWidgets('waits for the recogniser before it says it is listening',
         (tester) async {
       final c = controller();
@@ -698,7 +834,8 @@ void main() {
         ),
       );
       await tester.pump();
-      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      // Held, as a finger holds it while it speaks.
+      await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump(const Duration(milliseconds: 300));
       // The permission prompt is up: nothing is listening yet.
       expect(find.text('Listening'), findsNothing);

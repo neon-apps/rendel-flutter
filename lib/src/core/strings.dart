@@ -108,6 +108,7 @@ class RendelStrings {
     this.removeFile = 'Remove {name}',
     this.speak = 'Speak instead of typing',
     this.stopListening = 'Stop listening',
+    this.holdToSpeak = 'Hold the microphone while you speak',
     this.typeMessage = 'Type a message',
     this.photos = 'Photos',
     this.camera = 'Camera',
@@ -395,6 +396,10 @@ class RendelStrings {
   final String removeFile;
   final String speak;
   final String stopListening;
+
+  /// Said when the microphone is tapped rather than held: it listens only
+  /// while it is held, and a tap sends nothing.
+  final String holdToSpeak;
 
   /// The composer at rest: the keyboard that opens the box, and the three
   /// places a file comes from, in the "+" menu and in the box.
@@ -747,6 +752,7 @@ class RendelStrings {
     String? removeFile,
     String? speak,
     String? stopListening,
+    String? holdToSpeak,
     String? typeMessage,
     String? photos,
     String? camera,
@@ -918,6 +924,7 @@ class RendelStrings {
       removeFile: removeFile ?? this.removeFile,
       speak: speak ?? this.speak,
       stopListening: stopListening ?? this.stopListening,
+      holdToSpeak: holdToSpeak ?? this.holdToSpeak,
       typeMessage: typeMessage ?? this.typeMessage,
       photos: photos ?? this.photos,
       camera: camera ?? this.camera,
@@ -1112,6 +1119,7 @@ const Map<String, RendelStrings> _byLocale = {
     removeFile: '{name} dosyasını kaldır',
     speak: 'Yazmak yerine konuşun',
     stopListening: 'Dinlemeyi durdur',
+    holdToSpeak: 'Konuşurken mikrofona basılı tutun',
     typeMessage: 'Mesaj yaz',
     photos: 'Fotoğraflar',
     camera: 'Kamera',
@@ -1289,6 +1297,7 @@ const Map<String, RendelStrings> _byLocale = {
     removeFile: '{name} entfernen',
     speak: 'Sprechen statt tippen',
     stopListening: 'Zuhören beenden',
+    holdToSpeak: 'Halten Sie das Mikrofon gedrückt, während Sie sprechen',
     typeMessage: 'Nachricht schreiben',
     photos: 'Fotos',
     camera: 'Kamera',
@@ -1465,6 +1474,7 @@ const Map<String, RendelStrings> _byLocale = {
     removeFile: 'Retirer {name}',
     speak: 'Parler au lieu d’écrire',
     stopListening: 'Arrêter l’écoute',
+    holdToSpeak: 'Maintenez le micro appuyé pendant que vous parlez',
     typeMessage: 'Écrire un message',
     photos: 'Photos',
     camera: 'Appareil photo',
@@ -1640,6 +1650,7 @@ const Map<String, RendelStrings> _byLocale = {
     removeFile: 'Quitar {name}',
     speak: 'Hablar en lugar de escribir',
     stopListening: 'Dejar de escuchar',
+    holdToSpeak: 'Mantén pulsado el micrófono mientras hablas',
     typeMessage: 'Escribir un mensaje',
     photos: 'Fotos',
     camera: 'Cámara',
@@ -1814,6 +1825,7 @@ const Map<String, RendelStrings> _byLocale = {
     removeFile: 'إزالة {name}',
     speak: 'تحدّث بدلًا من الكتابة',
     stopListening: 'إيقاف الاستماع',
+    holdToSpeak: 'اضغط مطوّلًا على الميكروفون أثناء التحدث',
     typeMessage: 'اكتب رسالة',
     photos: 'الصور',
     camera: 'الكاميرا',

@@ -156,7 +156,9 @@ class RendelSpeech {
           localeId: await _availableLocale(locale),
           partialResults: true,
           listenFor: const Duration(seconds: 60),
-          pauseFor: const Duration(seconds: 3),
+          // The microphone is held while it listens, and letting go is what
+          // ends it: a pause to think must not send half a question.
+          pauseFor: const Duration(seconds: 30),
         ),
       );
     } catch (_) {

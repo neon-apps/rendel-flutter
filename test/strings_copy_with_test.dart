@@ -84,6 +84,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'removeFile': (s) => s.removeFile,
   'speak': (s) => s.speak,
   'stopListening': (s) => s.stopListening,
+  'holdToSpeak': (s) => s.holdToSpeak,
   'typeMessage': (s) => s.typeMessage,
   'photos': (s) => s.photos,
   'camera': (s) => s.camera,

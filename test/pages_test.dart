@@ -201,7 +201,8 @@ void main() {
       await api.answer(tester, [_text('a', 'The Aero Glide 2.')]);
       await settle(tester);
 
-      await tester.tap(find.bySemanticsLabel('Speak instead of typing'));
+      // Held, as a finger holds it while it speaks.
+      await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump();
       await tester.runAsync(() async {
         heard.complete('And in size 43?');
