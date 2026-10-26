@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.62.1
+
+- The iOS privacy manifest declares everything the SDK sends: Other User
+  Content and Customer Support (the conversation and form values), Photos
+  or Videos (an attached photo), User ID (`identify`), Device ID (the
+  install id and the push token), Product Interaction and Purchase
+  History. All linked to the user, none used for tracking. No audio: speech
+  is recognised by the phone's own recogniser. Check your App Store privacy
+  answers.
+
 ## 0.62.0
 
 - `Rendel.navigatorObserver`: add it to `MaterialApp.navigatorObservers`,
