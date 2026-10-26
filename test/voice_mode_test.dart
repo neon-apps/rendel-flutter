@@ -101,12 +101,13 @@ void main() {
         .widgetList<DecoratedBox>(find.byType(DecoratedBox))
         .map((box) => (box.decoration as BoxDecoration?)?.gradient)
         .whereType<RadialGradient>()
-        // The sphere's own, not the faint shade around its edge.
-        .singleWhere((gradient) =>
-            gradient.stops?.length == 4 && gradient.colors.first.toARGB32() >> 24 == 0xFF);
+        // The sphere's own, not the veil's light.
+        .singleWhere((gradient) => gradient.stops?.length == 5);
     final ink = corvo.colors.onSurface;
-    expect(dome.colors.first, voiceGlow(corvo.colors.surface, ink));
-    expect(contrastRatio(ink, dome.colors.first), greaterThanOrEqualTo(4.5));
+    // Translucent since 0.60.1, as Monogram's is: the glow, in part.
+    final glow = dome.colors.first.withValues(alpha: 1);
+    expect(glow, voiceGlow(corvo.colors.surface, ink));
+    expect(contrastRatio(ink, glow), greaterThanOrEqualTo(4.5));
   });
 
   testWidgets('a spoken question is written once, in the place it was heard in',

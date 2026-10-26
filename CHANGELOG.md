@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.60.1
+
+- Voice mode looks as Monogram's does, measured from its recording frame by
+  frame. Pressed, the microphone's ring goes as the pill swells a fifth into
+  its room, in its own colour, with no fade. The page greys a fifth darker
+  (in 0.60.0 the veil was not drawn at all). The sphere is 1.7 times the
+  screen's width, translucent, a little brighter toward its edge and soft
+  over its last twenty points; its crown is at 55% of the screen a third of
+  a second after the press and 47% by the end of the first second. Let go
+  with words, it swells once while the pill thinks and fades where it is as
+  the question is sent; with none, it falls away.
+
 ## 0.60.0
 
 - The microphone is held to speak, as on Monogram. Pressed, the "+" and the

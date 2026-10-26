@@ -314,6 +314,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     _head.dispose();
     _voiceSent.dispose();
     _voiceLeaving.dispose();
+    _voiceFalls.dispose();
     _held?.cancel();
     super.dispose();
   }
@@ -405,9 +406,12 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   bool _holding = false;
   Timer? _held;
 
-  /// Set the moment voice mode is let go: its glow falls and its pill
-  /// thinks while the last words are made out.
+  /// Set the moment the microphone is let go with words: the sphere swells
+  /// once and the pill thinks while the last words are made out.
   final _voiceLeaving = ValueNotifier<bool>(false);
+
+  /// Set the moment nothing will be sent: the sphere falls away.
+  final _voiceFalls = ValueNotifier<bool>(false);
 
   /// Set the moment a spoken question is sent: voice mode's words and pill go
   /// at once, in the frame the question is written in the words' place, while
@@ -441,6 +445,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
     _voiceSent.value = false;
     _voiceLeaving.value = false;
+    _voiceFalls.value = false;
     setState(() {
       _dictating = true;
       _attachError = null;
@@ -506,7 +511,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       });
     } finally {
       started?.removeListener(opened);
-      _voiceLeaving.value = true;
+      if (!_voiceSent.value) _voiceFalls.value = true;
       if (mounted) {
         setState(() {
           _dictating = false;
@@ -541,7 +546,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // mode stays up until it does.
     final stop = widget.onStopDictating;
     if (stop == null) return;
-    _voiceLeaving.value = true;
+    if (_heard.trim().isNotEmpty) _voiceLeaving.value = true;
     stop();
   }
 
@@ -553,7 +558,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// A tap away from voice mode while it listens: nothing is sent.
   void _cancelVoice() {
     _voiceCancelled = true;
-    _voiceLeaving.value = true;
+    _voiceFalls.value = true;
     widget.onStopDictating?.call();
     setState(() => _voice = false);
   }
@@ -690,10 +695,10 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   // once a spoken one is sent its wash fades under both.
                   Positioned.fill(
                     child: AnimatedSwitcher(
-                      duration: MediaQuery.disableAnimationsOf(context)
-                          ? Duration.zero
-                          : theme.motion.settle,
-                      // Long enough for its glow to be seen falling away.
+                      // In at once: the microphone under the finger must not
+                      // fade, and the veil and the sphere bring themselves in.
+                      duration: Duration.zero,
+                      // Long enough for the sphere to be seen falling away.
                       reverseDuration: MediaQuery.disableAnimationsOf(context)
                           ? Duration.zero
                           : _VoiceModeState.fall,
@@ -712,6 +717,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                               dock: _dock,
                               sent: _voiceSent,
                               leaving: _voiceLeaving,
+                              falls: _voiceFalls,
                               listening: _listening,
                               level: widget.dictationLevel,
                               voiceIcon: widget.voiceIcon,
@@ -739,7 +745,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                       excluding: _voice,
                       child: AnimatedOpacity(
                         opacity: _voice ? 0 : 1,
-                        duration: _dockAtOnce ? Duration.zero : theme.motion.swap,
+                        // Gone at once under the finger, so the microphone is
+                        // never seen twice; back with a fade.
+                        duration: _voice || _dockAtOnce ? Duration.zero : theme.motion.swap,
                         // There for a screen reader from the frame voice mode
                         // closes; whether it is at all is the exclusion's
                         // business above.
@@ -3117,8 +3125,9 @@ class _Round extends StatelessWidget {
 ///
 /// With [onDown] it is held to speak: the press starts voice mode and letting
 /// go ([onUp]) ends it, and [onTap] is left to a screen reader, which cannot
-/// hold. [held] draws it as it is under the finger: a little larger, its fill
-/// eased toward its ink.
+/// hold. [held] draws it as it is under the finger, as Monogram's is: in
+/// 150ms the ring goes and the pill swells a fifth into the room it took,
+/// overshooting a little, in its own colour.
 class _MicPill extends StatelessWidget {
   const _MicPill({
     super.key,
@@ -3139,19 +3148,9 @@ class _MicPill extends StatelessWidget {
   final bool held;
   final double width;
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = RendelThemeScope.of(context);
-    final still = MediaQuery.disableAnimationsOf(context);
-    final pill = AnimatedContainer(
-      duration: still ? Duration.zero : theme.motion.settle,
-      curve: theme.motion.curve,
-      width: width,
-      height: 52,
-      decoration: BoxDecoration(
-        color: held
-            ? Color.lerp(theme.colors.accent, theme.colors.onAccent, 0.2)
-            : theme.colors.accent,
+  /// [ring] is how much of the composer's ring is drawn, 0 to 1.
+  BoxDecoration _decoration(RendelTheme theme, double ring) => BoxDecoration(
+        color: theme.colors.accent,
         borderRadius: BorderRadius.circular(26),
         // Painted in order: the drop shadow, the edge, then the ring.
         boxShadow: [
@@ -3161,26 +3160,54 @@ class _MicPill extends StatelessWidget {
             blurRadius: 28,
             spreadRadius: -14,
           ),
-          BoxShadow(color: theme.composerEdge, spreadRadius: 5),
-          // The composer's glass, as the box is drawn.
-          BoxShadow(
-            color: theme.colors.composer.withValues(alpha: _Glass.tintAlpha),
-            spreadRadius: 4,
-          ),
+          if (ring > 0) ...[
+            BoxShadow(
+              color: theme.composerEdge.withValues(alpha: theme.composerEdge.a * ring),
+              spreadRadius: 5 * ring,
+            ),
+            // The composer's glass, as the box is drawn.
+            BoxShadow(
+              color: theme.colors.composer.withValues(alpha: _Glass.tintAlpha * ring),
+              spreadRadius: 4 * ring,
+            ),
+          ],
         ],
-      ),
-      child: Icon(icon, size: 24, color: theme.colors.onAccent),
-    );
+      );
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final still = MediaQuery.disableAnimationsOf(context);
+    final glyph = Icon(icon, size: 24, color: theme.colors.onAccent);
     if (held) {
-      // Grows as the finger lands, and stays grown while it is held.
       return TweenAnimationBuilder<double>(
-        tween: Tween(begin: still ? 1.08 : 1, end: 1.08),
-        duration: theme.motion.settle,
-        curve: Curves.easeOutBack,
-        builder: (context, scale, child) => Transform.scale(scale: scale, child: child),
-        child: RendelPressable(semanticLabel: label, onTap: onTap, pressedScale: 1, child: pill),
+        tween: Tween(begin: still ? 1 : 0, end: 1),
+        duration: const Duration(milliseconds: 150),
+        builder: (context, t, child) => Transform.scale(
+          scale: 1 + 0.2 * Curves.easeOutBack.transform(t),
+          child: Container(
+            width: width,
+            height: 52,
+            decoration: _decoration(theme, 1 - t),
+            child: child,
+          ),
+        ),
+        child: RendelPressable(
+          semanticLabel: label,
+          onTap: onTap,
+          pressedScale: 1,
+          child: Center(child: glyph),
+        ),
       );
     }
+    final pill = AnimatedContainer(
+      duration: still ? Duration.zero : theme.motion.settle,
+      curve: theme.motion.curve,
+      width: width,
+      height: 52,
+      decoration: _decoration(theme, 1),
+      child: glyph,
+    );
     if (onDown == null && onUp == null) {
       return RendelPressable(semanticLabel: label, onTap: onTap, child: pill);
     }
@@ -3272,13 +3299,15 @@ class _ArriveState extends State<_Arrive> with SingleTickerProviderStateMixin {
 }
 
 /// Voice mode, over everything under the header, as Monogram draws it
-/// (Tuna 2026-10-26).
+/// (Tuna 2026-10-26, measured from her recording frame by frame).
 ///
-/// The page dims under a grey veil, and a frosted sphere a little wider than
-/// the screen rises from under the microphone; what it covers is blurred
+/// The page greys under a veil, and a frosted sphere twice the screen's
+/// width rises from under the microphone — fast for a third of a second,
+/// then creeping on while it is held — its edge soft, what it covers blurred
 /// past reading. It swells with the speaker's voice, and the words are
-/// written over it as they arrive. Let go, it falls away the way it came
-/// while the pill thinks. The web SDK draws the same.
+/// written over it as they arrive. Let go with words, it swells once and the
+/// pill thinks; let go with none, or let go of, it falls the way it came.
+/// The web SDK draws the same.
 class _VoiceMode extends StatefulWidget {
   const _VoiceMode({
     super.key,
@@ -3286,6 +3315,7 @@ class _VoiceMode extends StatefulWidget {
     required this.dock,
     required this.sent,
     required this.leaving,
+    required this.falls,
     required this.listening,
     required this.level,
     required this.voiceIcon,
@@ -3302,9 +3332,12 @@ class _VoiceMode extends StatefulWidget {
   /// only the veil and the sphere are left to fade.
   final ValueListenable<bool> sent;
 
-  /// True once the microphone is let go: the sphere falls, and the pill
-  /// thinks while the last words are made out.
+  /// True once the microphone is let go with words: the sphere swells once,
+  /// and the pill thinks while the last words are made out.
   final ValueListenable<bool> leaving;
+
+  /// True once nothing will be sent: the sphere falls away.
+  final ValueListenable<bool> falls;
 
   /// The recogniser is listening; until it is, nothing is said.
   final bool listening;
@@ -3326,13 +3359,36 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
   // The sphere's rise, run backwards to fall.
   late final AnimationController _rise = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 620),
+    duration: const Duration(milliseconds: 360),
     reverseDuration: fall,
   );
   late final CurvedAnimation _risen = CurvedAnimation(
     parent: _rise,
     curve: Curves.easeOutCubic,
     reverseCurve: Curves.easeInCubic,
+  );
+  // The veil is there before the sphere is up, and goes after it has fallen.
+  late final CurvedAnimation _veiled = CurvedAnimation(
+    parent: _rise,
+    curve: const Interval(0, 0.5, curve: Curves.easeOut),
+    reverseCurve: const Interval(0, 0.6, curve: Curves.easeIn),
+  );
+
+  // The slow climb after the rise, for as long as it is held.
+  late final AnimationController _creep = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
+  // It starts as the rise ends.
+  late final CurvedAnimation _crept = CurvedAnimation(
+    parent: _creep,
+    curve: const Interval(0.33, 1, curve: Curves.easeOut),
+  );
+
+  // One swell when it is let go with words.
+  late final AnimationController _pulse = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 460),
   );
 
   // The sphere's slow drift, so it is alive between words.
@@ -3345,7 +3401,8 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    widget.leaving.addListener(_leave);
+    widget.leaving.addListener(_let);
+    widget.falls.addListener(_fall);
   }
 
   @override
@@ -3355,25 +3412,40 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
     _started = true;
     if (MediaQuery.disableAnimationsOf(context)) {
       _rise.value = 1;
+      _creep.value = 1;
     } else {
       _rise.forward();
+      _creep.forward();
       _drift.repeat(reverse: true);
     }
-    _leave();
+    _let();
+    _fall();
   }
 
-  /// Once let go it only falls: a new press opens a voice mode of its own.
-  void _leave() {
-    if (!widget.leaving.value || _rise.status == AnimationStatus.reverse) return;
+  void _let() {
+    if (!widget.leaving.value || _pulse.isAnimating || _pulse.value > 0) return;
     if (MediaQuery.disableAnimationsOf(context)) return;
+    _pulse.forward();
+  }
+
+  /// Once it falls it only falls: a new press opens a voice mode of its own.
+  void _fall() {
+    if (!widget.falls.value || _rise.status == AnimationStatus.reverse) return;
+    if (MediaQuery.disableAnimationsOf(context)) return;
+    _creep.stop();
     _rise.reverse();
   }
 
   @override
   void dispose() {
-    widget.leaving.removeListener(_leave);
+    widget.leaving.removeListener(_let);
+    widget.falls.removeListener(_fall);
     _risen.dispose();
+    _veiled.dispose();
+    _crept.dispose();
     _rise.dispose();
+    _creep.dispose();
+    _pulse.dispose();
     _drift.dispose();
     super.dispose();
   }
@@ -3395,58 +3467,67 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
         builder: (context, box) {
           final width = box.maxWidth;
           final height = box.maxHeight;
-          // A little wider than a phone; on a wide screen, held to the
-          // bottom half of it.
-          final sphere = math.min(width * 1.06, height * 0.56);
+          // 1.7 times a phone's width, so only its crown shows; on a wide
+          // screen, held to the height.
+          final sphere = math.min(width * 1.7, height * 1.1);
           return Stack(
             clipBehavior: Clip.hardEdge,
             children: [
-              // The veil: the page greys under it, as it does under a held
-              // microphone on the phone this was asked to look like.
+              // The veil: the page greys under it, a fifth darker, as it does
+              // under a held microphone on the phone this was asked to look
+              // like. A colour and a gradient in one decoration paint only the
+              // gradient, which is why 0.60.1 drew no veil at all.
               Positioned.fill(
                 child: FadeTransition(
-                  opacity: _risen,
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: dark ? 0.30 : 0.16),
-                          gradient: RadialGradient(
-                            center: const Alignment(1, -1),
-                            radius: 1.1,
-                            colors: [
-                              colors.accent.withValues(alpha: 0.12),
-                              colors.accent.withValues(alpha: 0),
-                            ],
-                          ),
+                  opacity: _veiled,
+                  child: ColoredBox(
+                    color: Colors.black.withValues(alpha: dark ? 0.32 : 0.20),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: const Alignment(1, -0.4),
+                          radius: 1.1,
+                          colors: [
+                            colors.accent.withValues(alpha: 0.10),
+                            colors.accent.withValues(alpha: 0),
+                          ],
                         ),
-                        child: const SizedBox.expand(),
                       ),
+                      child: const SizedBox.expand(),
                     ),
                   ),
                 ),
               ),
-              // The sphere, rising from under the microphone.
-              Positioned(
-                left: (width - sphere) / 2,
-                width: sphere,
-                height: sphere,
-                bottom: -sphere * 0.02,
+              // The sphere: its crown at 55% of the screen a third of a
+              // second after the press, and 47% by the end of the first
+              // second, where it stays while it is held.
+              AnimatedBuilder(
+                animation: Listenable.merge([_risen, _crept]),
+                builder: (context, child) => Positioned(
+                  left: (width - sphere) / 2,
+                  width: sphere,
+                  height: sphere,
+                  top: height * (1.02 - 0.50 * _risen.value - 0.10 * _crept.value),
+                  child: child!,
+                ),
                 child: AnimatedBuilder(
-                  animation: _risen,
-                  builder: (context, child) => Transform.translate(
-                    offset: Offset(0, sphere * 0.8 * (1 - _risen.value)),
-                    child: Transform.scale(
-                      scale: 0.82 + 0.18 * _risen.value,
+                  animation: _pulse,
+                  builder: (context, child) {
+                    // Up fast, back slowly.
+                    final t = _pulse.value;
+                    final swell = t < 0.3
+                        ? Curves.easeOut.transform(t / 0.3)
+                        : 1 - Curves.easeInOut.transform((t - 0.3) / 0.7);
+                    return Transform.scale(
+                      scale: 1 + 0.08 * swell,
                       alignment: Alignment.bottomCenter,
                       child: child,
-                    ),
-                  ),
+                    );
+                  },
                   child: ValueListenableBuilder<double>(
                     valueListenable: widget.level ?? const _Silent(),
                     builder: (context, level, child) => TweenAnimationBuilder<double>(
-                      tween: Tween(end: 1 + 0.05 * level),
+                      tween: Tween(end: 1 + 0.03 * level),
                       duration: const Duration(milliseconds: 160),
                       builder: (context, swell, child) => Transform.scale(
                         scale: swell,
@@ -3460,63 +3541,44 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                       builder: (context, child) {
                         final t = Curves.easeInOut.transform(_drift.value);
                         return Transform.translate(
-                          offset: Offset(
-                            sphere * (-0.015 + 0.03 * t),
-                            sphere * (0.012 - 0.024 * t),
-                          ),
+                          offset: Offset(width * (-0.02 + 0.04 * t), height * (0.006 - 0.012 * t)),
                           child: child,
                         );
                       },
                       child: Stack(
-                        clipBehavior: Clip.none,
                         children: [
-                          // A soft shade just outside its edge, which sets it
-                          // off the veil.
+                          // What it covers, blurred, inside its soft edge so
+                          // the blur's own edge is under the fade.
                           Positioned.fill(
-                            left: -sphere * 0.05,
-                            right: -sphere * 0.05,
-                            top: -sphere * 0.05,
-                            bottom: -sphere * 0.05,
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  stops: const [0, 0.86, 0.91, 1],
-                                  colors: [
-                                    Colors.black.withValues(alpha: 0),
-                                    Colors.black.withValues(alpha: 0),
-                                    Colors.black.withValues(alpha: dark ? 0.16 : 0.06),
-                                    Colors.black.withValues(alpha: 0),
-                                  ],
+                            child: Padding(
+                              padding: EdgeInsets.all(sphere * 0.012),
+                              child: ClipOval(
+                                child: BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                                  child: const SizedBox.expand(),
                                 ),
                               ),
                             ),
                           ),
+                          // Milky and translucent, a little brighter toward
+                          // its edge, as glass is, and soft over its last
+                          // twenty points.
                           Positioned.fill(
-                            child: ClipOval(
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    gradient: RadialGradient(
-                                      stops: const [0, 0.62, 0.9, 1],
-                                      colors: [
-                                        glow,
-                                        glow.withValues(alpha: 0.82),
-                                        glow.withValues(alpha: 0.6),
-                                        glow.withValues(alpha: 0.5),
-                                      ],
-                                    ),
-                                    // A light rim, as glass catches it.
-                                    border: Border.all(
-                                      color: Colors.white.withValues(alpha: dark ? 0.18 : 0.7),
-                                      width: 1.2,
-                                    ),
-                                  ),
-                                  child: const SizedBox.expand(),
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: RadialGradient(
+                                  stops: const [0, 0.84, 0.95, 0.978, 1],
+                                  colors: [
+                                    glow.withValues(alpha: 0.66),
+                                    glow.withValues(alpha: 0.68),
+                                    glow.withValues(alpha: 0.82),
+                                    glow.withValues(alpha: 0.5),
+                                    glow.withValues(alpha: 0),
+                                  ],
                                 ),
                               ),
+                              child: const SizedBox.expand(),
                             ),
                           ),
                         ],
@@ -3599,7 +3661,10 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                               transitionBuilder: (child, animation) => FadeTransition(
                                 opacity: animation,
                                 alwaysIncludeSemantics: true,
-                                child: child,
+                                child: ScaleTransition(
+                                  scale: Tween(begin: 0.9, end: 1.0).animate(animation),
+                                  child: child,
+                                ),
                               ),
                               child: leaving && widget.heard.trim().isNotEmpty
                                   ? _StatusPill(
