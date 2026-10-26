@@ -848,6 +848,49 @@ void main() {
       await tester.pump(const Duration(milliseconds: 600));
     });
 
+    // "Listening…" arriving over the pill rebuilt it, and its swell played a
+    // second time under the finger: the ring flashed twice (Özlem 2026-10-26).
+    testWidgets('the held pill swells once, not again when listening starts',
+        (tester) async {
+      final c = controller();
+      addTearDown(c.dispose);
+      final started = ValueNotifier<bool>(false);
+      final pending = Completer<String?>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                onDictate: (_) => pending.future,
+                onStopDictating: () {},
+                dictationStarted: started,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
+      await tester.pump(const Duration(milliseconds: 300));
+      State swell() => tester.state(find
+          .ancestor(
+            of: find.bySemanticsLabel('Stop listening'),
+            matching: find.byType(TweenAnimationBuilder<double>),
+          )
+          .first);
+      final before = swell();
+
+      started.value = true;
+      await tester.pump();
+      expect(find.textContaining('Listening'), findsWidgets);
+      expect(identical(swell(), before), isTrue);
+
+      pending.complete(null);
+      await tester.pump(const Duration(milliseconds: 600));
+    });
+
     testWidgets('stays un-pressable when there is nothing to stop it with',
         (tester) async {
       final stops = <String>[];

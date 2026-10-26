@@ -3640,6 +3640,9 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                 ),
               if (!sent)
               Positioned.fill(
+                // Keyed: the words above arrive when listening starts, and
+                // unkeyed this was rebuilt and the pill swelled a second time.
+                key: const ValueKey('voice-pill'),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [

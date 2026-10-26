@@ -5,6 +5,12 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.60.2
+
+- The held microphone swells once. When the recogniser opened and
+  "Listening…" appeared, the pill was rebuilt and its swell played again, so
+  its ring flashed a second time under the finger.
+
 ## 0.60.1
 
 - Voice mode looks as Monogram's does, measured from its recording frame by
