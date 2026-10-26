@@ -22,7 +22,7 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.59.8
+      ref: v0.59.9
 
 dev_dependencies:
   flutter_lints: ^5.0.0

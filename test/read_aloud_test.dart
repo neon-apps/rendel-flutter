@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
+import 'package:flutter/services.dart' show MethodChannel;
+import 'package:flutter_pcm_sound/flutter_pcm_sound.dart' show FlutterPcmSound;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -210,6 +212,32 @@ void main() {
       expect(out.fed.fold<int>(0, (a, b) => a + b), 9600);
     });
 
+    test('reaches the speaker as exactly the bytes fed, so no byte is heard twice (Tuna 2026-10-26: static)', () async {
+      TestWidgetsFlutterBinding.ensureInitialized();
+      final heard = <int>[];
+      const channel = MethodChannel('flutter_pcm_sound/methods');
+      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(channel, (call) async {
+        if (call.method == 'feed') {
+          heard.addAll((call.arguments as Map)['buffer'] as Uint8List);
+          // The speaker has played it all.
+          scheduleMicrotask(() => FlutterPcmSound.onFeedSamplesCallback?.call(0));
+        }
+        return true;
+      });
+      addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+      // An odd first piece: before 0.59.9 its last byte went out twice, and every sample after it was a byte out.
+      final voice = Uint8List.fromList([for (var i = 0; i < 24001; i++) i % 251]);
+      asked = [];
+      client = () => MockClient.streaming((request, _) async => http.StreamedResponse(
+            Stream.fromIterable([voice, Uint8List.fromList([7])]),
+            200,
+            headers: {'content-type': 'audio/pcm; rate=24000; channels=1; encoding=s16le'},
+          ));
+      await RendelVoice(client: client).speak('Bir.', 'tr', url: 'https://api.test/v1/speech/t9');
+      expect(heard, [...voice, 7]);
+    });
+
     test('waits for half a second of the voice before the first sound, then feeds the rest as it comes', () async {
       // As api.rendel.ai sends it: a fifth of a second, a pause, then the rest.
       serve((_) => pcm([9600, 4800, 9600, 24000]));
@@ -341,66 +369,13 @@ void main() {
       await tester.pump(const Duration(minutes: 2));
     });
 
-    testWidgets("does not read a typed question's answer by itself; its own speaker reads it on a tap",
+    testWidgets("reads a typed question's answer by itself too, with no Listen button to press (Tuna 2026-10-26)",
         (tester) async {
       final (c, voice) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok1'));
       await type(tester, c, 'Weather?');
-      expect(voice.said, isEmpty);
-      expect(find.text('Listen'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('Listen to this answer'));
-      await tester.pump();
       expect(voice.said, [('Tomorrow is clear.', 'en')]);
       expect(voice.urls.single, '${c.api.config.apiBaseUrl}/v1/speech/tok1');
-      // While it reads, the same speaker stops it.
-      final stops = voice.stops;
-      await tester.tap(find.bySemanticsLabel('Stop reading'));
-      await tester.pump();
-      expect(voice.stops, greaterThan(stops));
-      expect(find.text('Listen'), findsOneWidget);
-    });
-
-    testWidgets("sits under the answer's first paragraph and above its cards, and counts the time heard (QA 2026-10-24)",
-        (tester) async {
-      final (c, voice) = await open(tester, [
-        const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
-        BlockReady(index: 0, block: _text('Tomorrow is clear.')),
-        const TurnSpeech(token: 'tok20', text: 'Tomorrow is clear.', lang: 'en'),
-        BlockReady(
-          index: 1,
-          block: WireBlock(id: 'k', type: 'key_points', fallbackText: 'Dry', props: {
-            'items': [
-              {'icon': 'check', 'title': 'Dry all day', 'body': 'No rain.'},
-            ],
-          })
-            ..ready = true,
-        ),
-        TurnEnd(status: 'completed', pending: const [], lang: 'en'),
-      ]);
-      await type(tester, c, 'Weather?');
-      final pill = tester.getRect(find.text('Listen'));
-      expect(pill.top, greaterThan(tester.getRect(find.text('Tomorrow is clear.')).bottom));
-      expect(pill.bottom, lessThan(tester.getRect(find.text('Dry all day')).top));
-      expect(tester.getSize(find.bySemanticsLabel('Listen to this answer')).height, greaterThanOrEqualTo(44));
-
-      await tester.tap(find.bySemanticsLabel('Listen to this answer'));
-      await tester.pump();
-      expect(find.text('0:00'), findsOneWidget);
-      voice.heard = const Duration(milliseconds: 4200);
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(find.text('0:04'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('Stop reading'));
-      await tester.pump();
-      expect(find.text('Listen'), findsOneWidget);
-    });
-
-    testWidgets('offers no speaker once its voice token has lived its thirty minutes', (tester) async {
-      final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok2'));
-      await type(tester, c, 'Weather?');
-      expect(find.bySemanticsLabel('Listen to this answer'), findsOneWidget);
-      final answered = c.messages.last;
-      answered.speech = RendelAnswerSpeech(token: 'tok2', lang: 'en', at: DateTime.now().subtract(const Duration(minutes: 31)));
-      answered.touch();
-      await tester.pump();
+      expect(find.text('Listen'), findsNothing);
       expect(find.bySemanticsLabel('Listen to this answer'), findsNothing);
     });
 
@@ -455,7 +430,7 @@ void main() {
           hasToggledState: true,
           isToggled: true,
           isButton: true,
-          hint: 'Answers to questions you ask out loud play by themselves',
+          hint: 'Answers play by themselves',
         ),
       );
       await tester.tap(find.bySemanticsLabel('Voice replies'));
@@ -466,7 +441,7 @@ void main() {
       final stopsBefore = voice.stops;
       await say(tester, 'And Friday?');
       expect(voice.stops, greaterThan(stopsBefore));
-      expect(voice.said, hasLength(1), reason: 'muted, a spoken question is not read by itself');
+      expect(voice.said, hasLength(1), reason: 'muted, nothing is read by itself');
     });
 
     testWidgets('Voice replies fits the header on a narrow phone, and gives up its word only when the name needs the room',
@@ -623,7 +598,7 @@ void main() {
       expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
     });
 
-    testWidgets("an answer that ends in a confirmation has a Listen pill, reading its lede and the card's question",
+    testWidgets("an answer that ends in a confirmation is read by itself: its lede and the card's question",
         (tester) async {
       final (c, voice) = await open(tester, [
         const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
@@ -645,16 +620,12 @@ void main() {
       ]);
       await type(tester, c, 'Freeze my card');
       expect(c.phase, RendelPhase.awaitingConfirmation);
-      expect(find.bySemanticsLabel('Listen to this answer'), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('Listen to this answer'));
-      await tester.pump();
       expect(voice.said.single.$1, 'Your card ending 4821 can be frozen now. Freeze the card ending 4821?');
     });
 
     testWidgets('draws no speaker at all where the host or the console turned voice off', (tester) async {
       final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en', token: 'tok3'), voiced: false);
       await type(tester, c, 'Weather?');
-      expect(find.bySemanticsLabel('Listen to this answer'), findsNothing);
       expect(find.bySemanticsLabel('Voice replies'), findsNothing);
     });
   });

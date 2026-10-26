@@ -219,7 +219,11 @@ class _PluginPcmOut implements RendelPcmOut {
   @override
   Future<void> feed(Uint8List s16le) {
     _dry = false;
-    return FlutterPcmSound.feed(PcmArrayInt16(bytes: ByteData.sublistView(s16le)));
+    // A copy of exactly these bytes: the plugin sends the view's whole
+    // buffer, so a piece cut from a longer one played its odd byte twice and
+    // every sample after it was heard a byte out, as loud static (Tuna
+    // 2026-10-26, "cızırtılı").
+    return FlutterPcmSound.feed(PcmArrayInt16(bytes: ByteData.sublistView(Uint8List.fromList(s16le))));
   }
 
   @override
@@ -261,18 +265,20 @@ const _startHeld = Duration(milliseconds: 500);
 /// voice at all. A voice that made no sound in three seconds stays silent: the
 /// answer is on the screen.
 ///
-/// [on] is the header's speaker: whether an answer to a spoken question is read
-/// by itself, remembered between launches. A tap on an answer's own speaker
-/// reads it whatever [on] says, and the last answer read is kept, so a second
-/// tap does not fetch it again.
+/// [on] is the header's switch: whether every answer is read by itself as its
+/// opening is written, remembered between launches (Tuna 2026-10-26: no
+/// Listen button to press first). The last answer read is kept, so reading it
+/// again does not fetch it again.
 class RendelVoice {
   RendelVoice({RendelPcmOut? out, http.Client Function()? client})
       : _out = out ?? _PluginPcmOut(),
         _client = client ?? http.Client.new;
 
-  static const _key = 'rendel_read_aloud';
+  /// A new name since 0.59.9: the old switch meant answers to spoken
+  /// questions only, so its setting is not carried over to this one.
+  static const _key = 'rendel_read_answers';
 
-  /// Whether an answer to a spoken question is read by itself. On until the person turns it off.
+  /// Whether answers are read by themselves. On until the person turns it off.
   final on = ValueNotifier<bool>(true);
 
   /// The answer being read, by the key it was read under; null when quiet.

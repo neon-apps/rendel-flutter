@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';
-import 'dart:ui' show FontFeature, ImageFilter;
+import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart'
     show TargetPlatform, ValueListenable, defaultTargetPlatform, listEquals;
@@ -248,12 +248,12 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     if (state != AppLifecycleState.resumed) widget.voice?.stop();
   }
 
-  /// An answer that may be read aloud. Read by itself only when its question
-  /// was asked out loud and the header's speaker is on (Tuna 2026-10-23); any
-  /// other answer waits for a tap on its own speaker.
+  /// An answer read aloud by itself as its opening is written, however its
+  /// question was asked, while the header's switch is on: no button to press
+  /// first (Tuna 2026-10-26).
   void _readAloud(RendelMessage answer, {String? text, String? lang, String? speech}) {
     final voice = widget.voice;
-    if (voice == null || !mounted || !_askedByVoice || !voice.on.value) return;
+    if (voice == null || !mounted || !voice.on.value) return;
     // Only an answer the person is there for: not one that lands while the
     // app is in the background (Tuna 2026-10-23: only when a question is
     // asked and answered).
@@ -281,12 +281,6 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
   /// What an answer is read under, for its speaker to know it is the one playing.
   static String _keyOf(RendelMessage answer) => answer.serverId ?? 'answer-${identityHashCode(answer)}';
-
-  /// Whether an answer's own speaker may still read it: the server's token for
-  /// its voice lives thirty minutes, less a minute's margin; the phone's own
-  /// voice needs none.
-  static bool _canSay(RendelAnswerSpeech? speech) =>
-      speech != null && (speech.token == null || DateTime.now().difference(speech.at) < const Duration(minutes: 29));
 
   /// A tap, and a screen of the app opened the way the presentation opens
   /// one.
@@ -800,9 +794,6 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   bool _askedWhole = false;
   bool _spoken = false;
 
-  /// The newest question was asked out loud: its answer is read by itself.
-  bool _askedByVoice = false;
-
   /// The newest question this screen has seen, so the next one is noticed
   /// whichever way it was sent: typed, a suggestion, a quick reply, spoken.
   RendelMessage? _question;
@@ -844,7 +835,6 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
         final words = question.blocks.firstOrNull?.props['markdown'];
         _asked = words is String ? words : '';
         _askedWhole = _spoken;
-        _askedByVoice = _spoken;
         changed = true;
       }
     }
@@ -1250,8 +1240,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       // The thumbs wait for the turn to end, which the controller says.
       listenable: Listenable.merge([
         ...answers,
-        if ((widget.feedback || widget.voice != null) && !detail) controller,
-        if (widget.voice != null && !detail) widget.voice!.playing,
+        if (widget.feedback && !detail) controller,
       ]),
       builder: (context, _) {
         final blocks = [for (final answer in answers) ...answer.blocks];
@@ -1289,33 +1278,6 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
             (controller.phase == RendelPhase.idle || !identical(controller.messages.lastOrNull, answered));
         // What the answer kept, changed, forgot or relied on about the person.
         final memory = [for (final answer in answers) ...answer.memory];
-        // The answer's Listen pill, under its first paragraph and before its
-        // cards, as soon as its voice is known (QA 2026-10-24).
-        final voice = widget.voice;
-        final voiced = detail || voice == null
-            ? null
-            : answers.reversed.where((m) => m.role == 'assistant' && _canSay(m.speech)).firstOrNull;
-        final listen = voiced != null && (voiced.speech!.token != null || (voiced.speech!.text ?? spokenLead(voiced.blocks)) != null)
-            ? _ListenPill(
-                key: ValueKey('rendel-listen-${_keyOf(voiced)}'),
-                strings: widget.strings,
-                voice: voice!,
-                playing: voice.playing.value == _keyOf(voiced),
-                fresh: DateTime.now().difference(voiced.speech!.at) < const Duration(milliseconds: 1500),
-                onTap: () => voice.playing.value == _keyOf(voiced) ? voice.stop() : _say(voiced),
-              )
-            : null;
-        // Where it goes: after the voiced answer's first text block, or before its first block.
-        var listenAfter = -1;
-        if (voiced != null) {
-          var from = 0;
-          for (final answer in answers) {
-            if (identical(answer, voiced)) break;
-            from += answer.blocks.length;
-          }
-          listenAfter = from + voiced.blocks.indexWhere((b) => b.type == 'text');
-        }
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1324,8 +1286,6 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                 padding: const EdgeInsets.only(bottom: 14),
                 child: _AskedLine(text: askedText.trim(), image: asked.image),
               ),
-            if (listen != null && listenAfter < 0)
-              Padding(padding: const EdgeInsets.only(bottom: 16), child: listen),
             for (var i = 0; i < blocks.length; i++) ...[
               Padding(
                 padding: EdgeInsets.only(top: gap(i)),
@@ -1380,7 +1340,6 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   ),
                 ),
               ),
-              if (listen != null && i == listenAfter) Padding(padding: const EdgeInsets.only(top: 16), child: listen),
             ],
             if (memory.isNotEmpty)
               Padding(
@@ -1413,135 +1372,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   }
 }
 
-/// An answer's Listen pill (QA 2026-10-24), under its first paragraph and
-/// before its cards: "▶ Listen" reads the answer's opening on a tap, and
-/// "■ 0:04", the time heard, stops it while it reads. 44 high, and as wide
-/// either way, so nothing moves on a tap. Mirrors the web SDK's `.rd-listen`.
-class _ListenPill extends StatefulWidget {
-  const _ListenPill({
-    super.key,
-    required this.strings,
-    required this.voice,
-    required this.playing,
-    required this.fresh,
-    required this.onTap,
-  });
-
-  final RendelStrings strings;
-  final RendelVoice voice;
-  final bool playing;
-
-  /// It came with the answer just now, so it opens a little room for itself
-  /// under the paragraph; on a page come back to, it is simply there.
-  final bool fresh;
-  final VoidCallback onTap;
-
-  @override
-  State<_ListenPill> createState() => _ListenPillState();
-}
-
-class _ListenPillState extends State<_ListenPill> {
-  Timer? _tick;
-
-  @override
-  void initState() {
-    super.initState();
-    _count();
-  }
-
-  @override
-  void didUpdateWidget(_ListenPill old) {
-    super.didUpdateWidget(old);
-    if (old.playing != widget.playing) _count();
-  }
-
-  /// The time on the pill counts while it reads, and stops with it.
-  void _count() {
-    _tick?.cancel();
-    _tick = widget.playing ? Timer.periodic(const Duration(milliseconds: 250), (_) => setState(() {})) : null;
-  }
-
-  @override
-  void dispose() {
-    _tick?.cancel();
-    super.dispose();
-  }
-
-  static String _clock(Duration heard) {
-    final seconds = heard.inSeconds;
-    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = RendelThemeScope.of(context);
-    final still = MediaQuery.disableAnimationsOf(context);
-    final playing = widget.playing;
-    final ink = playing ? theme.colors.onAccent : theme.colors.onSurface;
-    final pill = RendelPressable(
-      semanticLabel: playing ? widget.strings.stopReading : widget.strings.readAloudThis,
-      onTap: widget.onTap,
-      child: AnimatedContainer(
-        duration: still ? Duration.zero : const Duration(milliseconds: 200),
-        curve: theme.motion.curve,
-        height: 44,
-        constraints: const BoxConstraints(minWidth: 108),
-        padding: const EdgeInsetsDirectional.fromSTEB(15, 0, 18, 0),
-        decoration: BoxDecoration(
-          color: playing ? theme.colors.accent : theme.colors.surfaceRaised,
-          borderRadius: BorderRadius.circular(theme.radius.control),
-          border: Border.all(color: playing ? theme.colors.accent : theme.hairline),
-          boxShadow: [
-            BoxShadow(
-              color: theme.colors.shadow.withValues(alpha: playing ? 0.30 : 0.16),
-              blurRadius: 22,
-              spreadRadius: -12,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(playing ? Icons.stop_rounded : Icons.play_arrow_rounded, size: 20, color: ink),
-            const SizedBox(width: 8),
-            Text(
-              playing ? _clock(widget.voice.elapsed) : widget.strings.listen,
-              maxLines: 1,
-              style: theme.text.label.copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                height: 1,
-                color: ink,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: widget.fresh && !still ? 0 : 1, end: 1),
-      duration: const Duration(milliseconds: 340),
-      curve: theme.motion.curve,
-      // Its own node: merged into the page's, its label was read with the question's.
-      child: Align(alignment: AlignmentDirectional.centerStart, child: Semantics(container: true, child: pill)),
-      builder:
-          (context, t, child) => ClipRect(
-            clipBehavior: t < 1 ? Clip.hardEdge : Clip.none,
-            child: Align(
-              alignment: AlignmentDirectional.topStart,
-              heightFactor: t,
-              child: Opacity(opacity: t, child: child),
-            ),
-          ),
-    );
-  }
-}
-
-/// The header's Voice replies switch (QA 2026-10-24): whether an answer to a
-/// spoken question is read by itself. Its word and a switch on the glass the
+/// The header's Voice replies switch (QA 2026-10-24): whether answers are
+/// read aloud as they come. Its word and a switch on the glass the
 /// page steps sit on. 36 drawn, 44 to the finger. [compact], when the name
 /// needs the room (`_Header._needsCompact`), is the switch alone, 46 wide,
 /// with a speaker on its knob saying what it turns on; its word is still its

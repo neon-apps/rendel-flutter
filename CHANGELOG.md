@@ -5,6 +5,20 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.59.9
+
+- The voice is clean. It came through with loud static on a real iPhone: a
+  piece of the voice cut from a longer one reached the speaker with the bytes
+  after it, so one byte was played twice and every sample after it was heard
+  a byte out. Each piece now goes to the speaker as exactly its own bytes.
+- Every answer is read aloud by itself as its opening is written, however
+  the question was asked. The Listen button under the answer's first
+  paragraph is gone. The header's Voice replies switch still turns reading
+  off, and starts on again for everyone: its setting is kept under a new
+  name, `rendel_read_answers`. `RendelStrings.listen`, `readAloudThis` and
+  `stopReading` are no longer shown, and are kept so an app that sets them
+  still builds.
+
 ## 0.59.8
 
 - Rendel's own colours follow its new brand. A marked phrase on an answer

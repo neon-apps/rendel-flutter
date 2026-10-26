@@ -51,7 +51,7 @@ class RendelStrings {
     this.composerHint = 'Ask anything',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
-    this.readAloud = 'Answers to questions you ask out loud play by themselves',
+    this.readAloud = 'Answers play by themselves',
     this.autoRead = 'Voice replies',
     this.listen = 'Listen',
     this.readAloudThis = 'Listen to this answer',
@@ -272,22 +272,22 @@ class RendelStrings {
   final String sendMessage;
   final String newConversation;
 
-  /// What the header's Auto-read switch does, as its screen-reader hint: an
-  /// answer to a spoken question is read by itself.
+  /// What the header's Auto-read switch does, as its screen-reader hint:
+  /// answers are read by themselves.
   final String readAloud;
 
-  /// The header's switch, in its own words: answers to spoken questions read
-  /// by themselves, on or off. A switch, so a screen reader says which.
+  /// The header's switch, in its own words: answers read by themselves, on
+  /// or off. A switch, so a screen reader says which.
   final String autoRead;
 
-  /// The pill under an answer's first paragraph that reads it aloud.
+  /// Unused since 0.59.9, which reads every answer by itself; kept so an app
+  /// that sets it still builds.
   final String listen;
 
-  /// That pill to a screen reader: holds the pill's own word ([listen]), and
-  /// what it reads.
+  /// Unused since 0.59.9, as [listen] is.
   final String readAloudThis;
 
-  /// The same pill while it reads, stopping it.
+  /// Unused since 0.59.9, as [listen] is.
   final String stopReading;
 
   final String retry;
@@ -1049,7 +1049,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Ne isterseniz sorun',
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
-    readAloud: 'Sesle sorduğunuz soruların yanıtı kendiliğinden okunur',
+    readAloud: 'Yanıtlar kendiliğinden okunur',
     autoRead: 'Sesli yanıt',
     listen: 'Dinle',
     readAloudThis: 'Bu cevabı dinle',
@@ -1224,7 +1224,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Stellen Sie Ihre Frage',
     sendMessage: 'Nachricht senden',
     newConversation: 'Neue Unterhaltung beginnen',
-    readAloud: 'Antworten auf laut gestellte Fragen werden von selbst vorgelesen',
+    readAloud: 'Antworten werden von selbst vorgelesen',
     autoRead: 'Sprachantworten',
     listen: 'Anhören',
     readAloudThis: 'Diese Antwort anhören',
@@ -1401,7 +1401,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Posez votre question',
     sendMessage: 'Envoyer le message',
     newConversation: 'Démarrer une nouvelle conversation',
-    readAloud: 'Les réponses aux questions posées à voix haute se lisent d’elles-mêmes',
+    readAloud: 'Les réponses se lisent d’elles-mêmes',
     autoRead: 'Réponses vocales',
     listen: 'Écouter',
     readAloudThis: 'Écouter cette réponse',
@@ -1577,7 +1577,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'Pregunta lo que quieras',
     sendMessage: 'Enviar mensaje',
     newConversation: 'Iniciar una conversación nueva',
-    readAloud: 'Las respuestas a lo que preguntas en voz alta se leen solas',
+    readAloud: 'Las respuestas se leen solas',
     autoRead: 'Respuestas por voz',
     listen: 'Escuchar',
     readAloudThis: 'Escuchar esta respuesta',
@@ -1752,7 +1752,7 @@ const Map<String, RendelStrings> _byLocale = {
     composerHint: 'اسأل عن أي شيء',
     sendMessage: 'إرسال الرسالة',
     newConversation: 'بدء محادثة جديدة',
-    readAloud: 'تُقرأ الإجابات عن الأسئلة التي تطرحها بصوتك تلقائيًا',
+    readAloud: 'تُقرأ الإجابات تلقائيًا',
     autoRead: 'ردود صوتية',
     listen: 'استمع',
     readAloudThis: 'استمع إلى هذه الإجابة',
