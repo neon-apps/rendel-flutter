@@ -14,6 +14,7 @@ import '../core/memory.dart';
 import '../core/platform.dart';
 import '../core/read_aloud.dart' show spokenLead;
 import '../core/route.dart';
+import '../core/screens.dart';
 import '../protocol/protocol.dart';
 import '../transport/api_client.dart';
 
@@ -1007,6 +1008,8 @@ class ConversationController extends ChangeNotifier {
         final screen = routes[route];
         if (screen == null) return false;
         final from = navigateOrigin(route, params);
+        // The page it pushes is called by the screen's title from now on.
+        RendelScreens.instance.opening(screen.title);
         try {
           await screen.open(params);
         } catch (err) {
@@ -1187,6 +1190,10 @@ class ConversationController extends ChangeNotifier {
         if (answers[i] != null) providers[i].key: answers[i],
     };
 
+    // The screen the person is on, as `Rendel.navigatorObserver` or
+    // `setScreen` last said; on every turn, as the web SDK sends it.
+    final screen = RendelScreens.instance.current;
+
     final body = {
       ...payload,
       if (conversationId != null) 'conversation_id': conversationId,
@@ -1221,9 +1228,10 @@ class ConversationController extends ChangeNotifier {
         // languages; those are the same fact and neither is a phone setting.
         if (languages.isNotEmpty) 'languages': languages,
       },
-      if (context.isNotEmpty || openForms.isNotEmpty)
+      if (context.isNotEmpty || openForms.isNotEmpty || screen != null)
         'context': {
           if (context.isNotEmpty) 'app_state': context,
+          if (screen != null) 'current_screen': screen,
           if (openForms.isNotEmpty) 'open_forms': openForms,
         },
     };

@@ -5,6 +5,23 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.62.0
+
+- `Rendel.navigatorObserver`: add it to `MaterialApp.navigatorObservers`,
+  `CupertinoApp.navigatorObservers` or GoRouter's `observers:` and each
+  page the app shows is counted by its route name (ids in a path become
+  `:id`), on every device, whether or not Rendel is opened. Views are sent
+  in batches every 15 s and when the app goes to the background.
+- `Rendel.setScreen(name)` names the current page yourself; the name stays
+  with that page. Each turn sends the current screen as
+  `context.current_screen`.
+- `Rendel.track(name, [props])`: any name other than `purchase` is a goal,
+  with an optional `value` and `currency`. `props` is optional now.
+- The iOS privacy manifest declares Product Interaction and Purchase
+  History, linked to the user, not used for tracking. Check your App Store
+  privacy answers.
+- New log codes `invalid_goal` and `invalid_screen`; `unknown_event` is gone.
+
 ## 0.61.1
 
 - The message box is written at the theme's body size (`type.body`), as

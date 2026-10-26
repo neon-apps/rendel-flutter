@@ -13,7 +13,7 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.61.1
+      ref: v0.62.0
 ```
 
 ## Three lines to a running assistant

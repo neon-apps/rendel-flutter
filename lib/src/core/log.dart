@@ -71,6 +71,9 @@ class RendelLogRecord {
   /// * `copy_failed` — the clipboard refused a `copy` tap's value
   /// * `calendar_failed` — the event editor could not be opened for an
   ///   `add_to_calendar` tap
+  /// * `invalid_goal` — `track` was given a goal name that is not one, or a
+  ///   value without a three-letter currency; nothing was sent
+  /// * `invalid_screen` — `setScreen` was given an empty name
   /// * the server's own code when a turn ends in an `error` frame:
   ///   `invalid_key`, `quota_exceeded`, `rate_limited`, `model_busy`,
   ///   `upgrade_required`, `manifest_unknown`, `invalid_request` or `internal`

@@ -426,15 +426,17 @@ class RendelApiClient {
   /// POST /v1/events with one event: a contact channel tapped, Rendel opened
   /// (analytics-roi T3, T4). Never a throw, and nothing the user sees waits
   /// on it; the server ignores an event it does not know.
-  Future<void> sendEvent(Map<String, dynamic> event) async {
+  Future<void> sendEvent(Map<String, dynamic> event) => sendEvents([event]);
+
+  /// POST /v1/events with several, as [sendEvent] sends one: screen views go
+  /// in batches (screens-goals.md), at most 50 to a request.
+  Future<void> sendEvents(List<Map<String, dynamic>> events) async {
     try {
       await _http
           .post(
             Uri.parse('${config.apiBaseUrl}/v1/events'),
             headers: _headers,
-            body: jsonEncode({
-              'events': [event],
-            }),
+            body: jsonEncode({'events': events}),
           )
           .timeout(config.requestTimeout);
     } catch (_) {

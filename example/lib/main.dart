@@ -344,6 +344,8 @@ class NeonKicksApp extends StatelessWidget {
     return MaterialApp(
       title: 'Neon Kicks',
       navigatorKey: kicksNavigator,
+      // Every screen counted, and each question asked on the screen it is about.
+      navigatorObservers: [Rendel.navigatorObserver],
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(

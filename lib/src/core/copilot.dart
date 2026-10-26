@@ -26,6 +26,7 @@ import 'memory.dart';
 import 'pairing.dart';
 import 'platform.dart';
 import 'route.dart';
+import 'screens.dart';
 import 'strings.dart';
 import 'remote_config.dart';
 
@@ -238,6 +239,8 @@ class Rendel {
     );
     _handOverClient(_api);
     RendelFollowups.instance.send = (event) => unawaited(_api?.sendEvent(event));
+    // The screens shown since launch go now that there is a device to count them against.
+    RendelScreens.instance.send = (views) => unawaited(_api?.sendEvents(views));
     unawaited(_syncManifest());
     // An app that restores its session before initialising the copilot calls
     // `identify` first. That call used to go nowhere, silently.
@@ -697,14 +700,59 @@ class Rendel {
     );
   }
 
-  /// Something the person did that the app wants counted: only `'purchase'`
-  /// today, `{'value': 549.9, 'currency': 'TRY', 'items': [...]}`, which
-  /// Follow-ups credits to the follow-up they last opened (R2). Never a throw.
-  static void track(String name, Map<String, dynamic> props) {
-    if (name != 'purchase') {
-      RendelLog.warn('unknown_event', 'track("$name") is not counted; only "purchase" is');
+  // ————————————————————————— screens and goals —————————————————————————
+
+  /// Add to your app's navigator, and every screen it shows is counted as a
+  /// screen view, and each question carries the screen it was asked on
+  /// (design/plans/screens-goals.md):
+  ///
+  /// ```dart
+  /// MaterialApp(navigatorObservers: [Rendel.navigatorObserver], ...);
+  /// GoRouter(observers: [Rendel.navigatorObserver], ...);
+  /// ```
+  ///
+  /// A page's name is its route's (`RouteSettings.name`), with its ids taken
+  /// out: `/orders/8812?tab=2` is `/orders/:id`. A page Rendel opened from a
+  /// screen registered with [registerRoute] is called by that screen's
+  /// title. Dialogs, sheets and pages pushed without a name are not
+  /// screens of their own; name those with [setScreen]. The same screen twice
+  /// in a row is one view. Views are counted from launch, on every device,
+  /// whether or not Rendel is opened, and sent once [init] has run: every 15
+  /// seconds, at 40, and when the app goes to the background. One navigator:
+  /// the app's root one.
+  static final NavigatorObserver navigatorObserver = RendelNavigatorObserver();
+
+  /// Names the screen on top yourself, where the route's name says too
+  /// little: a page pushed without one, tabs inside one page. Holds for that
+  /// page, back to it included, until the next call; null hands it back to
+  /// the route's name. At most 120 characters. Safe to call before [init].
+  static void setScreen(String? name) {
+    if (name == null) return RendelScreens.instance.name(null);
+    final given = name.trim();
+    if (given.isEmpty) {
+      RendelLog.warn('invalid_screen', 'setScreen needs a name, or null to name screens by their route again');
       return;
     }
+    RendelScreens.instance.name(given.length > maxScreenName ? given.substring(0, maxScreenName) : given);
+  }
+
+  /// Something the person did that the app wants counted.
+  ///
+  /// `'purchase'` takes `{'value': 549.9, 'currency': 'TRY', 'items': [...]}`,
+  /// which Follow-ups credits to the follow-up they last opened (R2). Any
+  /// other name is a goal, something the app counts as a success: lowercase
+  /// letters, digits and `_`, a letter first, at most 40 characters, with an
+  /// optional value and its currency (screens-goals.md):
+  ///
+  /// ```dart
+  /// Rendel.track('signup');
+  /// Rendel.track('booking', {'value': 120, 'currency': 'TRY'});
+  /// ```
+  ///
+  /// The console shows a goal sent from here as reported by the app. Never a
+  /// throw: a malformed call is logged and not counted.
+  static void track(String name, [Map<String, dynamic> props = const {}]) {
+    if (name != 'purchase') return _trackGoal(name, props);
     final value = props['value'];
     final given = props['currency'];
     final currency = given is String ? given.trim().toUpperCase() : '';
@@ -721,6 +769,38 @@ class Rendel {
           'value': value,
           'currency': currency,
           if (items is List) 'items': items.take(20).toList(),
+        })));
+  }
+
+  static final _goalName = RegExp(r'^[a-z][a-z0-9_]{0,39}$');
+
+  static void _trackGoal(String name, Map<String, dynamic> props) {
+    if (!_goalName.hasMatch(name)) {
+      RendelLog.warn(
+        'invalid_goal',
+        'track("$name") is not counted: a goal\'s name is lowercase letters, digits and _, starting with a letter, at most 40 characters',
+      );
+      return;
+    }
+    final value = props['value'];
+    if (value == null) {
+      unawaited(_whenClient().then((api) => api?.sendEvent({'type': 'goal', 'name': name})));
+      return;
+    }
+    final given = props['currency'];
+    final currency = given is String ? given.trim().toUpperCase() : '';
+    if (value is! num || !value.isFinite || value < 0 || value > 1000000000 || !RegExp(r'^[A-Z]{3}$').hasMatch(currency)) {
+      RendelLog.warn(
+        'invalid_goal',
+        'track("$name") with a value needs a value of 0 or more and a three-letter currency code such as "TRY"',
+      );
+      return;
+    }
+    unawaited(_whenClient().then((api) => api?.sendEvent({
+          'type': 'goal',
+          'name': name,
+          'value': value,
+          'currency': currency,
         })));
   }
 
@@ -866,6 +946,7 @@ class Rendel {
     _inboxAsked = null;
     _foreground?.dispose();
     _foreground = null;
+    RendelScreens.instance.resetForTest();
   }
 
   // ————————————————————————— remote config —————————————————————————
