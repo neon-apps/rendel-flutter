@@ -156,7 +156,41 @@ void main() {
         .whereType<LinearGradient>()
         .where((gradient) => gradient.colors.first == const Color(0xFFE8E2D2));
     expect(grounds, isNotEmpty);
-    expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
-    expect(find.byIcon(Icons.chevron_left_rounded), findsNothing);
+    expect(find.byKey(const ValueKey('rendel-glyph-iosBack')), findsOneWidget);
+    expect(find.byKey(const ValueKey('rendel-glyph-chevronBack')), findsNothing);
+  });
+
+  testWidgets('the page steps match the capsule beside them: its height, the size of its glyphs', (tester) async {
+    final api = RendelApiClient(appKey: 'rd_pk_test_x', deviceId: 'd', config: const RendelConfig());
+    final controller = ConversationController(
+      api: api,
+      actions: const {},
+      sdkVersion: 'flutter/test',
+      onOpenUrl: (_) async => true,
+    );
+    addTearDown(controller.dispose);
+    for (final words in ['First answer.', 'Second answer.']) {
+      controller.pages.add(RendelMessage.history('assistant', [
+        WireBlock(id: words, type: 'text', fallbackText: words, props: {'markdown': words})..ready = true,
+      ]));
+    }
+    controller.page = 1;
+    // Start over is drawn once there is a conversation to start over.
+    controller.messages.add(RendelMessage.user('Bana kreatin önerir misin'));
+    await tester.pumpWidget(MaterialApp(
+      home: RendelThemeScope(
+        theme: _light({..._palette, 'style': {'arrows': 'arrow'}}),
+        child: Scaffold(body: ThreadScreen(controller: controller)),
+      ),
+    ));
+    await tester.pump(const Duration(seconds: 1));
+    // Özlem 2026-10-27: one height for both pills, the arrows at start over's size.
+    final pills = find.byWidgetPredicate((widget) => widget.runtimeType.toString() == '_StepsGlass');
+    expect(pills, findsNWidgets(2));
+    expect(tester.getSize(pills.first).height, 38);
+    expect(tester.getSize(pills.last).height, 38);
+    final reset = tester.getSize(find.byKey(const ValueKey('rendel-glyph-reset')));
+    expect(tester.getSize(find.byKey(const ValueKey('rendel-glyph-arrowBack'))), reset);
+    expect(tester.getSize(find.byKey(const ValueKey('rendel-glyph-arrowForward'))), reset);
   });
 }

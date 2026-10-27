@@ -5,6 +5,13 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.63.1
+
+- Back and forward are drawn in the thin line of start over and close, at
+  start over's 20, instead of Material's heavier arrows, in the family
+  `theme.style.arrows` names; their pill is 38 high, as the capsule across
+  the header is (Özlem 2026-10-27).
+
 ## 0.63.0
 
 - Taps are counted on their own: a global pointer route sees each tap

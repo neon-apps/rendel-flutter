@@ -1942,7 +1942,8 @@ class _HeaderName extends StatelessWidget {
 
 /// Back and forward through the pages a conversation has opened: a glass pill
 /// holding two round buttons, at the header's leading edge. Each is 44 to the
-/// finger (QA 2026-10-24); the pill is drawn 40 high behind them.
+/// finger (QA 2026-10-24); the pill is drawn 38 high behind them, as the
+/// capsule across the header is (Özlem 2026-10-27).
 class _PageSteps extends StatelessWidget {
   const _PageSteps({required this.onBack, required this.onForward});
 
@@ -1956,28 +1957,27 @@ class _PageSteps extends StatelessWidget {
     final rtl = Directionality.of(context) == TextDirection.rtl;
     // In the family the host's own navigation uses.
     final (back, forward) = switch (theme.style.arrows) {
-      RendelArrowStyle.chevron => (Icons.chevron_left_rounded, Icons.chevron_right_rounded),
-      RendelArrowStyle.arrow => (Icons.arrow_back_rounded, Icons.arrow_forward_rounded),
-      RendelArrowStyle.ios => (Icons.arrow_back_ios_new_rounded, Icons.arrow_forward_ios_rounded),
+      RendelArrowStyle.chevron => (_Glyph.chevronBack, _Glyph.chevronForward),
+      RendelArrowStyle.arrow => (_Glyph.arrowBack, _Glyph.arrowForward),
+      RendelArrowStyle.ios => (_Glyph.iosBack, _Glyph.iosForward),
     };
     return Stack(
       children: [
-        // 40 high, as in 0.60 (Özlem 2026-10-26): 38 read as too small.
         Positioned.fill(
-          top: 2,
-          bottom: 2,
+          top: 3,
+          bottom: 3,
           child: _StepsGlass(shape: BorderRadius.circular(theme.radius.control)),
         ),
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             _PageStep(
-              icon: rtl ? forward : back,
+              glyph: rtl ? forward : back,
               label: strings.previousPage,
               onTap: onBack,
             ),
             _PageStep(
-              icon: rtl ? back : forward,
+              glyph: rtl ? back : forward,
               label: strings.nextPage,
               onTap: onForward,
             ),
@@ -1991,9 +1991,9 @@ class _PageSteps extends StatelessWidget {
 /// One step through the pages. Spent rather than absent at either end: a
 /// button that comes and goes moves the one beside it.
 class _PageStep extends StatelessWidget {
-  const _PageStep({required this.icon, required this.label, this.onTap});
+  const _PageStep({required this.glyph, required this.label, this.onTap});
 
-  final IconData icon;
+  final _Glyph glyph;
   final String label;
   final VoidCallback? onTap;
 
@@ -2014,8 +2014,9 @@ class _PageStep extends StatelessWidget {
           child: SizedBox(
             width: 44,
             height: 44,
-            // 24 again, as in 0.60 (Özlem 2026-10-26): 20 read as too small.
-            child: Icon(icon, size: 24, color: theme.colors.onSurface),
+            // The thin line and size of start over beside it (Özlem
+            // 2026-10-27), not Material's heavier glyphs.
+            child: _HeaderGlyph.step(glyph, color: theme.colors.onSurface),
           ),
         ),
       ),
@@ -3079,35 +3080,43 @@ class _Round extends StatelessWidget {
   }
 }
 
-/// The header's reset and close, drawn in a thin line at the sizes the
-/// console's Appearance phone shows them (reset 20, close 22), rather than
-/// Material's heavier filled glyphs (Özlem 2026-10-26). The paths are the web
-/// SDK's `reset` and `close`, on its 24-point grid.
+/// The header's glyphs.
+enum _Glyph { reset, close, arrowBack, arrowForward, chevronBack, chevronForward, iosBack, iosForward }
+
+/// The header's reset, close and page steps, drawn in a thin line at the
+/// sizes the console's Appearance phone shows them (reset and the steps 20,
+/// close 22), rather than Material's heavier filled glyphs (Özlem 2026-10-26,
+/// the steps 2026-10-27). The paths are the web SDK's `reset`, `close`,
+/// `arrow-left`, `chevron-left`, `ios-back` and their mirrors, on its
+/// 24-point grid.
 class _HeaderGlyph extends StatelessWidget {
   const _HeaderGlyph.reset({required this.color})
-      : close = false,
+      : glyph = _Glyph.reset,
         size = 20;
   const _HeaderGlyph.close({required this.color})
-      : close = true,
+      : glyph = _Glyph.close,
         size = 22;
+  const _HeaderGlyph.step(this.glyph, {required this.color}) : size = 20;
 
-  final bool close;
+  final _Glyph glyph;
   final double size;
   final Color color;
 
   @override
   Widget build(BuildContext context) => Center(
         child: CustomPaint(
+          // Which glyph, for a test to find: the painter is private.
+          key: ValueKey('rendel-glyph-${glyph.name}'),
           size: Size.square(size),
-          painter: _HeaderGlyphPainter(close: close, color: color),
+          painter: _HeaderGlyphPainter(glyph: glyph, color: color),
         ),
       );
 }
 
 class _HeaderGlyphPainter extends CustomPainter {
-  const _HeaderGlyphPainter({required this.close, required this.color});
+  const _HeaderGlyphPainter({required this.glyph, required this.color});
 
-  final bool close;
+  final _Glyph glyph;
   final Color color;
 
   @override
@@ -3120,26 +3129,49 @@ class _HeaderGlyphPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
     final path = Path();
-    if (close) {
-      path
-        ..moveTo(6, 6)
-        ..lineTo(18, 18)
-        ..moveTo(18, 6)
-        ..lineTo(6, 18);
-    } else {
-      path
-        ..moveTo(4.5, 12)
-        ..arcToPoint(const Offset(6.7, 6.7), radius: const Radius.circular(7.5), largeArc: true, clockwise: false)
-        ..lineTo(4.5, 9)
-        ..moveTo(4.5, 4.5)
-        ..lineTo(4.5, 9)
-        ..lineTo(9, 9);
+    void bend(double x1, double y1, double x2, double y2, double x3, double y3) => path
+      ..moveTo(x1, y1)
+      ..lineTo(x2, y2)
+      ..lineTo(x3, y3);
+    switch (glyph) {
+      case _Glyph.close:
+        path
+          ..moveTo(6, 6)
+          ..lineTo(18, 18)
+          ..moveTo(18, 6)
+          ..lineTo(6, 18);
+      case _Glyph.reset:
+        path
+          ..moveTo(4.5, 12)
+          ..arcToPoint(const Offset(6.7, 6.7), radius: const Radius.circular(7.5), largeArc: true, clockwise: false)
+          ..lineTo(4.5, 9)
+          ..moveTo(4.5, 4.5)
+          ..lineTo(4.5, 9)
+          ..lineTo(9, 9);
+      case _Glyph.arrowBack:
+        path
+          ..moveTo(19, 12)
+          ..lineTo(5, 12);
+        bend(11, 6, 5, 12, 11, 18);
+      case _Glyph.arrowForward:
+        path
+          ..moveTo(5, 12)
+          ..lineTo(19, 12);
+        bend(13, 6, 19, 12, 13, 18);
+      case _Glyph.chevronBack:
+        bend(15, 6, 9, 12, 15, 18);
+      case _Glyph.chevronForward:
+        bend(9, 6, 15, 12, 9, 18);
+      case _Glyph.iosBack:
+        bend(15.5, 4, 8, 12, 15.5, 20);
+      case _Glyph.iosForward:
+        bend(8.5, 4, 16, 12, 8.5, 20);
     }
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(_HeaderGlyphPainter old) => old.close != close || old.color != color;
+  bool shouldRepaint(_HeaderGlyphPainter old) => old.glyph != glyph || old.color != color;
 }
 
 /// The microphone: the one filled control at rest, in the app's accent, with
