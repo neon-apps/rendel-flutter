@@ -1975,13 +1975,13 @@ class _PageSteps extends StatelessWidget {
               glyph: rtl ? forward : back,
               label: strings.previousPage,
               onTap: onBack,
-              inward: const EdgeInsetsDirectional.only(start: 16),
+              inward: const EdgeInsetsDirectional.only(start: 8),
             ),
             _PageStep(
               glyph: rtl ? back : forward,
               label: strings.nextPage,
               onTap: onForward,
-              inward: const EdgeInsetsDirectional.only(end: 16),
+              inward: const EdgeInsetsDirectional.only(end: 8),
             ),
           ],
         ),
@@ -1997,9 +1997,10 @@ class _PageStep extends StatelessWidget {
 
   final _Glyph glyph;
 
-  /// Room on the side away from the other step: each glyph sits 8 toward
-  /// it, so the two are 28 apart while each stays 44 to the finger (Özlem
-  /// 2026-10-27: 36 was still too far).
+  /// Room on the side away from the other step: each glyph sits 4 toward
+  /// it, so the two are 28 apart and the pill hugs them, 72 wide (Özlem
+  /// 2026-10-27: 36 apart was too far, then the pill too wide for them).
+  /// Each step is 36 across and 44 high to the finger.
   final EdgeInsetsDirectional inward;
   final String label;
   final VoidCallback? onTap;
@@ -2019,7 +2020,7 @@ class _PageStep extends StatelessWidget {
         child: Opacity(
           opacity: onTap == null ? 0.28 : 1,
           child: SizedBox(
-            width: 44,
+            width: 36,
             height: 44,
             // The thin line and size of start over beside it (Özlem
             // 2026-10-27), not Material's heavier glyphs.

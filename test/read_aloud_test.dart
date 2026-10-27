@@ -481,7 +481,7 @@ void main() {
       }
     });
 
-    testWidgets('the name is whole on the first page, and the steps come with the second, each 44 to the finger (QA 2026-10-24)',
+    testWidgets('the name is whole on the first page, and the steps come with the second, each 36 across and 44 high to the finger (QA 2026-10-24, Özlem 2026-10-27)',
         (tester) async {
       addTearDown(tester.view.reset);
       for (final width in [390.0, 360.0, 700.0]) {
@@ -496,7 +496,7 @@ void main() {
           await type(tester, c, 'And Friday?');
           expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
           expect(tester.takeException(), isNull);
-          expect(tester.getSize(find.bySemanticsLabel('Previous page')), const Size(44, 44));
+          expect(tester.getSize(find.bySemanticsLabel('Previous page')), const Size(36, 44));
           await tester.pumpWidget(const SizedBox());
         }
       }

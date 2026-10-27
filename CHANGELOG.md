@@ -5,6 +5,12 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.63.4
+
+- The pill behind back and forward hugs them, 72 wide: each step is 36
+  across (44 high), its glyph 4 toward the other, still 28 apart (Özlem
+  2026-10-27).
+
 ## 0.63.3
 
 - Back and forward 28 apart: each glyph sits 8 toward the other while
