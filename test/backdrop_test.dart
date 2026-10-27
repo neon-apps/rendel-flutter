@@ -192,5 +192,9 @@ void main() {
     final reset = tester.getSize(find.byKey(const ValueKey('rendel-glyph-reset')));
     expect(tester.getSize(find.byKey(const ValueKey('rendel-glyph-arrowBack'))), reset);
     expect(tester.getSize(find.byKey(const ValueKey('rendel-glyph-arrowForward'))), reset);
+    // Özlem 2026-10-27: the two glyphs 36 apart, each step still 44 to the finger.
+    final back = tester.getCenter(find.byKey(const ValueKey('rendel-glyph-arrowBack')));
+    final forward = tester.getCenter(find.byKey(const ValueKey('rendel-glyph-arrowForward')));
+    expect(forward.dx - back.dx, 36);
   });
 }

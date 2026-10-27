@@ -1975,11 +1975,13 @@ class _PageSteps extends StatelessWidget {
               glyph: rtl ? forward : back,
               label: strings.previousPage,
               onTap: onBack,
+              inward: const EdgeInsetsDirectional.only(start: 8),
             ),
             _PageStep(
               glyph: rtl ? back : forward,
               label: strings.nextPage,
               onTap: onForward,
+              inward: const EdgeInsetsDirectional.only(end: 8),
             ),
           ],
         ),
@@ -1991,9 +1993,14 @@ class _PageSteps extends StatelessWidget {
 /// One step through the pages. Spent rather than absent at either end: a
 /// button that comes and goes moves the one beside it.
 class _PageStep extends StatelessWidget {
-  const _PageStep({required this.glyph, required this.label, this.onTap});
+  const _PageStep({required this.glyph, required this.label, required this.inward, this.onTap});
 
   final _Glyph glyph;
+
+  /// Room on the side away from the other step: each glyph sits 4 toward
+  /// it, so the two are 36 apart while each stays 44 to the finger, as the
+  /// console's phone draws them (Özlem 2026-10-27).
+  final EdgeInsetsDirectional inward;
   final String label;
   final VoidCallback? onTap;
 
@@ -2016,7 +2023,10 @@ class _PageStep extends StatelessWidget {
             height: 44,
             // The thin line and size of start over beside it (Özlem
             // 2026-10-27), not Material's heavier glyphs.
-            child: _HeaderGlyph.step(glyph, color: theme.colors.onSurface),
+            child: Padding(
+              padding: inward,
+              child: _HeaderGlyph.step(glyph, color: theme.colors.onSurface),
+            ),
           ),
         ),
       ),
