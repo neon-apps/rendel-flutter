@@ -1975,13 +1975,13 @@ class _PageSteps extends StatelessWidget {
               glyph: rtl ? forward : back,
               label: strings.previousPage,
               onTap: onBack,
-              inward: const EdgeInsetsDirectional.only(start: 8),
+              inward: const EdgeInsetsDirectional.only(start: 16),
             ),
             _PageStep(
               glyph: rtl ? back : forward,
               label: strings.nextPage,
               onTap: onForward,
-              inward: const EdgeInsetsDirectional.only(end: 8),
+              inward: const EdgeInsetsDirectional.only(end: 16),
             ),
           ],
         ),
@@ -1997,9 +1997,9 @@ class _PageStep extends StatelessWidget {
 
   final _Glyph glyph;
 
-  /// Room on the side away from the other step: each glyph sits 4 toward
-  /// it, so the two are 36 apart while each stays 44 to the finger, as the
-  /// console's phone draws them (Özlem 2026-10-27).
+  /// Room on the side away from the other step: each glyph sits 8 toward
+  /// it, so the two are 28 apart while each stays 44 to the finger (Özlem
+  /// 2026-10-27: 36 was still too far).
   final EdgeInsetsDirectional inward;
   final String label;
   final VoidCallback? onTap;

@@ -5,6 +5,12 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.63.3
+
+- Back and forward 28 apart: each glyph sits 8 toward the other while
+  each step stays 44 to the finger (Özlem 2026-10-27: 36 was still too
+  far).
+
 ## 0.63.2
 
 - Back and forward 36 apart, as the console draws them: each glyph sits
