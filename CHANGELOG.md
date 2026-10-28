@@ -5,6 +5,19 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.65.1
+
+**Fixed**
+
+- The opening screen matches the console's Appearance preview (Tuna
+  2026-10-28, Grove on a phone beside the preview):
+  - the welcome opens at the top of the panel, where the conversation will
+    be, instead of mid-screen;
+  - the suggestions card is the raised surface (`surfaceRaised`), as on the
+    web, instead of the grey `surfaceHigh`;
+  - every text style names its letter spacing, so a Material 3 host's text
+    theme (0.25–0.5) no longer spaces the panel's words wider.
+
 ## 0.65.0
 
 **Changed**

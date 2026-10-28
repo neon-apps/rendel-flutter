@@ -2298,8 +2298,11 @@ class _EmptyState extends StatelessWidget {
     final theme = RendelThemeScope.of(context);
     // Left-aligned and opened by the turn, not centred. A centred empty
     // state is a poster; this one is the first line of the conversation the
-    // reader is about to have, and it sits where that conversation will.
-    return Center(
+    // reader is about to have, and it sits where that conversation will: at
+    // the top, as the web panel's `.rd-empty` does (it sat mid-screen until
+    // 0.65.1).
+    return Align(
+      alignment: Alignment.topCenter,
       child: SingleChildScrollView(
         padding: EdgeInsets.all(theme.space.xl),
         child: Column(
@@ -2332,10 +2335,11 @@ class _EmptyState extends StatelessWidget {
               SizedBox(height: theme.space.xl),
               // One card, a hairline between each suggestion (Tuna,
               // 2026-10-10): a list to pick from, not four boxes. The web
-              // panel draws the same (`.rd-suggestions`).
+              // panel draws the same (`.rd-suggestions`), on the raised
+              // surface; until 0.65.1 this was the grey `surfaceHigh`.
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: theme.colors.surfaceHigh,
+                  color: theme.colors.surfaceRaised,
                   border: Border.all(color: theme.hairline),
                   borderRadius: BorderRadius.circular(theme.radius.card),
                 ),

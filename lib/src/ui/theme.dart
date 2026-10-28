@@ -610,6 +610,11 @@ class RendelPartLook {
 /// Renderers read `theme.text.heading` rather than assembling a [TextStyle],
 /// which is what keeps the catalog looking like one system. Built once per
 /// theme instance and cached, so this costs nothing per frame.
+///
+/// Every style names its letter spacing, 0 where the web panel's is normal.
+/// One left unset inherits the host's: a Material 3 app's text theme spaces
+/// body text 0.25–0.5, and Grove's panel read wider than the console's
+/// preview of it (Tuna, 2026-10-28).
 class RendelTextStyles {
   RendelTextStyles._({
     required RendelColors colors,
@@ -636,6 +641,7 @@ class RendelTextStyles {
           fontFamily: fontFamily,
           color: colors.onSurface,
           fontSize: scale.heading,
+          letterSpacing: 0,
           fontWeight: FontWeight.w600,
           height: 1.3,
         ),
@@ -643,18 +649,21 @@ class RendelTextStyles {
           fontFamily: fontFamily,
           color: colors.onSurface,
           fontSize: scale.heading,
+          letterSpacing: 0,
           height: 1.55,
         ),
         body = TextStyle(
           fontFamily: fontFamily,
           color: colors.onSurfaceSoft,
           fontSize: scale.body,
+          letterSpacing: 0,
           height: 1.5,
         ),
         label = TextStyle(
           fontFamily: fontFamily,
           color: colors.onSurface,
           fontSize: scale.label,
+          letterSpacing: 0,
           fontWeight: FontWeight.w500,
           height: 1.35,
         ),
@@ -662,6 +671,7 @@ class RendelTextStyles {
           fontFamily: fontFamily,
           color: colors.onSurfaceSoft,
           fontSize: scale.label,
+          letterSpacing: 0,
           fontWeight: FontWeight.w500,
           height: 1.35,
         ),
@@ -669,6 +679,7 @@ class RendelTextStyles {
           fontFamily: fontFamily,
           color: colors.onSurfaceFaint,
           fontSize: scale.caption,
+          letterSpacing: 0,
           height: 1.35,
         ),
         // Only legible on an accent fill: that is what `onAccent` is for. A
@@ -678,6 +689,7 @@ class RendelTextStyles {
           fontFamily: fontFamily,
           color: colors.onAccent,
           fontSize: scale.label,
+          letterSpacing: 0,
           fontWeight: FontWeight.w600,
           height: 1.35,
         ),
@@ -685,6 +697,7 @@ class RendelTextStyles {
           fontFamily: fontFamily,
           color: colors.onSurface,
           fontSize: scale.label,
+          letterSpacing: 0,
           fontWeight: FontWeight.w600,
           height: 1.35,
         ),
@@ -692,6 +705,7 @@ class RendelTextStyles {
           fontFamily: fontFamily,
           color: colors.onSurfaceSoft,
           fontSize: scale.caption,
+          letterSpacing: 0,
           height: 1.35,
         ),
         // Sentence case, not uppercase. The web sets this step at 75% width;
