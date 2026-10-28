@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.64.0
+
+**Fixed**
+
+- An answer's `**bold**` arrived as its asterisks (Özlem 2026-10-28: the
+  Cilt365 lede read "**Dehidrate Yağlı Cilt**", in every app). A text block
+  now reads its inline marks as the web SDK and the console do: `**bold**`,
+  `*italic*`, `` `code` ``, `~~struck~~` and `[words](https://…)`, which
+  opens where its words are tapped, beside the `==phrase==` mark it already
+  drew. The words arrive one after another in their own style, and a pair
+  left unclosed stays as written.
+
 ## 0.63.5
 
 **Fixed**

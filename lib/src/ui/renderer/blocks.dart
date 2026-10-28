@@ -5,7 +5,7 @@ import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
 import 'package:flutter/foundation.dart' show Factory, defaultTargetPlatform, kIsWeb;
-import 'package:flutter/gestures.dart' show OneSequenceGestureRecognizer, TapGestureRecognizer;
+import 'package:flutter/gestures.dart' show GestureRecognizer, OneSequenceGestureRecognizer, TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart' show LogicalKeyboardKey, StandardMessageCodec;
@@ -122,33 +122,75 @@ Widget buildFallback(BuildContext context, WireBlock block) {
   );
 }
 
-/// One run of answer text in [style], its ==marks== drawn, with the
-/// streaming caret after it when more is coming.
-Widget _textParagraph(BuildContext context, String text, TextStyle style, TextAlign? align, {required bool caret}) {
-  final theme = RendelThemeScope.of(context);
-  final marks = _markSpans(text);
-  if (!caret) {
-    final spans = marks?.spans ?? [TextSpan(text: text.isEmpty ? '…' : text)];
-    final drawn = _revealable(context, spans, style, align);
-    return marks == null ? drawn : _Marks(ranges: marks.ranges, color: theme.mark, child: drawn);
+/// One run of answer text in [style], its inline marks drawn ([_inline]),
+/// with the streaming caret after it when more is coming. A widget with
+/// state for its links' recognizers, which are its to dispose.
+class _Prose extends StatefulWidget {
+  const _Prose({
+    required this.text,
+    required this.style,
+    required this.dispatch,
+    this.align,
+    this.caret = false,
+  });
+
+  final String text;
+  final TextStyle style;
+  final TextAlign? align;
+
+  /// More of the words are coming: a caret after them says so, without a
+  /// spinner claiming the whole message is unavailable.
+  final bool caret;
+
+  /// Opens a `[words](https://…)` link; one it cannot handle is its words.
+  final RendelDispatcher dispatch;
+
+  @override
+  State<_Prose> createState() => _ProseState();
+}
+
+class _ProseState extends State<_Prose> {
+  final _taps = <TapGestureRecognizer>[];
+
+  void _forget() {
+    for (final tap in _taps) {
+      tap.dispose();
+    }
+    _taps.clear();
   }
-  final drawn = Text.rich(
-    TextSpan(
-      children: [
-        ...?marks?.spans,
-        if (marks == null) TextSpan(text: text.isEmpty ? '…' : text),
-        if (caret)
-          WidgetSpan(
-            alignment: PlaceholderAlignment.middle,
-            child: _Caret(color: theme.colors.onSurface, height: theme.type.heading),
-          ),
-      ],
-    ),
-    style: style,
-    textAlign: align,
-  );
-  if (marks == null) return drawn;
-  return _Marks(ranges: marks.ranges, color: theme.mark, child: drawn);
+
+  @override
+  void dispose() {
+    _forget();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    _forget();
+    final inline = _inline(widget.text, base: widget.style, theme: theme, link: (open) {
+      if (!widget.dispatch.canHandle(open)) return null;
+      final tap = TapGestureRecognizer()..onTap = () => widget.dispatch.onAction(open);
+      _taps.add(tap);
+      return tap;
+    });
+    final spans = <InlineSpan>[
+      if (inline.spans.isEmpty && !widget.caret) const TextSpan(text: '…') else ...inline.spans,
+      if (widget.caret)
+        WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          // Ink. The accent is reserved for what the reader can act on, and a
+          // cursor is the copilot talking.
+          child: _Caret(color: theme.colors.onSurface, height: theme.type.heading),
+        ),
+    ];
+    final drawn = widget.caret
+        ? Text.rich(TextSpan(children: spans), style: widget.style, textAlign: widget.align)
+        : _revealable(context, spans, widget.style, widget.align);
+    if (inline.marks.isEmpty) return drawn;
+    return _Marks(ranges: inline.marks, color: theme.mark, child: drawn);
+  }
 }
 
 Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
@@ -184,60 +226,20 @@ Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher di
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _textParagraph(context, text.substring(0, split).trim(), style, null, caret: false),
+          _Prose(text: text.substring(0, split).trim(), style: style, dispatch: dispatch),
           SizedBox(height: theme.space.md),
-          _textParagraph(
-            context,
-            rest,
-            theme.text.prose.copyWith(fontSize: 15, height: 1.5),
-            null,
+          _Prose(
+            text: rest,
+            style: theme.text.prose.copyWith(fontSize: 15, height: 1.5),
+            dispatch: dispatch,
             caret: !block.ready,
           ),
         ],
       );
     }
   }
-  final marks = _markSpans(text);
-
-  Widget paragraph() {
-    // While tokens are still arriving, a caret says "more is coming" without
-    // a spinner claiming the whole message is unavailable.
-    if (!block.ready) {
-      final streaming = Text.rich(
-        TextSpan(
-          children: [
-            ...?marks?.spans,
-            if (marks == null) TextSpan(text: text),
-            WidgetSpan(
-              alignment: PlaceholderAlignment.middle,
-              child: _Caret(
-                // Ink. The accent is reserved for what the reader can act on,
-                // and a cursor is the copilot talking.
-                color: theme.colors.onSurface,
-                height: theme.type.heading,
-              ),
-
-            ),
-          ],
-        ),
-        style: style,
-        textAlign: align,
-      );
-      if (marks == null) return streaming;
-      return _Marks(ranges: marks.ranges, color: theme.mark, child: streaming);
-    }
-
-    if (marks == null) {
-      return _revealable(context, [TextSpan(text: text.isEmpty ? '…' : text)], style, align);
-    }
-    return _Marks(
-      ranges: marks.ranges,
-      color: theme.mark,
-      child: _revealable(context, marks.spans, style, align),
-    );
-  }
-
-  if (!summary) return paragraph();
+  final paragraph = _Prose(text: text, style: style, align: align, dispatch: dispatch, caret: !block.ready);
+  if (!summary) return paragraph;
   // At most 32 characters wide, and balanced, so two short lines come out
   // even rather than one long line over an orphan.
   return LayoutBuilder(
@@ -254,13 +256,13 @@ Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher di
       return Center(
         child: SizedBox(
           width: balancedWidth(
-            text.replaceAllMapped(_markPattern, (match) => match.group(1)!),
+            _inline(text, base: style, theme: theme).plain,
             style,
             measure,
             scaler,
             direction,
           ),
-          child: paragraph(),
+          child: paragraph,
         ),
       );
     },
@@ -301,33 +303,87 @@ double balancedWidth(
   return math.min(max, wide.ceilToDouble());
 }
 
-/// `==phrase==`: a phrase the answer marks. Whitespace just inside either
-/// pair does not open or close one, so `a == b` stays an equation, and a pair
-/// left unclosed stays literal.
-final RegExp _markPattern = RegExp(r'==(?=\S)([^\n]+?)(?<=\S)==');
+/// The inline marks an answer carries, as the web SDK and the console read
+/// them (`markdown.ts`): `**bold**`, `*italic*`, `` `code` ``, `~~struck~~`,
+/// `[words](https://…)`, and `==phrase==`, the phrase an answer marks.
+/// Whitespace just inside a pair does not open or close one, so `a == b`
+/// stays an equation and `5 * 3` a product, and a pair left unclosed stays
+/// literal. The model is told to write none but the mark; what it wrote
+/// anyway arrived as its asterisks (Özlem 2026-10-28, Cilt365).
+final RegExp _inlinePattern = RegExp(
+  r'\*\*(.+?)\*\*|\*(?!\s)(.+?)\*|`([^`]+)`|~~(.+?)~~|\[([^\]]+)\]\(([^)\s]+)\)|==(?=\S)(.+?)(?<=\S)==',
+);
 
-/// The text as spans with the marks' delimiters taken out, and where the
-/// marked phrases fall in it. Null when nothing is marked, so unmarked prose
-/// is drawn exactly as it always was.
-({List<InlineSpan> spans, List<TextRange> ranges})? _markSpans(String text) {
-  final matches = _markPattern.allMatches(text).toList();
-  if (matches.isEmpty) return null;
-  final spans = <InlineSpan>[];
-  final ranges = <TextRange>[];
-  var at = 0;
-  var last = 0;
-  for (final match in matches) {
-    final before = text.substring(last, match.start);
-    if (before.isNotEmpty) spans.add(TextSpan(text: before));
-    at += before.length;
-    final phrase = match.group(1)!;
-    spans.add(TextSpan(text: phrase));
-    ranges.add(TextRange(start: at, end: at + phrase.length));
-    at += phrase.length;
-    last = match.end;
+/// [_inline]'s reading of a text: flat spans, each in the style its marks
+/// lay over the paragraph's, where the marked phrases fall, and the words
+/// with every delimiter taken out.
+class _Inline {
+  final spans = <TextSpan>[];
+  final marks = <TextRange>[];
+  var _length = 0;
+
+  String get plain => spans.map((span) => span.text).join();
+
+  void _add(String text, TextStyle? style, GestureRecognizer? tap) {
+    if (text.isEmpty) return;
+    spans.add(TextSpan(text: text, style: style, recognizer: tap));
+    _length += text.length;
   }
-  if (last < text.length) spans.add(TextSpan(text: text.substring(last)));
-  return (spans: spans, ranges: ranges);
+}
+
+/// [text] with its inline marks read, for a paragraph set in [base]. A link
+/// is live when [link] gives it a recognizer; otherwise, and when the
+/// protocol does not read it (https alone), it is its words.
+_Inline _inline(
+  String text, {
+  required TextStyle base,
+  required RendelTheme theme,
+  TapGestureRecognizer? Function(UIAction open)? link,
+}) {
+  final out = _Inline();
+  void walk(String text, TextStyle? style, GestureRecognizer? tap) {
+    TextStyle over(TextStyle more) => style?.merge(more) ?? more;
+    var last = 0;
+    for (final m in _inlinePattern.allMatches(text)) {
+      out._add(text.substring(last, m.start), style, tap);
+      last = m.end;
+      if (m[1] != null) {
+        walk(m[1]!, over(const TextStyle(fontWeight: FontWeight.w700)), tap);
+      } else if (m[2] != null) {
+        walk(m[2]!, over(const TextStyle(fontStyle: FontStyle.italic)), tap);
+      } else if (m[3] != null) {
+        out._add(
+          m[3]!,
+          over(TextStyle(
+            fontFamily: 'monospace',
+            fontFamilyFallback: const ['Menlo', 'Courier'],
+            fontSize: (base.fontSize ?? 14) * 0.88,
+          )),
+          tap,
+        );
+      } else if (m[4] != null) {
+        walk(m[4]!, over(const TextStyle(decoration: TextDecoration.lineThrough)), tap);
+      } else if (m[5] != null) {
+        final open = UIAction.tryParse({'kind': 'open_url', 'url': m[6]});
+        final live = open == null ? null : link?.call(open);
+        walk(
+          m[5]!,
+          live == null
+              ? style
+              : over(TextStyle(decoration: TextDecoration.underline, decorationColor: theme.colors.lineStrong)),
+          live ?? tap,
+        );
+      } else {
+        final start = out._length;
+        walk(m[7]!, style, tap);
+        out.marks.add(TextRange(start: start, end: out._length));
+      }
+    }
+    out._add(text.substring(last), style, tap);
+  }
+
+  walk(text, null, null);
+  return out;
 }
 
 /// Paints the mark behind each marked phrase of the paragraph below it: the
@@ -8825,7 +8881,8 @@ class _Arriving extends InheritedWidget {
 class _WordReveal extends StatefulWidget {
   const _WordReveal({required this.spans, required this.style, this.align});
 
-  /// Plain text spans, as `_markSpans` makes them.
+  /// Flat text spans, as `_inline` makes them: each in its own style over
+  /// the paragraph's, a link's with its recognizer.
   final List<InlineSpan> spans;
   final TextStyle style;
   final TextAlign? align;
@@ -8857,6 +8914,9 @@ class _WordRevealState extends State<_WordReveal> with SingleTickerProviderState
     super.dispose();
   }
 
+  /// [ink] [since] ms into its fade.
+  Color _faded(Color ink, double since) => ink.withValues(alpha: ink.a * (since / _fade).clamp(0.0, 1.0));
+
   @override
   Widget build(BuildContext context) {
     final ink = widget.style.color ?? DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000);
@@ -8868,15 +8928,16 @@ class _WordRevealState extends State<_WordReveal> with SingleTickerProviderState
         return Text.rich(
           TextSpan(children: [
             for (var i = 0; i < widget.spans.length; i++)
-              if (widget.spans[i] is TextSpan)
-                TextSpan(children: [
+              if (widget.spans[i] case TextSpan(:final style, :final recognizer))
+                TextSpan(style: style, children: [
                   for (final piece in _pieces[i])
                     if (piece.trim().isEmpty)
-                      TextSpan(text: piece)
+                      TextSpan(text: piece, recognizer: recognizer)
                     else
                       TextSpan(
                         text: piece,
-                        style: TextStyle(color: ink.withValues(alpha: ink.a * ((ms - _step * word++) / _fade).clamp(0.0, 1.0))),
+                        recognizer: recognizer,
+                        style: TextStyle(color: _faded(style?.color ?? ink, ms - _step * word++)),
                       ),
                 ])
               else

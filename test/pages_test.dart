@@ -1,13 +1,31 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
+import 'package:rendel/src/core/batteries.dart' show openLink;
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/protocol/protocol.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/renderer/blocks.dart' show readsFlatOnPage;
 import 'package:rendel/src/ui/thread_screen.dart';
+import 'package:url_launcher_platform_interface/link.dart';
+import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
+
+/// The browser a link in the prose opens in: what it was handed.
+class _Browser extends UrlLauncherPlatform {
+  final List<String> opened = [];
+
+  @override
+  LinkDelegate? get linkDelegate => null;
+
+  @override
+  Future<bool> launchUrl(String url, LaunchOptions options) async {
+    opened.add(url);
+    return true;
+  }
+}
 
 /// A server the test answers by hand, one event at a time, so the screen can
 /// be looked at between them.
@@ -74,17 +92,18 @@ WireBlock _text(String id, String markdown) =>
 
 /// The design brief's tests for answer pages (`design/PAGES.md`).
 void main() {
-  ConversationController controller(RendelApiClient api) => ConversationController(
+  ConversationController controller(RendelApiClient api, {Future<void> Function(String url)? onOpenUrl}) =>
+      ConversationController(
         api: api,
         actions: const {},
         sdkVersion: 'flutter/test',
+        onOpenUrl: onOpenUrl,
       );
 
-  ConversationController offline() => controller(RendelApiClient(
-        appKey: 'nc_pk_test_x',
-        deviceId: 'd',
-        config: const RendelConfig(),
-      ));
+  ConversationController offline({Future<void> Function(String url)? onOpenUrl}) => controller(
+        RendelApiClient(appKey: 'nc_pk_test_x', deviceId: 'd', config: const RendelConfig()),
+        onOpenUrl: onOpenUrl,
+      );
 
   Future<void> pump(WidgetTester tester, ConversationController c) async {
     await tester.pumpWidget(
@@ -116,9 +135,11 @@ void main() {
     await settle(tester);
   }
 
-  /// A page drawn from answers the conversation already holds.
-  ConversationController seeded(List<WireBlock> blocks) {
-    final c = offline();
+  /// A page drawn from answers the conversation already holds. [onOpenUrl]
+  /// is what opens a link; an app that followed the quickstart has
+  /// `openLink` there (`copilot.dart`), a bare controller nothing.
+  ConversationController seeded(List<WireBlock> blocks, {Future<void> Function(String url)? onOpenUrl}) {
+    final c = offline(onOpenUrl: onOpenUrl);
     c.messages
       ..add(RendelMessage.user('Which shoe should I buy?'))
       ..add(RendelMessage.assistant()..blocks.addAll(blocks));
@@ -436,6 +457,117 @@ void main() {
 
     expect(tester.widget<Text>(find.text("I can't give dietary advice.")).style?.fontSize, 21);
     expect(tester.widget<Text>(find.text('What I can do is show you the label for any snack.')).style?.fontSize, 15);
+  });
+
+  /* Özlem 2026-10-28: the model writes **bold** though it is told not to,
+     and the Cilt365 lede read "**Dehidrate Yağlı Cilt**", asterisks and all,
+     in every app. The web SDK and the console drew it bold already. */
+  group('inline marks', () {
+    /// The style the first run of words holding [word] is drawn in, merged
+    /// down the span tree as the reader sees it.
+    TextStyle styleOf(WidgetTester tester, String words, String word) {
+      final text = tester.widget<Text>(find.text(words));
+      TextStyle? found;
+      void walk(InlineSpan span, TextStyle style) {
+        if (found != null || span is! TextSpan) return;
+        final merged = style.merge(span.style);
+        if (span.text?.contains(word) ?? false) {
+          found = merged;
+          return;
+        }
+        span.children?.forEach((child) => walk(child, merged));
+      }
+
+      walk(text.textSpan!, text.style ?? const TextStyle());
+      return found!;
+    }
+
+    testWidgets('**bold** is drawn bold, without its asterisks', (tester) async {
+      final c = seeded([_text('t', 'Cilt profilin **Dehidrate Yağlı Cilt**. Lekeye de yatkın.')]);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await settle(tester);
+
+      const words = 'Cilt profilin Dehidrate Yağlı Cilt. Lekeye de yatkın.';
+      expect(find.text(words), findsOneWidget);
+      expect(find.textContaining('**'), findsNothing);
+      expect(styleOf(tester, words, 'Dehidrate').fontWeight, FontWeight.w700);
+      expect(styleOf(tester, words, 'Lekeye').fontWeight, FontWeight.w500);
+    });
+
+    testWidgets('bold holds through the words\' arrival', (tester) async {
+      final api = _LiveApi();
+      final c = controller(api);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await ask(tester, c, api, 'Cilt profilim?', [_text('t', 'Profilin **Dehidrate Yağlı Cilt**.')]);
+
+      const words = 'Profilin Dehidrate Yağlı Cilt.';
+      expect(find.byWidgetPredicate((w) => '${w.runtimeType}' == '_WordReveal'), findsOneWidget);
+      expect(find.text(words), findsOneWidget);
+      expect(styleOf(tester, words, 'Dehidrate').fontWeight, FontWeight.w700);
+      expect(styleOf(tester, words, 'Profilin').fontWeight, FontWeight.w500);
+    });
+
+    testWidgets('*italic*, `code` and ~~struck~~ are drawn as themselves', (tester) async {
+      final c = seeded([_text('t', 'Say *gently*, run `pub get`, not ~~that~~.')]);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await settle(tester);
+
+      const words = 'Say gently, run pub get, not that.';
+      expect(find.text(words), findsOneWidget);
+      expect(styleOf(tester, words, 'gently').fontStyle, FontStyle.italic);
+      expect(styleOf(tester, words, 'pub').fontFamily, 'monospace');
+      expect(styleOf(tester, words, 'that').decoration, TextDecoration.lineThrough);
+    });
+
+    testWidgets('a link is its words, and opens where they are tapped', (tester) async {
+      final browser = _Browser();
+      UrlLauncherPlatform.instance = browser;
+      final c = seeded([_text('t', 'See [the routine](https://cilt365.com/routine) today.')], onOpenUrl: openLink);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await settle(tester);
+
+      const words = 'See the routine today.';
+      expect(find.text(words), findsOneWidget);
+      expect(find.textContaining('https://'), findsNothing);
+      TapGestureRecognizer? tap;
+      tester.widget<Text>(find.text(words)).textSpan!.visitChildren((span) {
+        if (span is TextSpan && (span.text?.contains('routine') ?? false)) tap = span.recognizer as TapGestureRecognizer?;
+        return tap == null;
+      });
+      await tester.runAsync(() async {
+        tap!.onTap!();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+      expect(browser.opened, ['https://cilt365.com/routine']);
+    });
+
+    testWidgets('a lone asterisk and an unclosed pair stay as written', (tester) async {
+      final c = seeded([_text('t', 'Take 5 * 3 = 15, and **this stays.')]);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await settle(tester);
+
+      expect(find.text('Take 5 * 3 = 15, and **this stays.'), findsOneWidget);
+    });
+
+    testWidgets('a mark can hold bold, and the mark is painted', (tester) async {
+      final c = seeded([_text('t', 'The pick is ==the **Aero** Glide==, in your size.')]);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await settle(tester);
+
+      const words = 'The pick is the Aero Glide, in your size.';
+      expect(find.text(words), findsOneWidget);
+      expect(styleOf(tester, words, 'Aero').fontWeight, FontWeight.w700);
+      expect(
+        tester.renderObject(find.byWidgetPredicate((w) => '${w.runtimeType}' == '_Marks')),
+        paints..rrect(color: RendelTheme.paper().mark),
+      );
+    });
   });
 
   group('a marked phrase', () {
