@@ -76,6 +76,25 @@ enum RendelSendIcon {
   }
 }
 
+/// What the launcher shows (Tuna, 2026-10-28): its icon and its word, or a
+/// round button with the icon alone, which still says the word to a screen
+/// reader.
+enum RendelLauncherStyle {
+  label('label'),
+  icon('icon');
+
+  const RendelLauncherStyle(this.wireName);
+
+  final String wireName;
+
+  static RendelLauncherStyle? fromName(String? name) {
+    for (final value in RendelLauncherStyle.values) {
+      if (value.wireName == name) return value;
+    }
+    return null;
+  }
+}
+
 /// Which of the copilot's two themes is drawn.
 ///
 /// The SDK's own enum rather than Flutter's `ThemeMode`, because this file is
@@ -119,6 +138,9 @@ class RendelConfig {
     this.onStopDictating,
     this.streamIdleTimeout = const Duration(seconds: 45),
     this.launcherLabel = 'Ask',
+    this.launcherStyle = RendelLauncherStyle.label,
+    this.launcherIcon = 'sparkle',
+    this.launcherDraggable = false,
     this.composerHint,
     // The "+" the composer opens its menu of Photos, Camera and Files with.
     this.attachIcon = RendelAttachIcon.plus,
@@ -372,6 +394,22 @@ class RendelConfig {
   /// The word on the launcher. Name what the user gets, in their words.
   final String launcherLabel;
 
+  /// The launcher with its word, or as a round button with its icon alone.
+  final RendelLauncherStyle launcherStyle;
+
+  /// The launcher's icon, by the name the console's Appearance lists it
+  /// under (Phosphor, fill weight): `sparkle`, `chat-circle`, `headset`…
+  /// A name this build does not carry draws the sparkle. `custom` is the
+  /// customer's own, uploaded in the console; with none published it is the
+  /// sparkle too.
+  final String launcherIcon;
+
+  /// People may drag the launcher. Let go, it settles on the nearer side and
+  /// keeps that place on every screen and after a restart, on that device.
+  /// It then draws itself once, over the app, wherever the first
+  /// `RendelLauncher` was placed; every placement leaves an empty slot.
+  final bool launcherDraggable;
+
   /// The words in the message box before anyone has typed.
   ///
   /// Null is the right default and not an empty one: [RendelStrings.composerHint]
@@ -459,6 +497,9 @@ class RendelConfig {
   RendelConfig copyWith({
     String? assistantName,
     String? launcherLabel,
+    RendelLauncherStyle? launcherStyle,
+    String? launcherIcon,
+    bool? launcherDraggable,
     String? emptyStateTitle,
     String? emptyStateBody,
     List<String>? suggestions,
@@ -487,6 +528,9 @@ class RendelConfig {
       onStopDictating: onStopDictating,
       streamIdleTimeout: streamIdleTimeout,
       launcherLabel: launcherLabel ?? this.launcherLabel,
+      launcherStyle: launcherStyle ?? this.launcherStyle,
+      launcherIcon: launcherIcon ?? this.launcherIcon,
+      launcherDraggable: launcherDraggable ?? this.launcherDraggable,
       composerHint: composerHint ?? this.composerHint,
       attachIcon: attachIcon ?? this.attachIcon,
       voiceIcon: voiceIcon ?? this.voiceIcon,

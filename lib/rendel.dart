@@ -9,7 +9,7 @@ export 'src/core/action.dart'
 export 'src/core/log.dart' show RendelLog, RendelLogLevel, RendelLogRecord;
 export 'src/core/route.dart' show RendelRouteParam, RendelRouteOpener;
 export 'src/core/config.dart'
-    show RendelConfig, RendelAttachIcon, RendelAttachment, RendelAttachSource, RendelVoiceIcon, RendelSendIcon, RendelThemeMode;
+    show RendelConfig, RendelAttachIcon, RendelAttachment, RendelAttachSource, RendelVoiceIcon, RendelSendIcon, RendelThemeMode, RendelLauncherStyle;
 export 'src/core/strings.dart' show RendelStrings, RendelStringsScope;
 // Runtime appearance and opening surface: what the console publishes and how
 // a host decides where the last good payload is kept between launches.

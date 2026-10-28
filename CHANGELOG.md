@@ -5,6 +5,36 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.66.0
+
+**Added**
+
+- The launcher's look and place, chosen in the console's Appearance (Tuna
+  2026-10-28), or in code on `RendelConfig`:
+  - `launcherStyle`: `RendelLauncherStyle.label` (the icon and the word, the
+    default) or `RendelLauncherStyle.icon`, a round button with the icon
+    alone, as tall as the labelled one, which still says the word to a
+    screen reader;
+  - `launcherIcon`: one of 20 icons by name (Phosphor, fill weight;
+    `sparkle` by default), or `custom`, the customer's own icon uploaded in
+    the console, fetched like the logo (`/v1/apps/launcher-icon`) and drawn
+    in the launcher's ink. A name this build does not carry, and an icon of
+    their own that has not loaded or cannot be, is the sparkle;
+  - `launcherDraggable`: people may drag the launcher. It then draws itself
+    once, over the app, wherever the first `RendelLauncher` was placed, and
+    every placement keeps an empty slot. Let go, it settles 20 from the
+    nearer side at the height it was let go, inside the safe area, and keeps
+    that place on every screen and after a restart, on that device. A press
+    that moves less than 6 points is still a tap. The "In the app" popup
+    opens over it from the side it is on.
+- `path_parsing` (pure Dart) as a dependency, to draw the icons.
+
+**Changed**
+
+- The launcher leads with an icon before its word, 20 square and 8 from it,
+  as the web SDK's and the console's preview do, with the web's 16 before
+  the icon and 20 after the word.
+
 ## 0.65.2
 
 **Fixed**

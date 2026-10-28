@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../ui/launcher_icons.dart';
 import '../ui/theme.dart';
 import 'analytics.dart' show RendelCapture;
 import 'config.dart';
@@ -157,6 +158,19 @@ class RendelRemoteConfig {
   /// request out of.
   String? get logoAssetId {
     final value = theme['logoAssetId'];
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    final looksLikeId = RegExp(
+      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+    ).hasMatch(trimmed);
+    return looksLikeId ? trimmed : null;
+  }
+
+  /// The customer's own launcher icon, as an id, for the logo's reason: the
+  /// device builds the address from its own `apiBaseUrl`
+  /// (`/v1/apps/launcher-icon`). A uuid or nothing.
+  String? get launcherIconAssetId {
+    final value = copilot['launcherIconAssetId'];
     if (value is! String) return null;
     final trimmed = value.trim();
     final looksLikeId = RegExp(
@@ -592,6 +606,11 @@ class RendelRemoteConfig {
     return base.copyWith(
       assistantName: _text(copilot['assistantName'], 40),
       launcherLabel: _text(copilot['launcherLabel'], 24),
+      launcherStyle: RendelLauncherStyle.fromName(_iconName(copilot['launcherStyle'])),
+      // Like the composer's glyphs: a name this build does not draw is "said
+      // nothing", and the host's icon stays.
+      launcherIcon: _launcherIcon(copilot['launcherIcon']),
+      launcherDraggable: copilot['launcherDraggable'] is bool ? copilot['launcherDraggable'] as bool : null,
       // Clearable, unlike the two above. A name and a launcher label are
       // things the copilot cannot do without, so an empty one means "I said
       // nothing about this". A subtitle is something a customer may genuinely
@@ -622,6 +641,12 @@ class RendelRemoteConfig {
       // The console's voice switch (Settings › Voice), laid over the config by the API.
       readAloud: copilot['readAloud'] is bool ? copilot['readAloud'] as bool : null,
     );
+  }
+
+  /// One of the launcher icons this build carries, or `custom`, or nothing.
+  static String? _launcherIcon(Object? value) {
+    final name = _iconName(value);
+    return name == 'custom' || launcherIconPaths.containsKey(name) ? name : null;
   }
 
   /// A glyph name off the wire: a short plain string, or nothing.

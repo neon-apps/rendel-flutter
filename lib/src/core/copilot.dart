@@ -1001,6 +1001,7 @@ class Rendel {
     _parallelReads = true;
     _config = const RendelConfig();
     _logoAssetId = null;
+    _launcherIconAssetId = null;
     _codeConfig = _config;
     RendelFollowups.instance
       ..clear()
@@ -1149,6 +1150,7 @@ class Rendel {
     _darkTheme = remote.applyToDark(_codeTheme, _codeDarkTheme);
     _config = remote.applyToConfig(_codeConfig);
     _logoAssetId = remote.logoAssetId;
+    _launcherIconAssetId = remote.launcherIconAssetId;
     auditContrast(_theme);
     auditContrast(_darkTheme);
     configRevision.value++;
@@ -1171,6 +1173,25 @@ class Rendel {
     final id = _logoAssetId;
     if (id == null) return null;
     return '${_config.apiBaseUrl}/v1/apps/logo?v=$id';
+  }
+
+  /// The customer's own launcher icon's id, if one is published.
+  static String? _launcherIconAssetId;
+
+  /// Where the launcher fetches the customer's own icon from, while
+  /// `launcherIcon` is `custom`: built like [logoUrl] and fetched with
+  /// [logoHeaders], for the same reasons.
+  static String? get launcherIconUrl {
+    final id = _launcherIconAssetId;
+    if (id == null || _config.launcherIcon != 'custom') return null;
+    return '${_config.apiBaseUrl}/v1/apps/launcher-icon?v=$id';
+  }
+
+  /// Where a dragged launcher's place is kept on this device, one per app
+  /// key. Null before [init].
+  static String? get launcherPlaceKey {
+    final key = _appKey;
+    return key == null ? null : 'rendel_launcher_place_$key';
   }
 
   /// The words the thread is drawn with.
