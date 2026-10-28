@@ -77,6 +77,14 @@ class RendelSpeech {
   /// closed the instant it opened.
   var _listening = false;
 
+  /// [stop] arrived before the session began listening: a press let go while
+  /// the recogniser was still starting. iOS takes a few hundred milliseconds
+  /// to get there, and `SpeechToText.stop` before `listen` does nothing, so the
+  /// session then opened anyway and held the microphone, and the thread, until
+  /// its 30-second pause: a microphone that would not press again (Tuna
+  /// 2026-10-28, Grove). Checked at each step on the way to listening.
+  var _stopAsked = false;
+
   /// The errors that mean nobody spoke, rather than that nothing could listen.
   static const _silence = {'error_no_match', 'error_speech_timeout', 'error_retry'};
 
@@ -85,6 +93,7 @@ class RendelSpeech {
 
   /// `RendelConfig.onDictate`, built in.
   Future<String?> dictate(void Function(String partial) onPartial) async {
+    _stopAsked = false;
     final bool ready;
     try {
       // The callbacks are set on the first `initialize` and kept.
@@ -124,6 +133,8 @@ class RendelSpeech {
       throw StateError('speech recognition is unavailable');
     }
 
+    if (_stopAsked) return null;
+
     /* A session that has not finished letting go.
 
        iOS takes a moment to release the audio session, and `listen` during
@@ -133,6 +144,8 @@ class RendelSpeech {
       await _speech.cancel();
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
+
+    if (_stopAsked) return null;
 
     _heard = '';
     _failure = null;
@@ -167,6 +180,13 @@ class RendelSpeech {
       rethrow;
     }
 
+    // Let go while `listen` was on its way: close what it opened.
+    if (_stopAsked) {
+      await _speech.cancel();
+      _end();
+      return completer.future;
+    }
+
     // And if it did not start after all, say so now rather than leaving a lit
     // microphone attached to a future nobody will complete.
     if (!_speech.isListening) {
@@ -186,7 +206,10 @@ class RendelSpeech {
 
   /// `RendelConfig.onStopDictating`, built in. Stopping fires `onStatus`, which
   /// completes the future [dictate] returned.
-  void stop() => unawaited(_speech.stop());
+  void stop() {
+    _stopAsked = true;
+    unawaited(_speech.stop());
+  }
 
   void _end() {
     if (!_listening) return;

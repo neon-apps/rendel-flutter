@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -52,6 +55,35 @@ void main() {
       RendelSpeech(locale: 'tr-TR').dictate((_) {}),
       throwsA(isA<StateError>()),
     );
+  });
+
+  test('a press let go while the recogniser starts never opens the microphone', () async {
+    // Tuna 2026-10-28, Grove: let go at once and the session opened anyway,
+    // held the microphone and the thread for its 30-second pause, and the
+    // microphone would not press again until then.
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = MethodChannel('plugin.csdcorp.com/speech_to_text');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final starting = Completer<bool>();
+    final calls = <String>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      calls.add(call.method);
+      return switch (call.method) {
+        'initialize' => starting.future,
+        'has_permission' => true,
+        'locales' => <dynamic>[],
+        _ => true,
+      };
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final speech = RendelSpeech();
+    final heard = speech.dictate((_) {});
+    speech.stop(); // let go before the recogniser is up
+    starting.complete(true);
+
+    expect(await heard.timeout(const Duration(seconds: 1)), isNull);
+    expect(calls, isNot(contains('listen')));
   });
 
   test('the built-in picker reports a missing platform, not a cancel',

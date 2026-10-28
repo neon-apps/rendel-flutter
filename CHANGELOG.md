@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.65.2
+
+**Fixed**
+
+- A microphone pressed and let go at once would not press again for about
+  30 seconds (Tuna 2026-10-28, Grove). Let go while the recogniser was still
+  starting, the stop went nowhere: the session opened anyway and held the
+  microphone, and the thread, until its pause ran out. A stop that arrives
+  while the recogniser starts now ends the dictation there, and the
+  microphone is never opened.
+
 ## 0.65.1
 
 **Fixed**
