@@ -236,6 +236,59 @@ void main() {
       await settle(tester);
     });
 
+    testWidgets('its answer is written at one pace, word after word', (tester) async {
+      final api = _LiveApi();
+      final c = controller(api);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await _send(tester, c, 'Cildime uygun nemlendirici öner');
+      // 199 characters: 1.8 s at 110 a second.
+      final long = List.filled(40, 'word').join(' ');
+      await api.answer(tester, [_text('a', long)]);
+      await tester.pump(const Duration(milliseconds: 600));
+      List<double> alphas() {
+        final paragraph = tester.widget<RichText>(find.byWidgetPredicate((w) => w is RichText && w.text.toPlainText().startsWith('word')));
+        final out = <double>[];
+        paragraph.text.visitChildren((span) {
+          if (span is TextSpan && (span.text?.trim().isNotEmpty ?? false) && span.style?.color != null) out.add(span.style!.color!.a);
+          return true;
+        });
+        return out;
+      }
+      expect(alphas().first, greaterThan(0.99), reason: 'the first word is in by 0.6 s');
+      expect(alphas().last, 0, reason: 'the last is not due before 1.8 s');
+      await tester.pump(const Duration(seconds: 3));
+      expect(alphas().every((a) => a > 0.99), isTrue);
+    });
+
+    testWidgets('its answer is written at one pace when its start, words and ready arrive in one read',
+        (tester) async {
+      final api = _LiveApi();
+      final c = controller(api);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await _send(tester, c, 'Cildime uygun nemlendirici öner');
+      final long = List.filled(40, 'word').join(' ');
+      // As the server sends prose: started, said whole, and ready, in one
+      // flush — which used to count as entered before a frame drew it.
+      await api.push(tester, [
+        const TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
+        const BlockStart(index: 0, id: 'a', blockType: 'text'),
+        BlockDelta(index: 0, textDelta: long),
+        BlockReady(index: 0, block: _text('a', long)),
+        const TurnEnd(status: 'completed', pending: []),
+      ], end: true);
+      await tester.pump(const Duration(milliseconds: 600));
+      final paragraph = tester.widget<RichText>(find.byWidgetPredicate((w) => w is RichText && w.text.toPlainText().startsWith('word')));
+      final alphas = <double>[];
+      paragraph.text.visitChildren((span) {
+        if (span is TextSpan && (span.text?.trim().isNotEmpty ?? false) && span.style?.color != null) alphas.add(span.style!.color!.a);
+        return true;
+      });
+      expect(alphas, isNotEmpty, reason: 'written word by word, not simply there');
+      expect(alphas.last, 0);
+    });
+
     testWidgets('goes when a turn ends with nothing to show', (tester) async {
       final api = _LiveApi();
       final c = controller(api);
@@ -503,7 +556,7 @@ void main() {
       await ask(tester, c, api, 'Cilt profilim?', [_text('t', 'Profilin **Dehidrate Yağlı Cilt**.')]);
 
       const words = 'Profilin Dehidrate Yağlı Cilt.';
-      expect(find.byWidgetPredicate((w) => '${w.runtimeType}' == '_WordReveal'), findsOneWidget);
+      expect(find.byWidgetPredicate((w) => '${w.runtimeType}' == '_WordFlow'), findsOneWidget);
       expect(find.text(words), findsOneWidget);
       expect(styleOf(tester, words, 'Dehidrate').fontWeight, FontWeight.w700);
       expect(styleOf(tester, words, 'Profilin').fontWeight, FontWeight.w500);

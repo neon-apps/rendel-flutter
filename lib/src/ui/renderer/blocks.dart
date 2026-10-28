@@ -4,10 +4,11 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' show ImageFilter;
 
-import 'package:flutter/foundation.dart' show Factory, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart' show Factory, defaultTargetPlatform, kIsWeb, listEquals;
 import 'package:flutter/gestures.dart' show GestureRecognizer, OneSequenceGestureRecognizer, TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/scheduler.dart' show SchedulerBinding, SchedulerPhase, Ticker;
 import 'package:flutter/services.dart' show LogicalKeyboardKey, StandardMessageCodec;
 
 import '../../engine/conversation_controller.dart'
@@ -177,21 +178,38 @@ class _ProseState extends State<_Prose> {
     });
     final spans = <InlineSpan>[
       if (inline.spans.isEmpty && !widget.caret) const TextSpan(text: '…') else ...inline.spans,
-      if (widget.caret)
-        WidgetSpan(
-          alignment: PlaceholderAlignment.middle,
-          // Ink. The accent is reserved for what the reader can act on, and a
-          // cursor is the copilot talking.
-          child: _Caret(color: theme.colors.onSurface, height: theme.type.heading),
-        ),
     ];
-    final drawn = widget.caret
-        ? Text.rich(TextSpan(children: spans), style: widget.style, textAlign: widget.align)
-        : _revealable(context, spans, widget.style, widget.align);
+    // Ink. The accent is reserved for what the reader can act on, and a
+    // cursor is the copilot talking.
+    final caret = widget.caret ? _Caret(color: theme.colors.onSurface, height: theme.type.heading) : null;
+    // Written at the page's pace while its block is arriving, as a stream or
+    // whole (`_Flow`). A block seen before, and every block under reduced
+    // motion, is simply there.
+    final arriving = _Arriving.of(context);
+    if ((arriving != null || widget.caret) && !MediaQuery.disableAnimationsOf(context)) {
+      return _WordFlow(
+        page: arriving?.page,
+        notBefore: arriving?.at,
+        spans: spans,
+        style: widget.style,
+        align: widget.align,
+        caret: caret,
+        marks: inline.marks,
+        mark: theme.mark,
+      );
+    }
+    final drawn = Text.rich(
+      TextSpan(children: [...spans, if (caret != null) _caretSpan(caret)]),
+      style: widget.style,
+      textAlign: widget.align,
+    );
     if (inline.marks.isEmpty) return drawn;
     return _Marks(ranges: inline.marks, color: theme.mark, child: drawn);
   }
 }
+
+/// [caret] after the words, in the line.
+InlineSpan _caretSpan(Widget caret) => WidgetSpan(alignment: PlaceholderAlignment.middle, child: caret);
 
 Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
   final theme = RendelThemeScope.of(context);
@@ -394,28 +412,41 @@ _Inline _inline(
 /// background, which has no corner and paints the line's full height, and
 /// rather than as a `WidgetSpan`, which cannot wrap.
 class _Marks extends SingleChildRenderObjectWidget {
-  const _Marks({required this.ranges, required this.color, required super.child});
+  const _Marks({required this.ranges, required this.color, this.alphas, required super.child});
 
   final List<TextRange> ranges;
   final Color color;
 
+  /// How far in each mark is, one per range, while its words are arriving
+  /// (`_WordFlow`): a mark no fainter than the words it sits behind. Null
+  /// once they are all in.
+  final List<double>? alphas;
+
   @override
-  RenderObject createRenderObject(BuildContext context) => _RenderMarks(ranges, color);
+  RenderObject createRenderObject(BuildContext context) => _RenderMarks(ranges, color, alphas);
 
   @override
   void updateRenderObject(BuildContext context, _RenderMarks renderObject) {
     renderObject
       ..ranges = ranges
-      ..color = color;
+      ..color = color
+      ..alphas = alphas;
   }
 }
 
 class _RenderMarks extends RenderProxyBox {
-  _RenderMarks(this._ranges, this._color);
+  _RenderMarks(this._ranges, this._color, this._alphas);
 
   List<TextRange> _ranges;
   set ranges(List<TextRange> value) {
     _ranges = value;
+    markNeedsPaint();
+  }
+
+  List<double>? _alphas;
+  set alphas(List<double>? value) {
+    if (listEquals(value, _alphas)) return;
+    _alphas = value;
     markNeedsPaint();
   }
 
@@ -445,7 +476,11 @@ class _RenderMarks extends RenderProxyBox {
       final reach = size * 0.12;
       final paint = Paint()..color = _color;
       final transform = paragraph.getTransformTo(this);
-      for (final range in _ranges) {
+      for (var i = 0; i < _ranges.length; i++) {
+        final range = _ranges[i];
+        final alpha = _alphas == null || i >= _alphas!.length ? 1.0 : _alphas![i];
+        if (alpha <= 0) continue;
+        paint.color = _color.withValues(alpha: _color.a * alpha);
         final boxes = paragraph.getBoxesForSelection(
           TextSelection(baseOffset: range.start, extentOffset: range.end),
         );
@@ -8748,11 +8783,18 @@ class BlockEnter extends StatefulWidget {
     super.key,
     required this.id,
     required this.seen,
+    this.page,
     required this.child,
   });
 
   final String id;
   final Set<String> seen;
+
+  /// The page this block is on, by identity: its words are written at one
+  /// pace with the page's other blocks, and it enters once the words above
+  /// it are in (`_Flow`). Null for a block on no page, which keeps its own.
+  final Object? page;
+
   final Widget child;
 
   @override
@@ -8772,19 +8814,17 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
   bool _fresh = false;
   bool _started = false;
 
-  /// How long this block waits for the one before it, held at the start of
-  /// its own animation rather than on a timer.
+  /// How long this block waits for its turn (`_Flow.enter`), held at the
+  /// start of its own animation rather than on a timer.
   var _waitMs = 0;
+
+  /// When its entrance begins, on the frame clock, for the words inside it
+  /// to wait for.
+  double? _enterAt;
 
   /// The block below keeps its state when the blur above it is dropped as it
   /// lands: without this it was built afresh, and its words began again.
   final _keep = GlobalKey();
-
-  /// When the next block may start entering: blocks that arrive in one burst
-  /// enter at least [_enterGap] apart, in step rather than all at once (Tuna
-  /// 2026-10-23: smooth, as Monogram's).
-  static DateTime _nextEnter = DateTime.fromMillisecondsSinceEpoch(0);
-  static const _enterGap = Duration(milliseconds: 150);
 
   @override
   void initState() {
@@ -8799,10 +8839,11 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
   void didChangeDependencies() {
     super.didChangeDependencies();
     if (!_started && _fresh) {
-      final now = DateTime.now();
-      final wait = _nextEnter.isAfter(now) ? _nextEnter.difference(now) : Duration.zero;
-      _nextEnter = now.add(wait + _enterGap);
-      _waitMs = wait.inMilliseconds;
+      // Its turn: after the block before it, and after the words above it
+      // are written (`_Flow`).
+      final at = _Flow.enter(widget.page);
+      _enterAt = at;
+      _waitMs = (at - _frameNow()).round();
     }
     // A section arriving on a page rises out of a blur (`design/PAGES.md`),
     // after the block before it has begun to.
@@ -8828,7 +8869,10 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
-    final child = KeyedSubtree(key: _keep, child: _Arriving(fresh: _fresh, child: widget.child));
+    final child = KeyedSubtree(
+      key: _keep,
+      child: _Arriving(fresh: _fresh, page: widget.page, at: _enterAt, child: widget.child),
+    );
     if (MediaQuery.disableAnimationsOf(context)) return child;
     const travel = 14.0;
     return FadeTransition(
@@ -8860,26 +8904,127 @@ class _BlockEnterState extends State<BlockEnter> with SingleTickerProviderStateM
 }
 
 /// Whether the block below is arriving now, for the first time: a text block
-/// then has its words come in one after another ([_WordReveal]).
+/// then has its words come in at the page's pace ([_WordFlow]).
 class _Arriving extends InheritedWidget {
-  const _Arriving({required this.fresh, required super.child});
+  const _Arriving({required this.fresh, required this.page, required this.at, required super.child});
 
   final bool fresh;
 
-  static bool of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_Arriving>()?.fresh ?? false;
+  /// The page the block is on (`BlockEnter.page`).
+  final Object? page;
+
+  /// When the block's entrance begins, on the frame clock; null while that
+  /// is not yet known.
+  final double? at;
+
+  /// The block arriving now around [context], or null for one seen before.
+  static _Arriving? of(BuildContext context) {
+    final arriving = context.dependOnInheritedWidgetOfExactType<_Arriving>();
+    return arriving != null && arriving.fresh ? arriving : null;
+  }
 
   @override
-  bool updateShouldNotify(_Arriving oldWidget) => oldWidget.fresh != fresh;
+  bool updateShouldNotify(_Arriving oldWidget) =>
+      oldWidget.fresh != fresh || oldWidget.page != page || oldWidget.at != at;
 }
 
-/// An answer's words, coming in one after another as it arrives (Tuna
-/// 2026-10-23: the text came in jerks, not as smoothly as Monogram's). The
-/// server sends prose a block at a time, so the pace is set here: each word
-/// fades in 30 ms after the last, the whole held between 250 and 1200 ms.
-/// Colour only, so the paragraph is laid out once and its marks stay where
-/// they are; the text is all there for a screen reader from the start.
-class _WordReveal extends StatefulWidget {
-  const _WordReveal({required this.spans, required this.style, this.align});
+/// Now, on the frame clock: the clock tickers run on, so a wait booked
+/// here and the animation that plays it agree — in the app and under a
+/// test's clock alike, which a wall clock would not. Between frames, the
+/// last frame's time.
+double _frameNow() {
+  final binding = SchedulerBinding.instance;
+  if (binding.schedulerPhase != SchedulerPhase.idle) {
+    _lastFrame = binding.currentFrameTimeStamp.inMilliseconds.toDouble();
+  }
+  return _lastFrame;
+}
+
+double _lastFrame = 0;
+
+/// The writer. One pace for the whole page, so its paragraphs come in one
+/// after another and its cards land once the words above them are written,
+/// rather than each block in its own burst (Özlem 2026-10-28: ours came
+/// "tak tak tak", a paragraph at a time, where Monogram's flows). A text
+/// books its characters here as it arrives; a block enters once the one
+/// before it has begun to and the words above it are due.
+class _Flow {
+  /// Characters a second: Monogram's pace, read off a recording (~110).
+  static const charsPerSecond = 110.0;
+
+  /// The most one arrival may take. A long text is written faster, not later.
+  static const longestMs = 4000.0;
+
+  /// One word's fade, from nothing to its ink.
+  static const fadeMs = 180.0;
+
+  /// Blocks that arrive in one burst enter at least this far apart, in step
+  /// rather than all at once (Tuna 2026-10-23: smooth, as Monogram's).
+  static const enterGapMs = 150.0;
+
+  /// The page being written, by identity; when its last booked character
+  /// is due; and when its next block may enter. All on the frame clock. A
+  /// new page starts a new writer: the one before it was dissolved, words
+  /// still owed and all.
+  static Object _page = _none;
+  static double _end = 0;
+  static double _nextEnter = 0;
+  static const _none = Object();
+
+  static void _turnTo(Object? page, double now) {
+    final key = page ?? _none;
+    if (identical(key, _page)) return;
+    _page = key;
+    _end = now;
+    _nextEnter = now;
+  }
+
+  /// When a block of [page] may enter, and books it: after the block
+  /// before it, and after the words above it are written, so a page is
+  /// written top to bottom at one pace rather than its cards landing while
+  /// its first paragraph is still coming.
+  static double enter(Object? page) {
+    final now = _frameNow();
+    _turnTo(page, now);
+    final at = math.max(now, math.max(_nextEnter, _end));
+    _nextEnter = at + enterGapMs;
+    return at;
+  }
+
+  /// Books [chars] more characters of [page], from [notBefore] at the
+  /// earliest: when the first is due, and how many milliseconds each takes.
+  static ({double at, double perChar}) book(Object? page, int chars, {double? notBefore}) {
+    final now = _frameNow();
+    _turnTo(page, now);
+    var at = math.max(_end, now);
+    if (notBefore != null) at = math.max(at, notBefore);
+    final perChar = math.min(1000 / charsPerSecond, longestMs / math.max(chars, 1));
+    _end = at + chars * perChar;
+    return (at: at, perChar: perChar);
+  }
+}
+
+/// A paragraph written at the page's pace (`_Flow`): its words fade in one
+/// after another, each as its first character comes due, with more booked
+/// as a stream brings more. Opacity alone — the words are all laid out from
+/// the start, so nothing reflows and a screen reader has them whole — and
+/// the caret, when there is one, once the words so far are all in.
+class _WordFlow extends StatefulWidget {
+  const _WordFlow({
+    required this.page,
+    required this.notBefore,
+    required this.spans,
+    required this.style,
+    required this.align,
+    required this.caret,
+    required this.marks,
+    required this.mark,
+  });
+
+  /// The page the words are on (`BlockEnter.page`), and when its block
+  /// begins entering (frame clock), which the first word waits for.
+  final Object? page;
+  final double? notBefore;
 
   /// Flat text spans, as `_inline` makes them: each in its own style over
   /// the paragraph's, a link's with its recognizer.
@@ -8887,77 +9032,143 @@ class _WordReveal extends StatefulWidget {
   final TextStyle style;
   final TextAlign? align;
 
+  /// The streaming caret, while more is coming.
+  final Widget? caret;
+
+  /// The `==marked==` phrases, drawn behind their words as they come in.
+  final List<TextRange> marks;
+  final Color mark;
+
   @override
-  State<_WordReveal> createState() => _WordRevealState();
+  State<_WordFlow> createState() => _WordFlowState();
 }
 
-class _WordRevealState extends State<_WordReveal> with SingleTickerProviderStateMixin {
-  static const _fade = 180.0;
-  late final AnimationController _controller = AnimationController(vsync: this);
-  late final List<List<String>> _pieces = [
-    for (final span in widget.spans)
-      if (span is TextSpan) RegExp(r'\s+|\S+').allMatches(span.text ?? '').map((m) => m.group(0)!).toList() else const [],
-  ];
-  late final int _words = _pieces.expand((p) => p).where((piece) => piece.trim().isNotEmpty).length;
-  late final double _step = _words == 0 ? 0 : (_words * 30).clamp(250, 1200) / _words;
+class _WordFlowState extends State<_WordFlow> with SingleTickerProviderStateMixin {
+  static final _pieces = RegExp(r'\s+|\S+');
+
+  late final Ticker _ticker = createTicker(_tick);
+
+  /// The frame clock as this paragraph last saw it: at each tick while it
+  /// has words still coming in, and when more are booked.
+  double _now = 0;
+  double _origin = 0;
+
+  /// The text booked so far, and when each run of it is due: from
+  /// character [from] up to [to], the first at [at] on the clock and each
+  /// after it [perChar] later.
+  String _booked = '';
+  final _runs = <({int from, int to, double at, double perChar})>[];
 
   @override
   void initState() {
     super.initState();
-    _controller.duration = Duration(milliseconds: (_step * _words + _fade).round());
-    _controller.forward();
+    _plan();
+  }
+
+  @override
+  void didUpdateWidget(_WordFlow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _plan();
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _ticker.dispose();
     super.dispose();
   }
 
-  /// [ink] [since] ms into its fade.
-  Color _faded(Color ink, double since) => ink.withValues(alpha: ink.a * (since / _fade).clamp(0.0, 1.0));
+  void _tick(Duration elapsed) {
+    setState(() => _now = _origin + elapsed.inMilliseconds);
+    if (_now >= _done + _Flow.fadeMs) _ticker.stop();
+  }
+
+  /// When the last booked character is due.
+  double get _done {
+    if (_runs.isEmpty) return 0;
+    final last = _runs.last;
+    return last.at + (last.to - last.from) * last.perChar;
+  }
+
+  /// When the character at [offset] is due.
+  double _due(int offset) {
+    for (final run in _runs) {
+      if (offset < run.to) return run.at + (offset - run.from) * run.perChar;
+    }
+    return _done;
+  }
+
+  /// How far in the word at [offset] is: nothing before it is due, its ink
+  /// a fade later.
+  double _alpha(int offset) => ((_now - _due(offset)) / _Flow.fadeMs).clamp(0.0, 1.0);
+
+  String get _plain => [for (final span in widget.spans) if (span is TextSpan) span.text ?? ''].join();
+
+  /// Books what the text adds to what was booked. Text that changed under
+  /// its booking — a stream's words tidied as they settled — is rebooked
+  /// from where it changed, never from the start.
+  void _plan() {
+    final text = _plain;
+    var same = 0;
+    while (same < text.length && same < _booked.length && text.codeUnitAt(same) == _booked.codeUnitAt(same)) {
+      same++;
+    }
+    if (same < _booked.length) {
+      _runs.removeWhere((run) => run.from >= same);
+      if (_runs.isNotEmpty && _runs.last.to > same) {
+        final last = _runs.removeLast();
+        _runs.add((from: last.from, to: same, at: last.at, perChar: last.perChar));
+      }
+    }
+    _booked = text;
+    if (text.length == same) return;
+    final booking = _Flow.book(widget.page, text.length - same, notBefore: widget.notBefore);
+    _runs.add((from: same, to: text.length, at: math.max(booking.at, _done), perChar: booking.perChar));
+    _now = _frameNow();
+    if (_ticker.isActive) return;
+    _origin = _now;
+    _ticker.start();
+  }
 
   @override
   Widget build(BuildContext context) {
     final ink = widget.style.color ?? DefaultTextStyle.of(context).style.color ?? const Color(0xFF000000);
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final ms = _controller.value * (_controller.duration?.inMilliseconds ?? 0);
-        var word = 0;
-        return Text.rich(
-          TextSpan(children: [
-            for (var i = 0; i < widget.spans.length; i++)
-              if (widget.spans[i] case TextSpan(:final style, :final recognizer))
-                TextSpan(style: style, children: [
-                  for (final piece in _pieces[i])
-                    if (piece.trim().isEmpty)
-                      TextSpan(text: piece, recognizer: recognizer)
-                    else
-                      TextSpan(
-                        text: piece,
-                        recognizer: recognizer,
-                        style: TextStyle(color: _faded(style?.color ?? ink, ms - _step * word++)),
-                      ),
-                ])
-              else
-                widget.spans[i],
-          ]),
-          style: widget.style,
-          textAlign: widget.align,
-        );
-      },
+    var offset = 0;
+    final children = <InlineSpan>[];
+    for (final span in widget.spans) {
+      if (span is! TextSpan) {
+        children.add(span);
+        continue;
+      }
+      final pieces = <InlineSpan>[];
+      for (final match in _pieces.allMatches(span.text ?? '')) {
+        final piece = match.group(0)!;
+        if (piece.trim().isEmpty) {
+          pieces.add(TextSpan(text: piece, recognizer: span.recognizer));
+        } else {
+          final color = span.style?.color ?? ink;
+          pieces.add(TextSpan(
+            text: piece,
+            recognizer: span.recognizer,
+            style: TextStyle(color: color.withValues(alpha: color.a * _alpha(offset))),
+          ));
+        }
+        offset += piece.length;
+      }
+      children.add(TextSpan(style: span.style, children: pieces));
+    }
+    // The caret once the words so far are all in: the writer has caught up
+    // with the stream and waits, as the reader does, for more.
+    final caret = widget.caret;
+    if (caret != null && (_runs.isEmpty || _now >= _done + _Flow.fadeMs)) children.add(_caretSpan(caret));
+    final drawn = Text.rich(TextSpan(children: children), style: widget.style, textAlign: widget.align);
+    if (widget.marks.isEmpty) return drawn;
+    return _Marks(
+      ranges: widget.marks,
+      color: widget.mark,
+      alphas: [for (final range in widget.marks) _alpha(range.start)],
+      child: drawn,
     );
   }
-}
-
-/// [spans] as a paragraph: its words coming in one after another when its
-/// block is arriving now and ready whole, as it is.
-Widget _revealable(BuildContext context, List<InlineSpan> spans, TextStyle style, TextAlign? align) {
-  if (_Arriving.of(context) && !MediaQuery.disableAnimationsOf(context)) {
-    return _WordReveal(spans: spans, style: style, align: align);
-  }
-  return Text.rich(TextSpan(children: spans), style: style, textAlign: align);
 }
 
 // ————————————————————————— comparison —————————————————————————

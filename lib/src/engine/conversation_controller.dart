@@ -1331,8 +1331,12 @@ class ConversationController extends ChangeNotifier {
               final position = _openAssistant!.blocks.indexOf(existing);
               _openAssistant!.blocks[position] = block;
               // The skeleton already played the entrance for this slot, so
-              // the id is carried forward and hydration cannot re-arm it.
-              enteredBlockIds.add(block.id);
+              // the id is carried forward and hydration cannot re-arm it —
+              // when it had the chance to. A skeleton replaced before a frame
+              // drew it (its start, words and ready in one read of the
+              // stream) has not entered, and this block enters in its place:
+              // marked here, it was simply there, words and all.
+              if (enteredBlockIds.contains(existing.id)) enteredBlockIds.add(block.id);
             } else {
               // No skeleton preceded it, so nothing has entered yet. Marking
               // it here — which is what used to happen for both branches —

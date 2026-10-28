@@ -5,6 +5,20 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.65.0
+
+**Changed**
+
+- An answer flows in at one pace, as Monogram's does (Özlem 2026-10-28: ours
+  came "tak tak tak", a paragraph at a time, each in a burst of its own).
+  The page has one writer: its words come in at 110 characters a second, a
+  long paragraph faster so none takes over four seconds, and each paragraph,
+  card and section enters once the words above it are written, top to
+  bottom. A `==marked==` phrase is no brighter than its words. A text that
+  streams in keeps the same pace as more arrives, with the caret held back
+  until the words so far are in. Under reduced motion everything is simply
+  there, as before.
+
 ## 0.64.1
 
 **Fixed**

@@ -1392,6 +1392,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                         key: ValueKey(blocks[i].id),
                         id: blocks[i].id,
                         seen: controller.enteredBlockIds,
+                        // One writer for the page: its words at one pace,
+                        // its blocks in the order they are read.
+                        page: answers.first,
                         // Built under the page's scope, which a builder handed
                         // this method's context would not see. `text` is not
                         // swapped: it never draws a skeleton, and a swap would
