@@ -204,7 +204,8 @@ class _PluginPcmOut implements RendelPcmOut {
 
   @override
   Future<void> open(int sampleRate) async {
-    await FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
+    // Playback, said outright: the plugin sets the session's category itself.
+    await FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1, iosAudioCategory: IosAudioCategory.playback);
     await FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10);
     _drained = Completer<void>();
     _ending = false;
@@ -244,7 +245,8 @@ class _PluginPcmOut implements RendelPcmOut {
   }
 }
 
-/// No first sound by then: silence rather than a voice that is late (Tuna 2026-10-23).
+/// No first bytes by then, or no next piece before the first sound: silence
+/// rather than a voice that is late (Tuna 2026-10-23).
 const _firstSound = Duration(seconds: 3);
 
 /// PCM is fed in pieces of at least this many bytes: a tenth of a second at 24 kHz.
@@ -302,12 +304,15 @@ class RendelVoice {
   /// go, so a stop never cuts the host app's own sound.
   var _holding = false;
 
+  /// The speaker first: its plugin sets a bare playback category of its own,
+  /// so ours, spoken audio with other sound ducked under it, is set after it
+  /// and is the one that holds.
   Future<void> _hold(int rate) async {
+    await _out.open(rate);
     if (!_holding) {
       _holding = true;
       await RendelPlatform.voiceSession(true);
     }
-    await _out.open(rate);
   }
 
   Future<void> _release() async {
@@ -387,39 +392,52 @@ class RendelVoice {
   Future<_Next> _stream(String url, String key, int turn) async {
     final client = _fetching = _client();
     var late = false;
-    final deadline = Timer(_firstSound, () {
-      late = true;
-      client.close();
-    });
+    var opened = false;
+    Timer? deadline;
+    // The first bytes, and each piece until the first sound, within
+    // [_firstSound] of the last: a voice slow to begin is waited for, one that
+    // stalls stays silent. Once the speaker is open nothing is cut. The clock
+    // used to run from the request to the first feed, and the first answer
+    // after a cold start had its half second in at 2.8 s, opened the speaker
+    // past 3, and was cut after one breath (Özlem 2026-10-28).
+    void waitForMore() {
+      deadline?.cancel();
+      deadline = Timer(_firstSound, () {
+        late = true;
+        client.close();
+      });
+    }
+
+    waitForMore();
     final pieces = <Uint8List>[];
     try {
       final request = http.Request('GET', Uri.parse('$url${url.contains('?') ? '&' : '?'}f=pcm'));
       final response = await client.send(request);
       if (response.statusCode == 404) {
-        deadline.cancel();
+        deadline?.cancel();
         return _Next.file;
       }
       if (response.statusCode != 200) {
-        deadline.cancel();
+        deadline?.cancel();
         return _Next.silent;
       }
       final rate = int.tryParse(RegExp(r'rate=(\d+)').firstMatch(response.headers['content-type'] ?? '')?.group(1) ?? '') ?? 24000;
       final start = rate * 2 * _startHeld.inMilliseconds ~/ 1000;
-      var opened = false;
       var held = Uint8List(0);
       Future<void> play(Uint8List bytes) async {
         if (!opened) {
           opened = true;
+          deadline?.cancel();
           await _hold(rate);
           _heardAt = DateTime.now();
         }
         pieces.add(bytes);
         await _out.feed(bytes);
-        deadline.cancel();
       }
 
       await for (final chunk in response.stream) {
         if (turn != _turn) return _Next.played;
+        if (!opened) waitForMore();
         held = Uint8List.fromList([...held, ...chunk]);
         if (held.length >= (opened ? _minPiece : start)) {
           final even = held.length - held.length % 2;
@@ -428,13 +446,13 @@ class RendelVoice {
         }
       }
       if (held.length > 1 && turn == _turn) await play(Uint8List.sublistView(held, 0, held.length - held.length % 2));
-      deadline.cancel();
+      deadline?.cancel();
       if (pieces.isEmpty) return _Next.silent;
       _kept = (key: key, rate: rate, pieces: pieces);
       await _finish(turn);
       return _Next.played;
     } catch (err) {
-      deadline.cancel();
+      deadline?.cancel();
       if (turn != _turn) return _Next.played;
       if (pieces.isNotEmpty) {
         await _finish(turn);

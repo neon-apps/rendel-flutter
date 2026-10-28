@@ -5,6 +5,21 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.63.5
+
+**Fixed**
+
+- The first answer's voice was cut after one breath (Özlem 2026-10-28). The
+  three-second clock for the first sound ran from the request to the first
+  feed, and the first answer after a cold start had half a second of its
+  voice in at 2.8 s, opened the speaker past 3, and was cut. The clock now
+  waits for the first bytes, and for each piece until the first sound, three
+  seconds from the last; once the speaker is open nothing is cut.
+- The audio session is taken after the speaker opens, not before: the PCM
+  plugin sets a bare playback category of its own on opening, which took the
+  spoken-audio mode and the ducking of other sound with it. Playback is named
+  to the plugin outright.
+
 ## 0.63.4
 
 - The pill behind back and forward hugs them, 72 wide: each step is 36

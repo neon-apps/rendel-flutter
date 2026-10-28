@@ -83,6 +83,35 @@ class _Out implements RendelPcmOut {
   Future<void> close() async => closes++;
 }
 
+/// A speaker slow to open, as a real one is the first time: the audio unit
+/// is made and the session taken.
+class _SlowOut extends _Out {
+  @override
+  Future<void> open(int sampleRate) async {
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    await super.open(sampleRate);
+  }
+}
+
+/// A speaker that writes its opening and closing into [order], beside the
+/// audio session's calls.
+class _Ordered extends _Out {
+  _Ordered(this.order);
+  final List<String> order;
+
+  @override
+  Future<void> open(int sampleRate) async {
+    order.add('open');
+    await super.open(sampleRate);
+  }
+
+  @override
+  Future<void> close() async {
+    order.add('close');
+    await super.close();
+  }
+}
+
 /// A server that sends a fifth of a second of the voice and then nothing, as
 /// api.rendel.ai did for 18 seconds (2026-10-23); closing the client ends it.
 class _Stalls extends http.BaseClient {
@@ -244,6 +273,49 @@ void main() {
       final voice = RendelVoice(out: out, client: client);
       await voice.speak('Yarın hava açık.', 'tr', url: 'https://api.test/v1/speech/t5');
       expect(out.fed, [24000, 24000]);
+    });
+
+    testWidgets('waits for a voice slow to begin, and once it is heard cuts nothing (Özlem 2026-10-28)', (tester) async {
+      // The first answer after a cold start: half a second of the voice in at
+      // 2.8 s, a speaker that takes its time to open, the rest at 3.5 s. The
+      // old clock ran from the request to the first feed and cut this one
+      // after one breath.
+      // The session's native half answered at once, so every step runs on the
+      // test's own clock; a real reply from the engine comes outside it.
+      const channel = MethodChannel('rendel/platform');
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (_) async => null);
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+      final body = StreamController<List<int>>();
+      final slow = _SlowOut();
+      final voice = RendelVoice(
+        out: slow,
+        client: () => MockClient.streaming((request, _) async => http.StreamedResponse(body.stream, 200,
+            headers: {'content-type': 'audio/pcm; rate=24000; channels=1; encoding=s16le'})),
+      );
+      final spoken = voice.speak('Yarın hava açık.', 'tr', url: 'https://api.test/v1/speech/t7');
+      await tester.pump(const Duration(milliseconds: 2800));
+      body.add(Uint8List(24000));
+      await tester.pump(const Duration(milliseconds: 700));
+      expect(slow.opened, [24000], reason: 'the speaker opened past the third second and was not cut');
+      body.add(Uint8List(24000));
+      await body.close();
+      await spoken;
+      expect(slow.fed, [24000, 24000]);
+      expect(voice.playing.value, isNull, reason: 'heard to the end');
+    });
+
+    testWidgets('takes the audio session after the speaker opens, so its category is the one that holds', (tester) async {
+      const channel = MethodChannel('rendel/platform');
+      final order = <String>[];
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (call) async {
+        order.add('${call.method}:${call.arguments}');
+        return null;
+      });
+      addTearDown(() => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, null));
+      serve((_) => pcm([24000, 24000]));
+      final voice = RendelVoice(out: _Ordered(order), client: client);
+      await voice.speak('Bir.', 'tr', url: 'https://api.test/v1/speech/t8');
+      expect(order, ['open', 'voiceSession:true', 'close', 'voiceSession:false']);
     });
 
     test('stays silent when the voice stalls before half a second of it is in', () async {
