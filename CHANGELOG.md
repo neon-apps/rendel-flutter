@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.64.1
+
+**Fixed**
+
+- A voice whose stream fell behind was heard as a crackle (Özlem 2026-10-28:
+  a 288 ms hole mid-word on a recording): the speaker ran dry and was then
+  fed a tenth of a second at a time, stopping and starting on each. Once the
+  speaker runs dry the voice gathers half a second again before going on, as
+  it did to begin, so a stall is one pause.
+
 ## 0.64.0
 
 **Fixed**

@@ -192,6 +192,10 @@ abstract class RendelPcmOut {
 
   /// Silent at once, what is queued dropped.
   Future<void> close();
+
+  /// Whether the speaker has played everything fed and waits: the voice fell
+  /// behind. False where a speaker cannot say.
+  bool get dry => false;
 }
 
 /// [RendelPcmOut] on `flutter_pcm_sound`.
@@ -201,6 +205,9 @@ class _PluginPcmOut implements RendelPcmOut {
 
   /// The buffer ran dry after the last feed: the zero event comes once a feed.
   var _dry = false;
+
+  @override
+  bool get dry => _dry;
 
   @override
   Future<void> open(int sampleRate) async {
@@ -439,7 +446,11 @@ class RendelVoice {
         if (turn != _turn) return _Next.played;
         if (!opened) waitForMore();
         held = Uint8List.fromList([...held, ...chunk]);
-        if (held.length >= (opened ? _minPiece : start)) {
+        // Begun on half a second of the voice, and begun again on as much
+        // once the speaker ran dry: a stream that fell behind was fed a tenth
+        // of a second at a time and heard as a crackle (Özlem 2026-10-28, a
+        // 288 ms hole mid-word on a recording), so a stall is one pause.
+        if (held.length >= (!opened || _out.dry ? start : _minPiece)) {
           final even = held.length - held.length % 2;
           await play(Uint8List.sublistView(held, 0, even));
           held = Uint8List.fromList(held.sublist(even));

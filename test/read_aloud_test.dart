@@ -81,6 +81,16 @@ class _Out implements RendelPcmOut {
 
   @override
   Future<void> close() async => closes++;
+
+  @override
+  bool get dry => false;
+}
+
+/// A speaker that runs dry after its first piece, as a real one does when the
+/// stream falls behind.
+class _DryOut extends _Out {
+  @override
+  bool get dry => fed.length == 1;
 }
 
 /// A speaker slow to open, as a real one is the first time: the audio unit
@@ -316,6 +326,15 @@ void main() {
       final voice = RendelVoice(out: _Ordered(order), client: client);
       await voice.speak('Bir.', 'tr', url: 'https://api.test/v1/speech/t8');
       expect(order, ['open', 'voiceSession:true', 'close', 'voiceSession:false']);
+    });
+
+    test('gathers half a second again once the speaker ran dry, so a stall is one pause and not a crackle (Özlem 2026-10-28)', () async {
+      // Half a second, then the stream falls behind and dribbles in tenths.
+      serve((_) => pcm([24000, 4800, 4800, 4800, 4800, 4800, 4800]));
+      final out = _DryOut();
+      final voice = RendelVoice(out: out, client: client);
+      await voice.speak('Yarın hava açık.', 'tr', url: 'https://api.test/v1/speech/t9');
+      expect(out.fed, [24000, 24000, 4800]);
     });
 
     test('stays silent when the voice stalls before half a second of it is in', () async {
