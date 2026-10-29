@@ -493,6 +493,7 @@ sealed class RendelWireEvent {
           messageId: messageId,
           model: _text(data['model']) ?? '',
           requestId: _text(data['request_id']),
+          lang: _text(data['lang']),
         );
       case 'turn.status':
         final step = _text(data['step']);
@@ -591,6 +592,7 @@ class TurnStart extends RendelWireEvent {
     required this.messageId,
     required this.model,
     this.requestId,
+    this.lang,
   });
   final String conversationId;
   final String messageId;
@@ -600,6 +602,11 @@ class TurnStart extends RendelWireEvent {
   /// makes a support message actionable: one string that appears in our logs,
   /// on the row in the database and on the user's screen.
   final String? requestId;
+
+  /// The language this turn's answer is written in, as a BCP-47 tag (`tr`,
+  /// `en-AU`). Null against an older API. The SDK's own words follow it, so
+  /// a Turkish answer is not framed in English chrome.
+  final String? lang;
 }
 
 /// What the turn is doing while the reader waits: `action` when the model

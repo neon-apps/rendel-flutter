@@ -55,6 +55,7 @@ class ThreadScreen extends StatefulWidget {
     this.subtitle,
     this.suggestions = const [],
     this.strings = const RendelStrings(),
+    this.followAnswerLanguage = false,
     this.composerHint,
     this.attachIcon = RendelAttachIcon.plus,
     this.voiceIcon = RendelVoiceIcon.microphone,
@@ -103,6 +104,12 @@ class ThreadScreen extends StatefulWidget {
   /// facade so this widget stays constructible on its own — the gallery and
   /// every widget test build one without calling `init`.
   final RendelStrings strings;
+
+  /// True draws the SDK's own words in the language the conversation is
+  /// answered in (`ConversationController.answerLanguage`) when the SDK ships
+  /// that language, and [strings] otherwise. False keeps [strings] whole,
+  /// which is what a host's own set needs.
+  final bool followAnswerLanguage;
 
   /// The words in the message box before anyone has typed. Null takes
   /// [RendelStrings.composerHint], which is translated; this is the customer's
@@ -175,6 +182,18 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   final _head = ValueNotifier<double>(0);
   late final RendelDispatcher _dispatch;
 
+  /// The conversation's language the screen is drawn in; see [_strings].
+  String? _language;
+
+  /// The words this screen draws: [ThreadScreen.strings], or the SDK's own
+  /// set for the language this conversation is answered in.
+  RendelStrings get _strings {
+    final language = _language;
+    return widget.followAnswerLanguage && language != null && RendelStrings.ships(language)
+        ? RendelStrings.forLocale(language)
+        : widget.strings;
+  }
+
   /// What the blocks of a detail talk back through.
   late final RendelDispatcher _detailDispatch;
 
@@ -236,6 +255,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       c.page = c.pages.length - 1;
     }
     _question = _lastQuestion(c);
+    _language = c.answerLanguage;
     _wasBusy = c.busy;
     c.onAnswered = _readAloud;
     widget.voice?.prepare();
@@ -297,7 +317,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   void _openMemory() => showRendelMemory(
         context,
         memory: widget.controller.memory,
-        strings: widget.strings,
+        strings: _strings,
       );
 
   Future<String> _upload(RendelAttachment file) =>
@@ -340,7 +360,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       // The host's own picker threw. Theirs to log; ours to not leave a
       // paperclip that has silently stopped working.
       if (!mounted) return;
-      setState(() => _attachError = widget.strings.attachFailed);
+      setState(() => _attachError = _strings.attachFailed);
       return;
     }
     if (!mounted || picked == null) return;
@@ -370,13 +390,13 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
         _attachments.remove(waiting);
         // The server's sentence, in the app's language; ours when the reply
         // was not one the server wrote.
-        _attachError = failure.message ?? widget.strings.attachFailed;
+        _attachError = failure.message ?? _strings.attachFailed;
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _attachments.remove(waiting);
-        _attachError = widget.strings.attachFailed;
+        _attachError = _strings.attachFailed;
       });
     } finally {
       if (mounted) setState(() => _attaching = false);
@@ -474,7 +494,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
            nothing. */
         setState(() {
           _voice = false;
-          _attachError = widget.strings.nothingHeard;
+          _attachError = _strings.nothingHeard;
         });
         return;
       }
@@ -494,7 +514,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       // Refused, not broken: say where the switch is (Grove report P1-9).
       setState(() {
         _voice = false;
-        _attachError = widget.strings.dictationDenied;
+        _attachError = _strings.dictationDenied;
       });
     } catch (err) {
       if (!mounted) return;
@@ -507,7 +527,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       RendelLog.warn('dictation_failed', 'the host recogniser failed', error: err);
       setState(() {
         _voice = false;
-        _attachError = widget.strings.dictationFailed;
+        _attachError = _strings.dictationFailed;
       });
     } finally {
       started?.removeListener(opened);
@@ -539,7 +559,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // sent, and the strip over the composer says how it is used.
     if (!_listening || _held!.isActive) {
       _cancelVoice();
-      setState(() => _attachError = widget.strings.holdToSpeak);
+      setState(() => _attachError = _strings.holdToSpeak);
       return;
     }
     // A host's recogniser that cannot be stopped ends by itself, and voice
@@ -552,7 +572,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
   /// A refused microphone, on a platform whose settings can be opened to it.
   bool get _offerSettings =>
-      identical(_attachError, widget.strings.dictationDenied) &&
+      identical(_attachError, _strings.dictationDenied) &&
       defaultTargetPlatform == TargetPlatform.iOS;
 
   /// A tap away from voice mode while it listens: nothing is sent.
@@ -570,7 +590,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// server sent keeps the server's message, which arrives in the app's
   /// language already.
   String? _turnError(ConversationController c) {
-    final s = widget.strings;
+    final s = _strings;
     return switch (c.errorCode) {
       'confirmation_expired' => s.confirmationExpired,
       'turn_failed' => s.turnFailed,
@@ -624,7 +644,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // growing a parameter. Same shape as the theme scope, and for the same
     // reason.
     return RendelStringsScope(
-      strings: widget.strings,
+      strings: _strings,
       child: _build(context, theme, controller),
     );
   }
@@ -764,8 +784,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                             // second thing to learn.
                             message: _attachError ?? _turnError(controller),
                             retryLabel: _offerSettings
-                                ? widget.strings.openSettings
-                                : widget.strings.retry,
+                                ? _strings.openSettings
+                                : _strings.retry,
                             onRetry: _offerSettings
                                 ? () => unawaited(openAppSettings())
                                 : _attachError == null && controller.canRetry
@@ -942,6 +962,12 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       _asked = null;
       changed = true;
     }
+    // The conversation's language moved, or a new one has none yet: the
+    // SDK's words follow it.
+    if (c.answerLanguage != _language) {
+      _language = c.answerLanguage;
+      changed = true;
+    }
     // A new conversation has no details, open or not.
     if (_detail != null && !c.details.containsValue(_detail)) {
       _detail = null;
@@ -975,7 +1001,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final asked = known ?? card;
     c.details[asked.key] = asked;
     setState(() => _detail = asked);
-    unawaited(c.send(reply ?? widget.strings.detailAskAbout(asked.title), detail: asked));
+    unawaited(c.send(reply ?? _strings.detailAskAbout(asked.title), detail: asked));
   }
 
   /// Slides the sheet away, then does [then]. The page under it is as it was
@@ -1062,7 +1088,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// Null when none is.
   String? _status(ConversationController controller) {
     if (!controller.busy) return null;
-    final s = widget.strings;
+    final s = _strings;
     // A card's detail says so for the whole of its turn.
     if (controller.detail != null) return s.statusDetail;
     // A handler running on this device is the app being checked, whatever
@@ -1198,7 +1224,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                               key: ValueKey(card.id),
                               followup: card,
                               theme: theme,
-                              closeLabel: widget.strings.closeDetail,
+                              closeLabel: _strings.closeDetail,
                               onOpen: () => widget.onFollowupOpen?.call(card.id),
                               onDismiss: () => RendelFollowups.instance.dismiss(card.id),
                             ),
@@ -1434,7 +1460,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   children: [
                     Flexible(
                       child: _Helpful(
-                        strings: widget.strings,
+                        strings: _strings,
                         given: answered.rating,
                         onRate: (rating) => controller.rateTurn(answered, rating),
                       ),

@@ -518,6 +518,9 @@ class Rendel {
             RendelThemeScope(theme: themeOf(context), child: thread!),
         child: ThreadScreen(
           strings: strings,
+          // The host's own words win whole; the SDK's follow the language
+          // the conversation is answered in.
+          followAnswerLanguage: _config.strings == null,
           controller: controller,
           title: _config.assistantName,
           logoUrl: logoUrl,

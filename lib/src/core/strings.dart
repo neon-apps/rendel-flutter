@@ -673,6 +673,13 @@ class RendelStrings {
     return const RendelStrings();
   }
 
+  /// Whether [forLocale] has a set of its own for [tag]'s language, English
+  /// among them, rather than falling back to English for want of one.
+  static bool ships(String tag) {
+    final language = tag.trim().toLowerCase().replaceAll('_', '-').split('-').first;
+    return language == 'en' || _byLocale.keys.any((key) => key.split('-').first == language);
+  }
+
   /// One field of an existing set, changed. The rest are kept, which is what
   /// makes a shipped translation a starting point rather than a take-it-or-
   /// leave-it.

@@ -332,6 +332,12 @@ class ConversationController extends ChangeNotifier {
   final Set<String> enteredBlockIds = {};
   String? conversationId;
 
+  /// The language this conversation is answered in, from the newest
+  /// `turn.start` that named one; null for a new conversation or an older
+  /// API. The thread draws the SDK's own words in it. Speech and the locale
+  /// sent to the server stay with the config.
+  String? answerLanguage;
+
   /// The server's id for the most recent turn, shown with an error so a
   /// support message carries something an operator can search for.
   String? lastRequestId;
@@ -1066,6 +1072,7 @@ class ConversationController extends ChangeNotifier {
   void reset() {
     _generation++;
     conversationId = null;
+    answerLanguage = null;
     messages.clear();
     enteredBlockIds.clear();
     _usedShown.clear();
@@ -1278,11 +1285,13 @@ class ConversationController extends ChangeNotifier {
         var visible = true;
         var structural = true;
         switch (event) {
-          case TurnStart(:final conversationId, :final messageId, :final requestId):
+          case TurnStart(:final conversationId, :final messageId, :final requestId, :final lang):
             this.conversationId = conversationId;
             lastRequestId = requestId;
             _openAssistant?.serverId = messageId;
-            visible = false;
+            // Heard only when the language moved, for the thread's words.
+            visible = lang != null && lang != answerLanguage;
+            if (lang != null) answerLanguage = lang;
           case TurnStatus(:final step):
             if (step == 'action' || step == 'composing') {
               turnStatus = step;

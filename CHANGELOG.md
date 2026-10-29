@@ -5,6 +5,22 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.67.0
+
+**Changed**
+
+- The thread's own words follow the language the conversation is answered
+  in (Tuna 2026-10-29). A Turkish question in an app set to English
+  (`languages: ['en']`) was answered in Turkish under "Thinking…", "Go
+  back", "This cannot be undone" and "Arrives in about 10 min". The server
+  now names the answer's language on `turn.start` (`lang`), and the thread
+  draws its status line, cards, composer and controls in that language when
+  the SDK ships it (en, tr, de, fr, es, ar), and in `RendelConfig`'s
+  otherwise. A new conversation starts in the config's language again.
+  `RendelConfig.strings` still wins whole, and what the SDK sends and speaks
+  (`locale`, `languages`, dictation, read-aloud) is unchanged. The launcher
+  and the follow-up card, outside the thread, keep the config's language.
+
 ## 0.66.0
 
 **Added**
