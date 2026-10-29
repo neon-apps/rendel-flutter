@@ -5,6 +5,22 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.69.1
+
+**Fixed**
+
+- An app on current Flutter and Android Gradle builds without forcing a
+  `compileSdk` on Rendel's plugins. Reading aloud streamed through
+  `flutter_pcm_sound`, which builds against Android 33 and fails Flutter
+  3.44's AAR check (its embedding needs 34). Its Android and iOS code (public
+  domain) now live in Rendel's own plugin and build with the app's
+  `flutter.compileSdkVersion`; the dependency is gone. The voice sounds as
+  before. An app that uses `flutter_pcm_sound` itself keeps it: Rendel's copy
+  has a channel of its own.
+- `Rendel.setPushToken` takes `androidPackage`, and `rendel_push` 0.2.1 sends
+  it with an Android token, so Settings › Channels can say when the app is not
+  in the Firebase project yet.
+
 ## 0.69.0
 
 **Added**

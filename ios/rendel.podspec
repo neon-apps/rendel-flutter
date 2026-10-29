@@ -13,7 +13,9 @@ Checks the host app's Info.plist for the usage strings the assistant's microphon
   s.license          = { :file => '../LICENSE' }
   s.author           = 'Rendel'
   s.source           = { :path => '.' }
-  s.source_files = 'rendel/Sources/rendel/**/*.swift'
+  s.source_files = 'rendel/Sources/rendel/**/*.swift', 'rendel/Sources/rendel_pcm/**/*.{h,m}'
+  s.public_header_files = 'rendel/Sources/rendel_pcm/include/*.h'
+  s.frameworks = 'AudioToolbox', 'AVFoundation'
   s.dependency 'Flutter'
   s.platform = :ios, '13.0'
 

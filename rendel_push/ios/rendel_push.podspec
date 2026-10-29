@@ -4,7 +4,7 @@
 #
 Pod::Spec.new do |s|
   s.name             = 'rendel_push'
-  s.version          = '0.2.0'
+  s.version          = '0.2.1'
   s.summary          = 'Rendel push: the iOS half, straight to Apple.'
   s.description      = <<-DESC
 Asks for notification permission, reads the APNs device token and opens Rendel's pushes. No Firebase.

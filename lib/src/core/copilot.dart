@@ -715,7 +715,9 @@ class Rendel {
   /// [apns] says the token is an iOS device token, which Rendel sends
   /// straight to Apple with the app's key (no Firebase): `rendel_push` reads
   /// it, with the build's push environment, bundle id and Team ID.
-  static Future<void> setPushToken(String? token, {String? timezone, RendelApnsToken? apns}) async {
+  /// [androidPackage] names the Android app a Firebase token belongs to, so
+  /// Settings › Channels can say when it is missing from the Firebase project.
+  static Future<void> setPushToken(String? token, {String? timezone, RendelApnsToken? apns, String? androidPackage}) async {
     final api = await _whenClient();
     if (api == null) return;
     final platform = switch (defaultTargetPlatform) {
@@ -734,7 +736,7 @@ class Rendel {
       locale: resolveLocale(_config.locale),
       provider: apns == null ? null : 'apns',
       environment: apns?.environment,
-      topic: apns?.bundleId,
+      topic: apns?.bundleId ?? androidPackage,
       teamId: apns?.teamId,
     );
   }

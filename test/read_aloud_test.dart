@@ -5,7 +5,7 @@ import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart' show MethodChannel;
-import 'package:flutter_pcm_sound/flutter_pcm_sound.dart' show FlutterPcmSound;
+import 'package:rendel/src/core/pcm_sound.dart' show RendelPcmSound;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -254,13 +254,13 @@ void main() {
     test('reaches the speaker as exactly the bytes fed, so no byte is heard twice (Tuna 2026-10-26: static)', () async {
       TestWidgetsFlutterBinding.ensureInitialized();
       final heard = <int>[];
-      const channel = MethodChannel('flutter_pcm_sound/methods');
+      const channel = MethodChannel('rendel/pcm/methods');
       final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       messenger.setMockMethodCallHandler(channel, (call) async {
         if (call.method == 'feed') {
           heard.addAll((call.arguments as Map)['buffer'] as Uint8List);
           // The speaker has played it all.
-          scheduleMicrotask(() => FlutterPcmSound.onFeedSamplesCallback?.call(0));
+          scheduleMicrotask(() => RendelPcmSound.debugFeedEvent(0));
         }
         return true;
       });

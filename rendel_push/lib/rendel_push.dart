@@ -12,12 +12,15 @@ import 'package:rendel/rendel.dart';
 /// A device's push token, and on iOS what Apple needs to know about it.
 @immutable
 class RendelPushToken {
-  const RendelPushToken(this.token, {this.apns});
+  const RendelPushToken(this.token, {this.apns, this.androidPackage});
 
   final String token;
 
   /// Set for an iOS device token, which Rendel sends straight to Apple.
   final RendelApnsToken? apns;
+
+  /// The Android app a Firebase token belongs to.
+  final String? androidPackage;
 }
 
 /// Wires the device's push to Rendel: asks for permission, hands the token and
@@ -184,7 +187,7 @@ class RendelPush {
   }
 
   static Future<void> _send(RendelPushToken? token) async {
-    if (token != null) await Rendel.setPushToken(token.token, apns: token.apns);
+    if (token != null) await Rendel.setPushToken(token.token, apns: token.apns, androidPackage: token.androidPackage);
   }
 
   static RendelPushToken? _tokenOf(Object? raw) {
@@ -198,7 +201,7 @@ class RendelPush {
             teamId: raw['teamId'] as String?,
           )
         : null;
-    return RendelPushToken(token, apns: apns);
+    return RendelPushToken(token, apns: apns, androidPackage: apns == null ? raw['bundleId'] as String? : null);
   }
 
   static Map<String, dynamic>? _strings(Object? raw) =>

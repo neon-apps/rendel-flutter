@@ -69,7 +69,7 @@ void main() {
     await onAndroid(tester, () async {
       await RendelPush.wire(
         allowed: () async => true,
-        token: () async => const RendelPushToken('token-1'),
+        token: () async => const RendelPushToken('token-1', androidPackage: 'co.neonapps.grove'),
         refreshes: refreshes.stream,
         taps: const Stream.empty(),
         launchTap: () async => null,
@@ -79,8 +79,9 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
     expect(server.tokens, ['token-1', 'token-2']);
-    // A Firebase token says nothing more, as every SDK before this one.
+    // A Firebase token is the default kind, and says which Android app it belongs to.
     expect(server.bodies.first.containsKey('provider'), isFalse);
+    expect(server.bodies.first, containsPair('topic', 'co.neonapps.grove'));
   });
 
   testWidgets("says an iOS token is Apple's, with its build's environment, bundle id and team", (tester) async {

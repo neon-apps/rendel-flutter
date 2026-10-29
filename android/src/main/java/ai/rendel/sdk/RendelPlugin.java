@@ -54,6 +54,8 @@ public class RendelPlugin
   private static final int PICK_DOCUMENT = 0x4e43;
 
   private MethodChannel channel;
+  /** Reading aloud's PCM output, on its own channel. */
+  private final RendelPcmSound pcm = new RendelPcmSound();
   @Nullable private ActivityPluginBinding activity;
 
   /** The answer owed to the picker that is open. One at a time. */
@@ -64,11 +66,13 @@ public class RendelPlugin
     channel = new MethodChannel(binding.getBinaryMessenger(), "rendel/platform");
     context = binding.getApplicationContext();
     channel.setMethodCallHandler(this);
+    pcm.onAttachedToEngine(binding);
   }
 
   @Override
   public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
     channel.setMethodCallHandler(null);
+    pcm.onDetachedFromEngine(binding);
   }
 
   @Override

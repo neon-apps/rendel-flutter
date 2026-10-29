@@ -5,6 +5,10 @@ import Flutter
 import PassKit
 import UIKit
 
+#if canImport(rendel_pcm)
+  import rendel_pcm
+#endif
+
 /// The copilot's native half on iOS: two things Flutter cannot do alone.
 ///
 /// It tells the SDK which usage strings the host app's Info.plist is missing.
@@ -42,6 +46,8 @@ public class RendelPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate,
     )
     registrar.addMethodCallDelegate(RendelPlugin(), channel: channel)
     registrar.register(AddPassButtonFactory(), withId: "rendel/add-pass")
+    // Reading aloud's PCM output, on its own channel.
+    RendelPcmSound.register(with: registrar)
   }
 
   /// The answer owed to the picker that is open. One at a time.

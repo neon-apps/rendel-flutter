@@ -1,17 +1,17 @@
 import 'dart:async';
 import 'dart:io' show Directory, File;
-import 'dart:typed_data' show ByteData, Uint8List;
+import 'dart:typed_data' show Uint8List;
 
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart'
     show TargetPlatform, ValueNotifier, defaultTargetPlatform, kIsWeb, visibleForTesting;
-import 'package:flutter_pcm_sound/flutter_pcm_sound.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../protocol/protocol.dart' show WireBlock;
 import 'log.dart';
+import 'pcm_sound.dart';
 import 'platform.dart';
 
 /// What is read aloud of an answer: its opening paragraph, as words.
@@ -198,7 +198,7 @@ abstract class RendelPcmOut {
   bool get dry => false;
 }
 
-/// [RendelPcmOut] on `flutter_pcm_sound`.
+/// [RendelPcmOut] on the plugin's own PCM output ([RendelPcmSound]).
 class _PluginPcmOut implements RendelPcmOut {
   Completer<void>? _drained;
   var _ending = false;
@@ -212,12 +212,12 @@ class _PluginPcmOut implements RendelPcmOut {
   @override
   Future<void> open(int sampleRate) async {
     // Playback, said outright: the plugin sets the session's category itself.
-    await FlutterPcmSound.setup(sampleRate: sampleRate, channelCount: 1, iosAudioCategory: IosAudioCategory.playback);
-    await FlutterPcmSound.setFeedThreshold(sampleRate ~/ 10);
+    await RendelPcmSound.setup(sampleRate: sampleRate, channelCount: 1);
+    await RendelPcmSound.setFeedThreshold(sampleRate ~/ 10);
     _drained = Completer<void>();
     _ending = false;
     _dry = false;
-    FlutterPcmSound.setFeedCallback((remaining) {
+    RendelPcmSound.setFeedCallback((remaining) {
       if (remaining > 0) return;
       _dry = true;
       if (_ending && !(_drained?.isCompleted ?? true)) _drained!.complete();
@@ -227,11 +227,10 @@ class _PluginPcmOut implements RendelPcmOut {
   @override
   Future<void> feed(Uint8List s16le) {
     _dry = false;
-    // A copy of exactly these bytes: the plugin sends the view's whole
-    // buffer, so a piece cut from a longer one played its odd byte twice and
-    // every sample after it was heard a byte out, as loud static (Tuna
-    // 2026-10-26, "cızırtılı").
-    return FlutterPcmSound.feed(PcmArrayInt16(bytes: ByteData.sublistView(Uint8List.fromList(s16le))));
+    // A copy of exactly these bytes: a piece cut from a longer buffer once
+    // went out whole, played its odd byte twice and every sample after it a
+    // byte out, as loud static (Tuna 2026-10-26, "cızırtılı").
+    return RendelPcmSound.feed(Uint8List.fromList(s16le));
   }
 
   @override
@@ -247,8 +246,8 @@ class _PluginPcmOut implements RendelPcmOut {
   Future<void> close() async {
     final drained = _drained;
     if (drained != null && !drained.isCompleted) drained.complete();
-    FlutterPcmSound.setFeedCallback(null);
-    await FlutterPcmSound.release();
+    RendelPcmSound.setFeedCallback(null);
+    await RendelPcmSound.release();
   }
 }
 

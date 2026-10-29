@@ -14,9 +14,22 @@ let package = Package(
         .package(name: "FlutterFramework", path: "../FlutterFramework")
     ],
     targets: [
+        // Reading aloud's PCM output: flutter_pcm_sound's Objective-C, which a
+        // Swift target cannot hold, so it is a target of its own.
+        .target(
+            name: "rendel_pcm",
+            dependencies: [
+                .product(name: "FlutterFramework", package: "FlutterFramework")
+            ],
+            linkerSettings: [
+                .linkedFramework("AudioToolbox"),
+                .linkedFramework("AVFoundation"),
+            ]
+        ),
         .target(
             name: "rendel",
             dependencies: [
+                "rendel_pcm",
                 .product(name: "FlutterFramework", package: "FlutterFramework")
             ],
             resources: [

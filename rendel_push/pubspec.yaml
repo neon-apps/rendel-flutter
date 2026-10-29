@@ -3,7 +3,7 @@ description: >-
   Push notifications for Rendel follow-ups: straight to Apple on iOS (no
   Firebase), Firebase Cloud Messaging on Android without a version pin. Asks
   for permission, hands the token to Rendel, and opens Rendel's pushes.
-version: 0.2.0
+version: 0.2.1
 homepage: https://rendel.ai
 # Added from git, beside `rendel` in the same public repository; pub.dev takes
 # no package with a git dependency.
@@ -22,7 +22,7 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.69.0
+      ref: v0.69.1
 
 dev_dependencies:
   flutter_lints: ^5.0.0

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.2.1
+
+- An Android token carries the app's package name, so Settings › Channels can
+  say when the app is missing from the Firebase project.
+
 ## 0.2.0
 
 **Breaking**
