@@ -74,7 +74,7 @@ void main() {
     await c.send('hello');
 
     final client = server.chats.single['client'] as Map<String, dynamic>;
-    expect(client['capabilities'], ['form_update', 'surface_update', 'answer_pages', 'detail_pages', 'notices']);
+    expect(client['capabilities'], ['form_update', 'surface_update', 'answer_pages', 'detail_pages', 'notices', 'card_fill']);
     c.dispose();
   });
 

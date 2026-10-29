@@ -43,6 +43,12 @@ class _LiveApi extends RendelApiClient {
   final List<Map<String, dynamic>> sent = [];
   StreamController<RendelWireEvent>? _turn;
 
+  /// The conversation as the server stored it, for `GET .../messages`.
+  List<Map<String, dynamic>> stored = const [];
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMessages(String conversationId) async => stored;
+
   @override
   Stream<RendelWireEvent> chat(Map<String, dynamic> body) {
     sent.add(body);
@@ -89,6 +95,10 @@ WireBlock _block(String id, String type, Map<String, dynamic> props) =>
 
 WireBlock _text(String id, String markdown) =>
     _block(id, 'text', {'markdown': markdown});
+
+/// A text block as the server stores it.
+Map<String, dynamic> _wire(String id, String markdown) =>
+    {'id': id, 'type': 'text', 'fallback_text': markdown, 'props': {'markdown': markdown}};
 
 /// The design brief's tests for answer pages (`design/PAGES.md`).
 void main() {
@@ -415,6 +425,122 @@ void main() {
       // The record is not the pages: the conversation still holds all three.
       expect(c.messages.where((m) => m.role == 'assistant'), hasLength(3));
       expect(c.pages, hasLength(2));
+    });
+
+    // Grove 2026-10-29: a question, the sheet closed while it was answered,
+    // and reopened on the answer before it with the question gone and Next
+    // off. The controller had read the answer; the pages never took it.
+    group('the sheet closed mid-answer', () {
+      Future<void> close(WidgetTester tester) async {
+        await tester.pumpWidget(const SizedBox());
+        await tester.pump();
+      }
+
+      testWidgets('reopens on the answer that finished meanwhile', (tester) async {
+        final api = _LiveApi();
+        final c = controller(api);
+        addTearDown(c.dispose);
+        await pump(tester, c);
+        await ask(tester, c, api, 'First?', [_text('a', 'First answer.')]);
+
+        await _send(tester, c, 'Second?');
+        await api.push(tester, const [
+          TurnStart(conversationId: 'c1', messageId: 'm2', model: 'test'),
+          TurnStatus(step: 'action', action: 'find_order'),
+        ]);
+        // Closed before the answer had a block to show.
+        await close(tester);
+        await api.push(
+          tester,
+          [
+            const BlockStart(index: 0, id: 'b', blockType: 'text'),
+            const BlockDelta(index: 0, textDelta: 'Second'),
+            BlockReady(index: 0, block: _text('b', 'Second answer.')),
+            const TurnEnd(status: 'completed', pending: []),
+          ],
+          end: true,
+        );
+
+        await pump(tester, c);
+        await settle(tester);
+        expect(find.text('Second answer.'), findsOneWidget);
+        expect(find.text('Second?'), findsOneWidget, reason: 'its question over it');
+        expect(c.pages, hasLength(2));
+        await tester.tap(find.bySemanticsLabel('Previous page'));
+        await tester.pump();
+        expect(find.text('First answer.'), findsOneWidget);
+        expect(
+          tester.getSemantics(find.bySemanticsLabel('Next page')),
+          isSemantics(isButton: true, isEnabled: true),
+        );
+      });
+
+      testWidgets('reopens on the question while it is still answered', (tester) async {
+        final api = _LiveApi();
+        final c = controller(api);
+        addTearDown(c.dispose);
+        await pump(tester, c);
+        await ask(tester, c, api, 'First?', [_text('a', 'First answer.')]);
+
+        await _send(tester, c, 'Second?');
+        await close(tester);
+        await pump(tester, c);
+        await settle(tester);
+        // Still thinking: the question is over the screen, as it was.
+        expect(find.text('Second?'), findsOneWidget);
+
+        await api.answer(tester, [_text('b', 'Second answer.')]);
+        await settle(tester);
+        expect(find.text('Second answer.'), findsOneWidget);
+        expect(c.page, 1);
+      });
+
+      testWidgets('a cut stream is recovered from what the server stored', (tester) async {
+        final api = _LiveApi();
+        final c = controller(api);
+        addTearDown(c.dispose);
+        await pump(tester, c);
+        await ask(tester, c, api, 'First?', [_text('a', 'First answer.')]);
+
+        await _send(tester, c, 'Second?');
+        // The app put away: the stream ends with half an answer.
+        await api.push(
+          tester,
+          const [
+            TurnStart(conversationId: 'c1', messageId: 'm2', model: 'test'),
+            BlockStart(index: 0, id: 'b', blockType: 'text'),
+            BlockDelta(index: 0, textDelta: 'Second'),
+          ],
+          end: true,
+        );
+        await close(tester);
+        expect(c.errorCode, 'stream_dropped');
+
+        api.stored = [
+          {'id': 'u1', 'role': 'user', 'blocks': [_wire('q1', 'First?')]},
+          {'id': 'm1', 'role': 'assistant', 'blocks': [_wire('a', 'First answer.')]},
+          {'id': 'u2', 'role': 'user', 'blocks': [_wire('q2', 'Second?')]},
+          {'id': 'm2', 'role': 'assistant', 'blocks': [_wire('b', 'Second answer, whole.')]},
+        ];
+        await tester.runAsync(c.recover);
+        await pump(tester, c);
+        await settle(tester);
+        expect(find.text('Second answer, whole.'), findsOneWidget);
+        expect(c.errorText, isNull);
+        expect(c.pages, hasLength(2));
+      });
+
+      test('nothing is fetched for a turn that was not cut', () async {
+        final api = _LiveApi();
+        final c = controller(api);
+        api.stored = [
+          {'id': 'm9', 'role': 'assistant', 'blocks': [_wire('z', 'Elsewhere.')]},
+        ];
+        c.conversationId = 'c1';
+        await c.recover();
+        expect(c.messages, isEmpty);
+        c.dispose();
+      });
     });
 
     testWidgets('a new conversation starts with none', (tester) async {

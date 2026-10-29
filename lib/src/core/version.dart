@@ -6,4 +6,4 @@
 /// every app still introduced itself as the first one — and a floor of any
 /// height would have refused them all. `version_test.dart` fails the build
 /// when this and `pubspec.yaml` disagree.
-const String sdkVersion = 'flutter/0.67.0';
+const String sdkVersion = 'flutter/0.67.1';

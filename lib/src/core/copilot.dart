@@ -495,6 +495,8 @@ class Rendel {
     // one a device a day.
     unawaited(api.sendEvent({'type': 'assistant_open'}));
     final controller = _ensureController(api);
+    // An answer whose stream was cut may have finished on the server since.
+    unawaited(controller.recover());
     _events.add(RendelEvent.opened);
     // One recogniser per presentation, for the built-in dictation. It listens
     // in the app's locale or the phone's, never narrowed to `languages`: a

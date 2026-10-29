@@ -5,6 +5,28 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.67.1
+
+**Fixed**
+
+- An answer survives the sheet being closed before it arrived (Grove,
+  2026-10-29). The turn always went on, but its page was made only by the
+  open screen, so reopening showed the previous answer with the question
+  gone. Reopening now catches up: an answer that finished while closed is
+  the newest page, one still coming shows its question. A turn whose stream
+  was cut (the connection dropped, the answer stalled) is recovered from the
+  server when the sheet opens, if the server finished it.
+
+**Added**
+
+- Values set on the confirmation card (`card_fill`, sent with every chat
+  request). An editable value the server leaves for the person (`required`
+  on the control, absent from the parameters) is drawn empty, and the
+  confirm button waits until it is set. The server then lets the assistant
+  propose a card without asking for such values one turn at a time: a
+  return now goes order, item, card, with the reason and the refund chosen
+  on the card.
+
 ## 0.67.0
 
 **Changed**

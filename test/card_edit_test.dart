@@ -1,6 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:rendel/rendel.dart';
+import 'package:rendel/src/engine/conversation_controller.dart';
+import 'package:rendel/src/transport/api_client.dart';
 
 /// Values the user may change on a confirmation card (Tuna, 2026-10-11): each
 /// takes its control, the change goes to the server, and the card confirmed
@@ -37,10 +43,10 @@ void main() {
         'cancel': {'kind': 'cancel', 'invocation_id': 'inv_1'},
       };
 
-  Future<WireBlock> pump(WidgetTester tester) async {
+  Future<WireBlock> pump(WidgetTester tester, [Map<String, dynamic>? props]) async {
     sent = [];
     tapped = [];
-    final block = WireBlock(id: 'b', type: 'confirm_card', fallbackText: 'Add?', props: card())..ready = true;
+    final block = WireBlock(id: 'b', type: 'confirm_card', fallbackText: 'Add?', props: props ?? card())..ready = true;
     await tester.pumpWidget(MaterialApp(
       home: RendelThemeScope(
         theme: RendelTheme.paper(),
@@ -148,5 +154,97 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
     expect(find.bySemanticsLabel('More'), findsNothing);
     expect(find.text('Card'), findsOneWidget);
+  });
+
+  /// Values the person fills in on the card (`card_fill`, Tuna 2026-10-29):
+  /// the server leaves them out of `params` and marks their control
+  /// `required`, rather than asking for each in a turn of its own.
+  group('a value filled in on the card', () {
+    Map<String, dynamic> unfilled() => card()
+      ..['params'] = {'product_id': 'P003', 'quantity': 1}
+      ..['params_display'] = [
+        {'label': 'Product', 'value': 'Oat Milk 1L', 'param': 'product_id'},
+        {'label': 'Quantity', 'value': '1', 'param': 'quantity'},
+      ]
+      ..['editable'] = [
+        {'param': 'quantity', 'label': 'Quantity', 'kind': 'stepper', 'min': 1, 'max': 20},
+        {
+          'param': 'refund_to',
+          'label': 'Refund to',
+          'kind': 'choice',
+          'required': true,
+          'options': [
+            {'value': 'card', 'label': 'Card'},
+            {'value': 'store_credit', 'label': 'Store credit'},
+          ],
+        },
+        {'param': 'reason', 'label': 'Reason', 'kind': 'text', 'required': true, 'max_length': 200},
+      ];
+
+    test('is declared with each chat request', () async {
+      final bodies = <Map<String, dynamic>>[];
+      final c = ConversationController(
+        api: RendelApiClient(
+          appKey: 'nc_pk_test_x',
+          deviceId: 'd',
+          config: const RendelConfig(),
+          httpClient: MockClient((request) async {
+            if (request.url.path.endsWith('/v1/chat')) bodies.add(jsonDecode(request.body) as Map<String, dynamic>);
+            return http.Response('', 200, headers: {'content-type': 'text/event-stream'});
+          }),
+        ),
+        actions: const {},
+        sdkVersion: 'flutter/test',
+      );
+      await c.send('return my order');
+      expect((bodies.single['client'] as Map)['capabilities'], contains('card_fill'));
+      c.dispose();
+    });
+
+    testWidgets('its control is drawn empty, with its label', (tester) async {
+      await pump(tester, unfilled());
+      expect(find.text('Refund to'), findsOneWidget);
+      expect(find.text('Reason'), findsOneWidget);
+      // A choice with nothing chosen.
+      for (final option in ['Card', 'Store credit']) {
+        expect(tester.widget<RendelChip>(find.widgetWithText(RendelChip, option)).selected, isNot(true));
+      }
+      // An empty text field.
+      expect(find.byType(TextField), findsOneWidget);
+      expect(tester.widget<TextField>(find.byType(TextField)).controller!.text, isEmpty);
+    });
+
+    testWidgets('confirm waits until the redrawn card has every value', (tester) async {
+      await pump(tester, unfilled());
+      await tester.tap(find.text('Confirm'));
+      await tester.pump();
+      expect(tapped, isEmpty, reason: 'nothing filled in yet');
+
+      await tester.tap(find.text('Store credit'));
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump();
+      expect(sent, [
+        {'refund_to': 'store_credit'}
+      ]);
+      await tester.tap(find.text('Confirm'));
+      await tester.pump();
+      expect(tapped, isEmpty, reason: 'the reason is still missing');
+
+      await tester.enterText(find.byType(TextField), 'Too small');
+      await tester.pump(const Duration(milliseconds: 800));
+      await tester.pump();
+      expect(sent.last, {'reason': 'Too small'});
+      await tester.tap(find.text('Confirm'));
+      await tester.pump();
+      expect(tapped, hasLength(1));
+    });
+
+    testWidgets('a blank text is no value', (tester) async {
+      final props = unfilled()..['params'] = {'product_id': 'P003', 'quantity': 1, 'refund_to': 'card', 'reason': '  '};
+      await pump(tester, props);
+      await tester.tap(find.text('Confirm'));
+      await tester.pump();
+      expect(tapped, isEmpty);
+    });
   });
 }

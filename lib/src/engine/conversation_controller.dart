@@ -1081,6 +1081,7 @@ class ConversationController extends ChangeNotifier {
     _openAssistant = null;
     _pendingReads.clear();
     _lastPayload = null;
+    _cutAnswerId = null;
     _submittingFormId = null;
     _surfaceRevisions.clear();
     pages.clear();
@@ -1120,6 +1121,30 @@ class ConversationController extends ChangeNotifier {
     pages.addAll(messages.where((m) => m.role == 'assistant'));
     page = pages.length - 1;
     _notify();
+  }
+
+  /// The answer whose stream was cut (the app put away, the network gone),
+  /// by its server id, while the server may still have finished it.
+  String? _cutAnswerId;
+
+  /// Asked when the thread opens again: an answer whose stream was cut and
+  /// that the server has since stored whole is drawn from what it stored,
+  /// the conversation loaded as history. Nothing changes otherwise.
+  Future<void> recover() async {
+    final id = conversationId;
+    final cut = _cutAnswerId;
+    if (busy || id == null || cut == null) return;
+    final generation = _generation;
+    List<Map<String, dynamic>> history;
+    try {
+      history = await api.fetchMessages(id);
+    } catch (_) {
+      return;
+    }
+    if (generation != _generation || busy || _cutAnswerId != cut) return;
+    final stored = history.where((m) => m['id'] == cut).firstOrNull;
+    if (stored == null || (stored['blocks'] as List? ?? const []).isEmpty) return;
+    loadHistory(id, history);
   }
 
   // ————————————————————————— internals —————————————————————————
@@ -1499,6 +1524,7 @@ class ConversationController extends ChangeNotifier {
       errorCode = 'stream_dropped';
       _lastErrorRetryable = true;
     }
+    _cutAnswerId = errorCode == 'stream_dropped' || errorCode == 'copilot_stalled' ? open?.serverId : null;
 
     final produced = _turnBlocks.isNotEmpty || droppedStale || noticed;
 

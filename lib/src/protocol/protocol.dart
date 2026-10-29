@@ -76,12 +76,18 @@ const List<String> supportedComponents = [
 /// usage limit, the app's budget or credit paused), the server sends a
 /// `notice`, drawn as a calm answer with the composer resting, instead of an
 /// `error`.
+///
+/// `card_fill`: a `confirm_card` may leave out a value the person fills in
+/// on the card, its `editable` control marked `required`; the card draws the
+/// control empty and cannot be confirmed until a redraw carries the value.
+/// The server only lets the model propose such a card to a build that says so.
 const List<String> clientCapabilities = [
   'form_update',
   'surface_update',
   'answer_pages',
   'detail_pages',
   'notices',
+  'card_fill',
 ];
 
 /// The kinds of action this build carries out when a control is tapped,

@@ -1998,6 +1998,14 @@ Widget _confirmCard(
         if (_str(control['param']) != null) _str(control['param'])!: control,
   };
   final rowParams = {for (final row in display) _str(row['param'])};
+  // A value the person fills in here (`card_fill`): until a redraw carries
+  // it, the card cannot be confirmed.
+  final params = block.props['params'];
+  final unfilled = _maps(block.props['editable']).any((control) {
+    if (control['required'] != true) return false;
+    final value = params is Map ? params[_str(control['param'])] : null;
+    return value == null || value is String && value.trim().isEmpty;
+  });
   // The server's verb for the button, with the amount when it charges one
   // ("Place order · A$8.41"); the build's own word otherwise.
   final confirmLabel = _str(block.props['confirm_label']) ?? RendelStringsScope.of(context).confirm;
@@ -2148,8 +2156,9 @@ Widget _confirmCard(
                     danger: destructive,
                     // Not while a change is waiting for the server (the card
                     // confirmed is the one it drew last), nor before the
-                    // value is typed back and the text read.
-                    onTap: edits?.blocked == true || extras?.armed == false
+                    // value is typed back and the text read, nor while a
+                    // value it asks for is missing.
+                    onTap: edits?.blocked == true || extras?.armed == false || unfilled
                         ? null
                         : extras?.typedValue != null
                             ? () => dispatch.onAction(ConfirmAction(

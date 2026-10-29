@@ -254,9 +254,18 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       c.pages.addAll(_answers(c));
       c.page = c.pages.length - 1;
     }
-    _question = _lastQuestion(c);
+    // Caught up from the question the pages already answer, as an open
+    // screen would have been: a turn the controller kept reading while the
+    // sheet was closed had its answer missing from the pages, and the thread
+    // reopened on the one before it with Next off (Grove 2026-10-29).
+    _question = _questionBefore(c, c.pages.lastOrNull);
     _language = c.answerLanguage;
     _wasBusy = c.busy;
+    _syncPages();
+    // Still being asked, it is shown whole, having been seen; a turn that
+    // ended while away with nothing to show is not asked at all.
+    if (!c.busy) _asked = null;
+    _askedWhole = true;
     c.onAnswered = _readAloud;
     widget.voice?.prepare();
     WidgetsBinding.instance.addObserver(this);
@@ -903,6 +912,15 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   RendelMessage? _lastQuestion(ConversationController controller) =>
       controller.messages.reversed.where((m) => m.role == 'user').firstOrNull;
 
+  /// The question [answer] answers: the newest one before it. Null with no answer.
+  RendelMessage? _questionBefore(ConversationController controller, RendelMessage? answer) {
+    final messages = controller.messages;
+    for (var i = answer == null ? -1 : messages.indexOf(answer) - 1; i >= 0; i--) {
+      if (messages[i].role == 'user') return messages[i];
+    }
+    return null;
+  }
+
   /// Keeps the pages in step with the conversation.
   ///
   /// A question drops the pages after the one it was asked from, and is
@@ -911,6 +929,11 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// nothing to show gives the screen back as it was.
   void _turnPages() {
     if (!mounted) return;
+    if (_syncPages()) setState(() {});
+  }
+
+  /// [_turnPages]' work, and whether the screen changed with it.
+  bool _syncPages() {
     final c = widget.controller;
     var changed = false;
     void dropLater() {
@@ -923,8 +946,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     if (question != null && !identical(question, _question)) {
       _question = question;
       // A card opened over its page is asked with no question over the
-      // screen, and is no page: the pages after the one it is on stay.
-      if (question.detail == null) {
+      // screen, and is no page: the pages after the one it is on stay. A
+      // conversation loaded whole has its answer paged already.
+      if (question.detail == null && !c.pages.contains(c.messages.last)) {
         dropLater();
         final words = question.blocks.firstOrNull?.props['markdown'];
         _asked = words is String ? words : '';
@@ -975,7 +999,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       _afterClose = null;
       changed = true;
     }
-    if (changed) setState(() {});
+    return changed;
   }
 
   /* ——— a card opened over its page (`design/DETAIL.md`) ——— */
