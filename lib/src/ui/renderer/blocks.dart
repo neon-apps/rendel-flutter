@@ -1904,7 +1904,10 @@ class _EditRowState extends State<_EditRow> {
               Row(
                 children: [
                   Expanded(child: Text(label, style: labelStyle)),
-                  control,
+                  // A field in a row has no width of its own: unbounded, its
+                  // layout failed and took the whole page with it (QA R3, a
+                  // number on Grove's shopping-list card).
+                  if (_kind == 'number') SizedBox(width: 96, child: control) else control,
                 ],
               ),
             if (error != null) ...[

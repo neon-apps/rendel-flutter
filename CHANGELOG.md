@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.69.3
+
+**Fixed**
+
+- A confirmation card with a number field draws. The field had no width of its
+  own in its row, its layout failed, and the answer page was blank when the
+  card was alone on it, or the card was missing beside other blocks; the
+  thread then stopped drawing later answers until the app restarted.
+
 ## 0.69.2
 
 **Fixed**

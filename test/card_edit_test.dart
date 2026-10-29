@@ -247,4 +247,16 @@ void main() {
       expect(tapped, isEmpty);
     });
   });
+
+  testWidgets('a number beside its label has a width, so the card draws', (tester) async {
+    // QA R3: unbounded in its row, the field's layout failed and the page was blank.
+    await pump(tester, {
+      ...card(),
+      'editable': [
+        {'param': 'quantity', 'label': 'Quantity', 'kind': 'number'},
+      ],
+    });
+    expect(tester.takeException(), isNull);
+    expect(find.text('Add 1 of Oat Milk 1L to your cart?'), findsOneWidget);
+  });
 }
