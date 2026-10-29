@@ -13,12 +13,14 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/protocol/protocol.dart';
 import 'package:rendel/src/transport/api_client.dart';
+import 'package:rendel/src/ui/renderer/blocks.dart' show chartAxisLabels;
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
@@ -188,6 +190,15 @@ final _hbar = _wire('chart', {
   'unit': 'pairs',
 }, id: 'b_chart_hbar');
 
+// Six months of one year on a 375pt phone (QA 2026-10-29, iPhone SE).
+final _months = _wire('chart', {
+  'kind': 'bar',
+  'labels': ['May 2026', 'Jun 2026', 'Jul 2026', 'Aug 2026', 'Sep 2026', 'Oct 2026'],
+  'series': [
+    {'data': [12, 18, 9, 22, 15, 20]},
+  ],
+}, id: 'b_chart_months');
+
 const _curl = "curl -H 'X-Rendel-Key: rd_pk_test_123' https://api.rendel.ai/v1/health --max-time 10 --retry 3";
 
 final _snippet = _wire('code', {
@@ -236,8 +247,9 @@ void main() {
     WidgetTester tester,
     List<Map<String, dynamic>> blocks, {
     TextDirection direction = TextDirection.ltr,
+    double width = 390,
   }) async {
-    tester.view.physicalSize = const Size(390 * 3, 844 * 3);
+    tester.view.physicalSize = Size(width * 3, 844 * 3);
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     final c = controller();
@@ -565,6 +577,28 @@ void main() {
       expect(find.bySemanticsLabel(RegExp('^A chart block')), findsOneWidget, reason: 'the fallback names it');
     });
 
+    test('the year shared by every label is dropped from them (QA 2026-10-29)', () {
+      expect(chartAxisLabels(['May 2026', 'Jun 2026', 'Oct 2026']), ['May', 'Jun', 'Oct']);
+      expect(chartAxisLabels(['Mayıs 2026', 'Haziran 2026']), ['Mayıs', 'Haziran']);
+      // Across a new year the year is what tells them apart.
+      expect(chartAxisLabels(['Dec 2025', 'Jan 2026']), ['Dec 2025', 'Jan 2026']);
+      // Not every label a month of a year, or only one: as written.
+      expect(chartAxisLabels(['May 2026', 'Today']), ['May 2026', 'Today']);
+      expect(chartAxisLabels(['Oct 2026']), ['Oct 2026']);
+      expect(chartAxisLabels(['Mon', 'Tue']), ['Mon', 'Tue']);
+    });
+
+    testWidgets('bars of one year on a 375pt phone: the months whole, the year once in the readout',
+        (tester) async {
+      await pump(tester, [_months], width: 375);
+      for (final month in ['May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct']) {
+        expect(tester.renderObject<RenderParagraph>(find.text(month)).didExceedMaxLines, isFalse,
+            reason: '$month is clipped');
+      }
+      expect(find.text('May 2026'), findsNothing);
+      expect(find.textContaining('Oct 2026'), findsOneWidget, reason: 'the readout names its month in full');
+    });
+
     testWidgets('hbar in RTL: the labels on the right', (tester) async {
       await pump(tester, [_hbar], direction: TextDirection.rtl);
       final bars = painted(theme.readoutFill);
@@ -665,6 +699,7 @@ void main() {
         _line,
         _stacked,
         _hbar,
+        _months,
         _snippet,
       ]) {
         expect(wireBlockErrors(wire), isEmpty, reason: '${wire['id']}');

@@ -37,6 +37,11 @@ import '../core/strings.dart';
 import 'followup_card.dart';
 import 'theme.dart';
 
+/// How long the thread takes no taps after Send (QA R4-2): longer than a
+/// quick second tap and the keyboard going down, shorter than anyone waits
+/// before reaching for the page.
+const Duration sendHoldDuration = Duration(milliseconds: 600);
+
 /// The conversation surface: header, one answer to a page, composer.
 ///
 /// The shell runs on the same scales as the catalog it holds — no font size,
@@ -357,8 +362,22 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     _voiceLeaving.dispose();
     _voiceFalls.dispose();
     _held?.cancel();
+    _sendHold?.cancel();
     super.dispose();
   }
+
+  /// Set for a moment after a question is sent (`sendHoldDuration`), while
+  /// the thread takes no taps until something of the answer comes back.
+  ///
+  /// QA on 2026-10-29 (R4-2, Grove): Send tapped twice quickly left the
+  /// previous page under "The connection dropped before the answer
+  /// finished", though the server had the one message and Try again brought
+  /// its answer. The first tap puts the box and the keyboard away, so the
+  /// thread moves under a finger still coming down for the second, and that
+  /// tap landed on whatever was drawn there instead of on a disabled Send.
+  /// A second tap now lands on nothing.
+  bool _justSent = false;
+  Timer? _sendHold;
 
   /// Files already uploaded, waiting for the turn that will carry them.
   ///
@@ -631,7 +650,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final text = typed.trim().isEmpty && _attachments.isNotEmpty
         ? _attachments.map((pending) => pending.name).join(', ')
         : typed;
-    if (text.trim().isEmpty) return;
+    if (text.trim().isEmpty || widget.controller.busy) return;
 
     /* Nothing goes out half-uploaded: an id that does not exist yet is a file
        the turn would silently not carry. The send control is off while one is
@@ -642,9 +661,14 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // opens with.
     final image = _attachments.where((pending) => pending.mediaType.startsWith('image/')).firstOrNull?.bytes;
     _input.clear();
+    _sendHold?.cancel();
+    _sendHold = Timer(sendHoldDuration, () {
+      if (mounted) setState(() => _justSent = false);
+    });
     setState(() {
       _attachments.clear();
       _attachError = null;
+      _justSent = true;
     });
     final spoken = _spoken;
     _overDetail(() {
@@ -666,7 +690,17 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // reason.
     return RendelStringsScope(
       strings: _strings,
-      child: _build(context, theme, controller),
+      // Absorbed, not ignored: a tap let through would reach the host's
+      // screen under the sheet instead (`_justSent`). Only while nothing of
+      // the answer has come back: once it has, a tap is meant for it.
+      child: ListenableBuilder(
+        listenable: controller,
+        builder: (context, child) => AbsorbPointer(
+          absorbing: _justSent && controller.phase == RendelPhase.thinking,
+          child: child,
+        ),
+        child: _build(context, theme, controller),
+      ),
     );
   }
 
@@ -2382,16 +2416,21 @@ class _EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              // The customer's own words first, then the SDK's translated
-              // ones. Unlike the line below it, an EMPTY headline is not a
-              // choice anybody asked for — a thread opening on nothing but a
-              // subtitle reads as a page that failed to load — so a blank one
-              // falls back rather than clearing.
-              (headline?.trim().isNotEmpty ?? false)
-                  ? headline!
-                  : RendelStringsScope.of(context).emptyTitle,
-              style: theme.text.display,
+            // At most 1.6× the reader's size: at the largest it filled the
+            // whole sheet and hid the suggestions under it (QA R7, iPhone SE).
+            MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.6,
+              child: Text(
+                // The customer's own words first, then the SDK's translated
+                // ones. Unlike the line below it, an EMPTY headline is not a
+                // choice anybody asked for — a thread opening on nothing but a
+                // subtitle reads as a page that failed to load — so a blank one
+                // falls back rather than clearing.
+                (headline?.trim().isNotEmpty ?? false)
+                    ? headline!
+                    : RendelStringsScope.of(context).emptyTitle,
+                style: theme.text.display,
+              ),
             ),
             // An EMPTY subtitle is a choice — the console lets a customer
             // clear the line — and a null one means they never said. The

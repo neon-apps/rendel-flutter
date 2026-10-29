@@ -6,9 +6,33 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:maplibre_gl/maplibre_gl.dart' as ml;
 
+import '../theme.dart';
+
 /// The map a `map` block draws on (`design/CATALOG-B5.md`): OpenFreeMap's
 /// style over OpenStreetMap's data, hosted in the EU and asking for no key.
 const String rendelMapStyle = 'https://tiles.openfreemap.org/styles/liberty';
+
+/// The same map for a dark theme: OpenFreeMap's own dark style, over the same
+/// data and the same key-free host.
+///
+/// The light style stayed light inside a dark sheet (QA 2026-10-29, Grove):
+/// a bright rectangle in the middle of a dark answer. A filter over the tiles
+/// is the usual web fix, but the map here is a platform view, which a Flutter
+/// colour filter does not reach on iOS or Android; a dark style is drawn by
+/// the engine itself, with labels made to be read on it. The pins are the
+/// SDK's own widgets over the map, so they keep the theme's ink either way.
+const String rendelMapDarkStyle = 'https://tiles.openfreemap.org/styles/dark';
+
+/// The style a map drawn in [theme] takes: [rendelMapDarkStyle] on a dark
+/// ground, [rendelMapStyle] on a light one. Dark is judged as the theme
+/// derives its plates: the ground is dark when white reads on it better than
+/// black.
+String rendelMapStyleFor(RendelTheme theme) {
+  final ground = theme.colors.surface;
+  return contrastRatio(const Color(0xFFFFFFFF), ground) > contrastRatio(const Color(0xFF000000), ground)
+      ? rendelMapDarkStyle
+      : rendelMapStyle;
+}
 
 /// Where a map looks: the point at its centre and how far in.
 ///
@@ -194,7 +218,7 @@ class _MapLibreViewState extends State<_MapLibreView> {
     if (!_runs) return const SizedBox.expand();
     final interactive = widget.interactive;
     return ml.MapLibreMap(
-      styleString: rendelMapStyle,
+      styleString: rendelMapStyleFor(RendelThemeScope.of(context)),
       initialCameraPosition: ml.CameraPosition(
         target: ml.LatLng(widget.camera.lat, widget.camera.lng),
         zoom: widget.camera.zoom,

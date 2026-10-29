@@ -261,14 +261,19 @@ Widget _button(RendelTheme theme, String word, VoidCallback onTap) {
       ),
       child: iconOnly
           ? icon
-          : Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                icon,
-                // The web's gap between the two.
-                SizedBox(width: theme.space.sm),
-                Text(word, style: theme.text.labelStrong),
-              ],
+          // Grows with the reader's text size, but never past 1.5×: at the
+          // largest sizes it covered the app it floats over (QA R7, iPhone SE).
+          : MediaQuery.withClampedTextScaling(
+              maxScaleFactor: 1.5,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  icon,
+                  // The web's gap between the two.
+                  SizedBox(width: theme.space.sm),
+                  Text(word, style: theme.text.labelStrong),
+                ],
+              ),
             ),
     ),
   );

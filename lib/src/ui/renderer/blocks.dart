@@ -1809,6 +1809,20 @@ class _EditRowState extends State<_EditRow> {
     final labelStyle = _asPart(theme, 'details', theme.text.caption);
     final valueStyle = _asPart(theme, 'details', theme.text.captionSoftTabular);
     final error = widget.edits.errors[_param];
+    // A value the person has to fill in, still empty, says so beside its
+    // label ("Label · Required"), and its field shows the "…" the card's
+    // sentence holds for it. QA on 2026-10-29 (R3-9, Grove): "Add the
+    // address …: 22 Harris St…" above a greyed-out Add address, and nothing
+    // said the Label field was the one the card waited for.
+    final needed = widget.control['required'] == true && (value == null || value is String && value.trim().isEmpty);
+    final labelText = needed
+        ? Text.rich(TextSpan(text: label, children: [
+            TextSpan(
+              text: ' · ${strings.required}',
+              style: labelStyle.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w600),
+            ),
+          ]), style: labelStyle)
+        : Text(label, style: labelStyle);
 
     Widget control;
     switch (_kind) {
@@ -1880,6 +1894,7 @@ class _EditRowState extends State<_EditRow> {
           decoration: InputDecoration(
             isDense: true,
             counterText: '',
+            hintText: widget.control['required'] == true ? '…' : null,
             contentPadding: EdgeInsets.symmetric(horizontal: theme.space.sm, vertical: theme.space.xs + 2),
             filled: true,
             fillColor: theme.colors.surfaceHigh,
@@ -1897,13 +1912,13 @@ class _EditRowState extends State<_EditRow> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (stacked) ...[
-              Text(label, style: labelStyle),
+              labelText,
               SizedBox(height: theme.space.xs),
               control,
             ] else
               Row(
                 children: [
-                  Expanded(child: Text(label, style: labelStyle)),
+                  Expanded(child: labelText),
                   // A field in a row has no width of its own: unbounded, its
                   // layout failed and took the whole page with it (QA R3, a
                   // number on Grove's shopping-list card).
@@ -3871,6 +3886,33 @@ class _Bars extends StatefulWidget {
   State<_Bars> createState() => _BarsState();
 }
 
+/// The labels under a chart's bars, without the year when every one of them
+/// ends in the same one: "May 2026" … "Oct 2026" are drawn "May" … "Oct".
+///
+/// On a 375pt phone six bars leave each label about 42pt, and "May 2026"
+/// was clipped to "May 2…" under every bar (QA 2026-10-29, iPhone SE). The
+/// year said six times said nothing the first time had not; the readout
+/// above the bars still names its own bar in full ("in Oct 2026"), so it is
+/// stated once. Labels that are not all of one year are left as they are:
+/// across a new year the year is what tells "Jan" from "Jan".
+///
+/// Mirrors `axisLabels` in the Web SDK's `blocks.ts`.
+@visibleForTesting
+List<String> chartAxisLabels(List<String> labels) {
+  if (labels.length < 2) return labels;
+  final years = <String>{};
+  final short = <String>[];
+  for (final label in labels) {
+    final match = _yearAtEnd.firstMatch(label.trim());
+    if (match == null) return labels;
+    years.add(match.group(2)!);
+    short.add(match.group(1)!);
+  }
+  return years.length == 1 ? short : labels;
+}
+
+final RegExp _yearAtEnd = RegExp(r'^(.*\S)\s+(\d{4})$');
+
 class _BarsState extends State<_Bars> {
   /// The bar read out; null is the latest.
   int? _shown;
@@ -3887,6 +3929,8 @@ class _BarsState extends State<_Bars> {
     final top = peak > 0 ? peak : 1.0;
     final latest = data[last];
     final latestLabel = last < labels.length ? labels[last] : '';
+    // The readout names its bar in full; under the bars, the year once is enough.
+    final axis = chartAxisLabels(labels);
     final height = theme.size.plotHeight;
     final said = _chartFormat(data, unit, RendelStringsScope.of(context).numberLocale);
 
@@ -3987,7 +4031,7 @@ class _BarsState extends State<_Bars> {
                             ),
                             SizedBox(height: theme.space.sm),
                             Text(
-                              i < labels.length ? labels[i] : '',
+                              i < axis.length ? axis[i] : '',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               textAlign: TextAlign.center,
@@ -8493,7 +8537,7 @@ class RendelActionButton extends StatelessWidget {
   final bool expand;
 
   /// The `danger` control (`design/SYSTEM.md` §6a): filled in danger with
-  /// white words, for the confirmation of something that cannot be taken
+  /// [RendelTheme.onDanger] words, for the confirmation of something that cannot be taken
   /// back. A card part's own fill still wins.
   final bool danger;
 
@@ -8589,7 +8633,9 @@ class RendelActionButton extends StatelessWidget {
               ? theme.text.labelStrong
                   .copyWith(color: theme.colors.onSurfaceFaint)
               : dangerous
-                  ? theme.text.labelStrong.copyWith(color: const Color(0xFFFFFFFF))
+                  // White on the paper red; the brand black on a dark
+                  // theme's light rose, where white was 3.3:1 (QA 2026-10-29).
+                  ? theme.text.labelStrong.copyWith(color: theme.onDanger)
                   : outlined
                       ? theme.text.labelStrong
                           .copyWith(color: theme.accentText)
@@ -9058,7 +9104,10 @@ class _WordFlow extends StatefulWidget {
 class _WordFlowState extends State<_WordFlow> with SingleTickerProviderStateMixin {
   static final _pieces = RegExp(r'\s+|\S+');
 
-  late final Ticker _ticker = createTicker(_tick);
+  /// Made on first use: a paragraph that never animates, disposed after it
+  /// is taken out of the tree, must not make one then.
+  Ticker? _clock;
+  Ticker get _ticker => _clock ??= createTicker(_tick);
 
   /// The frame clock as this paragraph last saw it: at each tick while it
   /// has words still coming in, and when more are booked.
@@ -9085,7 +9134,7 @@ class _WordFlowState extends State<_WordFlow> with SingleTickerProviderStateMixi
 
   @override
   void dispose() {
-    _ticker.dispose();
+    _clock?.dispose();
     super.dispose();
   }
 
@@ -9226,7 +9275,10 @@ class _Comparison extends StatefulWidget {
 }
 
 class _ComparisonState extends State<_Comparison> {
-  static const double _pinHeight = 38;
+  /// Room for two lines of the pinned titles. It held one, and on a 375pt
+  /// phone two columns cut "Cheese Extravaganza" to "Cheese Extre…" (QA
+  /// 2026-10-29, iPhone SE): the one line that says which column is which.
+  static const double _pinHeight = 46;
 
   final _head = GlobalKey();
   ScrollPosition? _position;
@@ -9520,11 +9572,13 @@ class _ComparisonState extends State<_Comparison> {
                         for (final item in items)
                           Text(
                             titleOf(item),
-                            maxLines: 1,
+                            // Two lines, then the ellipsis (QA 2026-10-29).
+                            maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                             style: theme.text.label.copyWith(
                               fontSize: 13.5,
                               fontWeight: FontWeight.w600,
+                              height: 1.2,
                             ),
                           ),
                       ],

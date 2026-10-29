@@ -274,6 +274,28 @@ void main() {
         isTrue);
   });
 
+  // QA 2026-10-29, Grove on a dark theme: "Cancel order" was white on
+  // #D07181, 3.3:1. The danger fill's words are measured on it now, on every
+  // theme, and the rose Grove drew is held here by name.
+  test('the words on a danger control read on it at AA', () {
+    final drawn = {
+      ...themes,
+      'Grove, dark': RendelTheme(
+        colors: RendelTheme.deep().colors,
+        danger: const Color(0xFFD07181),
+      ),
+    };
+    drawn.forEach((name, theme) {
+      final ratio = contrastRatio(theme.onDanger, theme.danger);
+      expect(ratio, greaterThanOrEqualTo(4.5),
+          reason: '$name: the words on its danger button are '
+              '${ratio.toStringAsFixed(2)}:1');
+    });
+    // White stays white on the paper red, where it always read (5.84).
+    expect(RendelTheme.paper().onDanger, const Color(0xFFFFFFFF));
+    expect(RendelTheme.deep().onDanger, const Color(0xFF0A0A0A));
+  });
+
   themes.forEach((name, theme) {
     final colors = theme.colors;
     final surfaces = <(String, Color)>[

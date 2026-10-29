@@ -10,6 +10,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
@@ -83,6 +84,17 @@ final _shoes = _wire('comparison', {
     for (var i = 0; i < 9; i++) {'label': 'Row $i', 'values': ['a$i', 'b$i']},
   ],
   'summary': 'On the road the Aero Glide is lighter.',
+});
+
+// Two long names on a 375pt phone (QA 2026-10-29, iPhone SE).
+final _pizzas = _wire('comparison', {
+  'items': [
+    {'title': 'Cheese Extravaganza'},
+    {'title': 'Pepperoni Supreme'},
+  ],
+  'rows': [
+    for (var i = 0; i < 12; i++) {'label': 'Row $i', 'values': ['a$i', 'b$i']},
+  ],
 });
 
 final _plans = _wire('comparison', {
@@ -481,7 +493,7 @@ void main() {
 
       await scrollTo(headFoot - 60 + 20);
       expect(opacity(), 1);
-      expect(tester.getRect(pin).bottom, moreOrLessEquals(60 + 38, epsilon: 0.5),
+      expect(tester.getRect(pin).bottom, moreOrLessEquals(60 + 46, epsilon: 0.5),
           reason: 'its titles under the bar, not at the top of the screen');
       expect(find.descendant(of: pin, matching: find.text('Trail Circuit')), findsOneWidget);
       // Opaque, and up under the bar too: no row reads through it, or shows
@@ -496,7 +508,7 @@ void main() {
       // Kept under the bar while the rows go by.
       await scrollTo(headFoot + 200);
       expect(opacity(), 1);
-      expect(tester.getRect(pin).bottom, moreOrLessEquals(60 + 38, epsilon: 0.5));
+      expect(tester.getRect(pin).bottom, moreOrLessEquals(60 + 46, epsilon: 0.5));
 
       // Once the block's own foot comes up to the bar it goes.
       await scrollTo(foot - 60 + 10);
@@ -505,6 +517,29 @@ void main() {
       // And back with the header in view.
       await scrollTo(0);
       expect(opacity(), 0);
+    });
+
+    testWidgets('a pinned name too long for one line wraps to two, not an ellipsis (QA 2026-10-29)',
+        (tester) async {
+      tester.view.physicalSize = const Size(375 * 3, 667 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      await pump(tester, [_pizzas], bar: 60);
+      final pin = find.byKey(const ValueKey('rendel-comparison-pin'));
+      final position = tester.state<ScrollableState>(find.byType(Scrollable)).position;
+      position.jumpTo(tester.getRect(find.text('Row 0')).top - 60 + 20);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(tester.widget<AnimatedOpacity>(pin).opacity, 1);
+
+      final name = find.descendant(of: pin, matching: find.text('Cheese Extravaganza'));
+      final drawn = tester.renderObject<RenderParagraph>(name);
+      expect(drawn.maxLines, 2);
+      expect(drawn.didExceedMaxLines, isFalse, reason: 'the whole name, on two lines');
+      expect(tester.getSize(name).height, greaterThan(20), reason: 'it did wrap');
+      // Both lines inside the strip, under the bar.
+      expect(tester.getRect(name).bottom, lessThanOrEqualTo(tester.getRect(pin).bottom));
+      expect(tester.getRect(name).top, greaterThanOrEqualTo(60));
     });
   });
 
@@ -810,6 +845,7 @@ void main() {
     test('parse against the protocol schema', () {
       for (final wire in [
         _shoes,
+        _pizzas,
         _plans,
         _transactions,
         _ranking,

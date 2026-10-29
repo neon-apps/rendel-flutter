@@ -1105,6 +1105,20 @@ class RendelTheme {
   /// crimson nobody can read.
   late final Color danger = _danger ?? _legibleOnAll(const Color(0xFFB92D45), 4.5);
 
+  /// The words on a control filled in [danger]: white where white reads on
+  /// it at 4.5:1, and the brand black where it does not.
+  ///
+  /// It was always white (QA 2026-10-29, Grove on a dark theme: "Cancel
+  /// order" white on #D07181, 3.3:1). [danger] has to be read as TYPE on the
+  /// thread's own surfaces too, which on a dark ground pushes it light — so
+  /// on a dark ground no rose can carry both white words and a red caption
+  /// at AA, and the words change instead of the colour. Dark words on the
+  /// light rose are how the deep theme already writes on its accent.
+  late final Color onDanger =
+      contrastRatio(const Color(0xFFFFFFFF), danger) >= 4.5 + _floorMargin
+          ? const Color(0xFFFFFFFF)
+          : const Color(0xFF0A0A0A);
+
   /// The boundary of an interactive control.
   ///
   /// The decorative hairlines ([RendelColors.line], [RendelColors.lineStrong]) stay

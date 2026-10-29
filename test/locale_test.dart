@@ -98,6 +98,29 @@ void main() {
     }
   });
 
+  /// The server words "today" from this. Without it a Sydney shop's assistant
+  /// said "Thursday" on a Friday morning (QA, 2026-10-29).
+  test('every turn carries the device\'s UTC offset', () async {
+    final api = _ScriptedApi();
+    final c = ConversationController(
+      api: api,
+      actions: const {},
+      sdkVersion: 'flutter/test',
+    );
+    await c.send('one').timeout(const Duration(seconds: 5));
+    await c.send('two').timeout(const Duration(seconds: 5));
+    c.dispose();
+
+    expect(api.sent, hasLength(2));
+    for (final body in api.sent) {
+      final client = body['client'] as Map<String, dynamic>;
+      expect(
+        client['utc_offset_minutes'],
+        DateTime.now().timeZoneOffset.inMinutes,
+      );
+    }
+  });
+
   /// The host sets this in its own Dart and nothing else can move it. A
   /// `copyWith` that dropped it would put the copilot back on the device's
   /// locale the first time the console published anything at all.

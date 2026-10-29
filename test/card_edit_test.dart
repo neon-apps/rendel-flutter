@@ -203,8 +203,8 @@ void main() {
 
     testWidgets('its control is drawn empty, with its label', (tester) async {
       await pump(tester, unfilled());
-      expect(find.text('Refund to'), findsOneWidget);
-      expect(find.text('Reason'), findsOneWidget);
+      expect(find.text('Refund to · Required'), findsOneWidget);
+      expect(find.text('Reason · Required'), findsOneWidget);
       // A choice with nothing chosen.
       for (final option in ['Card', 'Store credit']) {
         expect(tester.widget<RendelChip>(find.widgetWithText(RendelChip, option)).selected, isNot(true));
@@ -237,6 +237,56 @@ void main() {
       await tester.tap(find.text('Confirm'));
       await tester.pump();
       expect(tapped, hasLength(1));
+    });
+
+    /// QA on 2026-10-29 (R3-9, Grove): "Add the address …" above a
+    /// greyed-out button, and nothing said which field the card waited for.
+    testWidgets('an empty one says it is required, until it is filled in', (tester) async {
+      await pump(tester, unfilled());
+      // The field shows the "…" the card's sentence holds for it.
+      expect(tester.widget<TextField>(find.byType(TextField)).decoration!.hintText, '…');
+      // A value that is not required carries no mark.
+      expect(find.text('Quantity'), findsOneWidget);
+
+      await tester.tap(find.text('Store credit'));
+      await tester.pump(const Duration(milliseconds: 1));
+      await tester.pump();
+      expect(find.text('Refund to'), findsOneWidget);
+      expect(find.text('Reason · Required'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'Too small');
+      await tester.pump();
+      expect(find.text('Reason'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 800));
+    });
+
+    testWidgets('the mark is in the reader\'s language', (tester) async {
+      final block = WireBlock(id: 'b', type: 'confirm_card', fallbackText: 'Add?', props: unfilled())..ready = true;
+      await tester.pumpWidget(MaterialApp(
+        home: RendelThemeScope(
+          theme: RendelTheme.paper(),
+          child: RendelStringsScope(
+            strings: RendelStrings.forLocale('tr'),
+            child: Scaffold(
+              body: SingleChildScrollView(
+                child: Builder(
+                  builder: (context) => ComponentRegistry.build(
+                    context,
+                    block,
+                    RendelDispatcher(
+                      onAction: (_) async => true,
+                      onSubmitForm: (_, __) async => RendelSubmitOutcome.sent,
+                      canHandle: (_) => true,
+                      onEditCard: (_, __) async => null,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ));
+      expect(find.text('Reason · Zorunlu'), findsOneWidget);
     });
 
     testWidgets('a blank text is no value', (tester) async {

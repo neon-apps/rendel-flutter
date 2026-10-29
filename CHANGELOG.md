@@ -5,6 +5,35 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.70.0
+
+**Added**
+
+- A relaunch opens on the last answer. When the app is opened again within an
+  hour of the last question, for the same person (or the same signed-out
+  device), the thread comes back with that answer, one that finished while the
+  app was closed included. Another person, Start over, signing out or an older
+  turn open a fresh thread.
+- Every turn sends the device's UTC offset (`client.utc_offset_minutes`), so
+  "today" and "tomorrow" in an answer are the person's own.
+
+**Fixed**
+
+- At the largest text sizes the launcher's word and the welcome heading grow
+  to a point (1.5× and 1.6×) instead of breaking their layout.
+- The danger button's words are readable on dark themes: they are white where
+  white reaches 4.5:1 on the colour and dark where it does not
+  (`RendelTheme.onDanger`). A map in a dark theme uses a dark map style.
+- On a 375pt phone, month labels under a chart's bars drop a year they all
+  share, and the pinned names of a comparison wrap to two lines instead of
+  being cut.
+- A value a confirmation card waits for reads "Label · Required" until it is
+  filled, and its empty field shows the same "…" as the card's sentence.
+- A second tap on Send within 600 ms, before the answer starts, lands on
+  nothing instead of on whatever moved under the finger.
+- A paragraph taken out of the thread before it animated no longer reports an
+  error while it is disposed.
+
 ## 0.69.3
 
 **Fixed**

@@ -1137,7 +1137,21 @@ class ConversationController extends ChangeNotifier {
     super.dispose();
   }
 
+  /// Told the conversation this thread is on each time a turn starts on it,
+  /// and null when the thread starts over ([reset]). `Rendel` keeps it with
+  /// who is signed in, so a relaunch can open on the last answer — one that
+  /// finished while the app was dead included (QA, 2026-10-29). Not told
+  /// when [loadHistory] puts a thread on screen: that is no new turn.
+  void Function(String? conversationId)? onConversation;
+
+  /// Starts over: the thread empties, and the conversation is not the one a
+  /// relaunch opens on any more.
   void reset() {
+    _clear();
+    onConversation?.call(null);
+  }
+
+  void _clear() {
     _generation++;
     conversationId = null;
     answerLanguage = null;
@@ -1173,7 +1187,7 @@ class ConversationController extends ChangeNotifier {
   /// running, which keeps the thread it belongs to.
   void loadHistory(String id, List<Map<String, dynamic>> history) {
     if (busy) return;
-    reset();
+    _clear();
     conversationId = id;
     for (final raw in history) {
       final role = raw['role'];
@@ -1327,6 +1341,13 @@ class ConversationController extends ChangeNotifier {
         // some set of languages and its support team reads some set of
         // languages; those are the same fact and neither is a phone setting.
         if (languages.isNotEmpty) 'languages': languages,
+        // The device's offset from UTC, east positive (Istanbul 180, Sydney
+        // 600 or 660), so the server can tell the model the person's own day
+        // and time. QA, 2026-10-29: a Sydney shop's assistant said "Thursday"
+        // on a Friday morning, because the only clock it knew was the
+        // server's. Read on every turn, so a phone that crosses a zone or a
+        // daylight-saving change mid-conversation is right on the next one.
+        'utc_offset_minutes': DateTime.now().timeZoneOffset.inMinutes,
       },
       if (context.isNotEmpty || openForms.isNotEmpty || screen != null)
         'context': {
@@ -1380,6 +1401,7 @@ class ConversationController extends ChangeNotifier {
         switch (event) {
           case TurnStart(:final conversationId, :final messageId, :final requestId, :final lang):
             this.conversationId = conversationId;
+            onConversation?.call(conversationId);
             lastRequestId = requestId;
             _openAssistant?.serverId = messageId;
             // Heard only when the language moved, for the thread's words.

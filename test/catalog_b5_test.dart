@@ -441,6 +441,21 @@ void main() {
   group('map', () {
     Size mapSize(WidgetTester tester, String key) => tester.getSize(find.byKey(ValueKey(key)));
 
+    test('a dark theme draws the dark map, a light one the light map (QA 2026-10-29)', () {
+      expect(rendelMapStyleFor(RendelTheme.paper()), rendelMapStyle);
+      expect(rendelMapStyleFor(RendelTheme.deep()), rendelMapDarkStyle);
+      expect(rendelMapDarkStyle, 'https://tiles.openfreemap.org/styles/dark');
+      // A host's own dark palette, and the SDK's dark mode of a light one.
+      final light = RendelTheme.fromTokens(
+        surface: const Color(0xFFFFFFFF),
+        onSurface: const Color(0xFF111111),
+        accent: const Color(0xFF1A237E),
+        onAccent: const Color(0xFFFFFFFF),
+      );
+      expect(rendelMapStyleFor(light), rendelMapStyle);
+      expect(rendelMapStyleFor(RendelTheme.darkFrom(light)), rendelMapDarkStyle);
+    });
+
     testWidgets('on the page: 200 tall, all pins fitted 40 in, no gestures, the credit and the caption', (tester) async {
       await pump(tester, [_stores]);
       final page = engine.built.last;

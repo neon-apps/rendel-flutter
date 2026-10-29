@@ -74,6 +74,23 @@ class Rendel {
   static RendelConfigStore? _userStore;
   static RendelConfigStore get _users => _userStore ??= _defaultStore('nc_user');
 
+  /// The conversation the last turn was on, who asked it and when, so a
+  /// relaunch opens on its last answer. QA, 2026-10-29: a person asked which
+  /// store is closest to Bondi and when it opens, the app was killed two
+  /// seconds later, the server finished the answer — and after the relaunch
+  /// the assistant opened fresh, so the person never saw it.
+  static RendelConfigStore? _conversationStore;
+  static RendelConfigStore get _conversations => _conversationStore ??= _defaultStore('nc_conversation');
+
+  /// How old the last turn may be for a relaunch to open on it. Past that the
+  /// person has moved on, and an old thread is a surprise rather than help.
+  @visibleForTesting
+  static Duration restoreWithin = const Duration(hours: 1);
+
+  /// Whether this run has looked for the conversation to open on. Once: after
+  /// the first `open` the thread lives in memory.
+  static bool _restoreAsked = false;
+
   /// Where the analytics switch, the super properties and the session are
   /// kept: the same kind of store as the device id, under its own key.
   static RendelConfigStore? _analyticsStore;
@@ -495,6 +512,9 @@ class Rendel {
     // one a device a day.
     unawaited(api.sendEvent({'type': 'assistant_open'}));
     final controller = _ensureController(api);
+    // The last conversation, if this person had one within the hour and the
+    // app has been relaunched since.
+    unawaited(_restoreConversation(api, controller));
     // An answer whose stream was cut may have finished on the server since.
     unawaited(controller.recover());
     _events.add(RendelEvent.opened);
@@ -607,7 +627,9 @@ class Rendel {
         user: () => _user,
         parallelReads: () => _parallelReads,
         readsAloud: () => _config.readAloud,
-      )..manifestHash = _currentManifestHash();
+      )
+        ..manifestHash = _currentManifestHash()
+        ..onConversation = _rememberConversation;
 
   /// The thread on screen, in its sheet or in the bubble. Null when the
   /// copilot is closed.
@@ -971,6 +993,9 @@ class Rendel {
     }
     final controller = _controller;
     if (controller == null) return;
+    // A process ending leaves the conversation a relaunch opens on; a logout
+    // forgets it with the thread.
+    if (!forget) controller.onConversation = null;
     controller.reset();
     // Dropping the reference without disposing leaked the controller's
     // notifier and every listener on it, one per logout. Disposing while the
@@ -1039,6 +1064,9 @@ class Rendel {
     RendelTaps.instance.resetForTest();
     // A relaunch keeps what the device kept, as for the signed-in user.
     if (!relaunch) _analyticsStore = null;
+    if (!relaunch) _conversationStore = null;
+    _restoreAsked = false;
+    restoreWithin = const Duration(hours: 1);
   }
 
   // ————————————————————————— remote config —————————————————————————
@@ -1336,6 +1364,67 @@ class Rendel {
       RendelLog.warn('user_store_failed', 'the signed-in user could not be read back', error: err);
       return null;
     }
+  }
+
+  /// Kept with whoever is signed in as the turn starts (null for nobody, which
+  /// on one device is the same anonymous person), and when. Null forgets it:
+  /// the store has no delete, so it writes the empty string.
+  static void _rememberConversation(String? conversationId) {
+    final value = conversationId == null
+        ? ''
+        : jsonEncode({
+            'conversation_id': conversationId,
+            'user': _user?['id'],
+            'at': DateTime.now().millisecondsSinceEpoch,
+          });
+    unawaited(() async {
+      try {
+        await _conversations.write(value).timeout(RendelDeviceId.storeTimeout);
+      } catch (err) {
+        RendelLog.warn('conversation_store_failed', 'the conversation could not be stored', error: err);
+      }
+    }());
+  }
+
+  /// Opens the thread on the conversation [_rememberConversation] kept, when
+  /// it was this person's (or this device's, signed out) and its last turn
+  /// started within [restoreWithin]. Somebody else signed in, a thread
+  /// started over, or an older one: the thread opens fresh, as it did. Never
+  /// one person's thread to another on a phone they share: `identify` with
+  /// a different user still resets the thread, and the check is made again
+  /// after the read, which an `identify` can land during.
+  static Future<void> _restoreConversation(RendelApiClient api, ConversationController controller) async {
+    if (_restoreAsked) return;
+    _restoreAsked = true;
+    if (controller.conversationId != null || controller.messages.isNotEmpty) return;
+    final String id;
+    final Object? who;
+    try {
+      final stored = await _conversations.read().timeout(RendelDeviceId.storeTimeout);
+      if (stored == null || stored.isEmpty) return;
+      final saved = (jsonDecode(stored) as Map).cast<String, Object?>();
+      final at = DateTime.fromMillisecondsSinceEpoch(saved['at'] as int);
+      if (DateTime.now().difference(at) > restoreWithin) return;
+      id = saved['conversation_id'] as String;
+      who = saved['user'];
+    } catch (err) {
+      RendelLog.warn('conversation_store_failed', 'the last conversation could not be read back', error: err);
+      return;
+    }
+    if (who != _user?['id']) return;
+    List<Map<String, dynamic>> history;
+    try {
+      history = await api.fetchMessages(id);
+    } catch (_) {
+      // Not readable now: the thread opens fresh, as it did before.
+      return;
+    }
+    final moved = !identical(controller, _controller) ||
+        who != _user?['id'] ||
+        controller.conversationId != null ||
+        controller.messages.isNotEmpty;
+    if (moved || history.isEmpty) return;
+    controller.loadHistory(id, history);
   }
 
   /// Empty is signed out. The store has no delete, and an empty string is
