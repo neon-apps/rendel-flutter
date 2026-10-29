@@ -352,6 +352,34 @@ class RendelApiClient {
     }
   }
 
+  /// POST /v1/invocations/:id/undo — the Undo on a line a write that ran
+  /// with no card left in the answer. Empty to ask for it; with [report]
+  /// once a handler the server handed back has run. The signed-in person's
+  /// token goes too, for an undo the server runs as them.
+  ///
+  /// Returns the server's answer (`state`: run, undone, undoing, failed,
+  /// expired), or null when the call could not be made at all.
+  Future<Map<String, dynamic>?> undo(
+    String invocationId, {
+    Map<String, String>? user,
+    Map<String, dynamic>? report,
+  }) async {
+    try {
+      final token = await _userToken();
+      final response = await _http
+          .post(
+            Uri.parse('${config.apiBaseUrl}/v1/invocations/$invocationId/undo'),
+            headers: {..._headers, if (token != null) 'X-Rendel-User-Token': token},
+            body: jsonEncode({if (user != null) 'user': user, if (report != null) 'report': report}),
+          )
+          .timeout(config.requestTimeout);
+      final parsed = jsonDecode(response.body);
+      return parsed is Map<String, dynamic> && parsed['state'] is String ? parsed : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// POST /v1/invocations/:id/edit — values the user changed on a
   /// confirmation card, checked by the server as it checks the model's call.
   ///

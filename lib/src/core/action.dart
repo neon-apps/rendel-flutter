@@ -49,6 +49,21 @@ class RendelInvocation {
 /// the same thing again.
 typedef RendelInvocationHandler = Future<RendelResult> Function(RendelInvocation invocation);
 
+/// Whether an action asks before it runs (`RendelAction.confirm`).
+enum RendelConfirm { always, never }
+
+/// The action that takes another back (`RendelAction.undo`). Parameters the
+/// two share by name pass through; [params] fills others from the call
+/// (`'{params.product_id}'`) or from what it returned (`'{result.line.id}'`).
+class RendelUndo {
+  const RendelUndo(this.action, {this.params});
+
+  final String action;
+  final Map<String, Object?>? params;
+
+  Map<String, dynamic> toJson() => {'action': action, if (params != null && params!.isNotEmpty) 'params': params};
+}
+
 /// A typed capability the copilot may propose. The handler runs inside the
 /// host app with the user's own session — the copilot holds no credentials.
 class RendelAction {
@@ -69,6 +84,8 @@ class RendelAction {
     this.fullText,
     this.confirmLabel,
     this.confirmLabels,
+    this.undo,
+    this.confirm,
   })  : assert(
           handler != null || onInvoke != null,
           'RendelAction needs a handler or an onInvoke.',
@@ -157,6 +174,15 @@ class RendelAction {
   /// same per language, matched like [confirmTemplates].
   final String? confirmLabel;
   final Map<String, String>? confirmLabels;
+
+  /// The action that takes this one back, such as `remove_from_cart` for
+  /// `add_to_cart`. A [RendelRisk.write] that names one runs with no
+  /// confirmation card and leaves a line with an Undo in the answer instead.
+  final RendelUndo? undo;
+
+  /// [RendelConfirm.always] keeps the card for a write that has an [undo].
+  /// A destructive action always asks, whatever this says.
+  final RendelConfirm? confirm;
 
   /// How long the platform waits for this action before giving up on it.
   final Duration timeout;

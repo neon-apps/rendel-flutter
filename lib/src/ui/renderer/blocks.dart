@@ -14282,3 +14282,147 @@ Widget buildCode(BuildContext context, WireBlock block, RendelDispatcher dispatc
     ],
   );
 }
+
+// ——— action_done: a write that ran with no card ———
+
+/// A write that ran with no card, said in one line, with its Undo while the
+/// window is open (`action_done`). Undo runs once: the button goes while it
+/// runs, and the line says how it went. The web SDK's `.rd-done` is the same
+/// line.
+Widget buildActionDone(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
+  return _ActionDone(block: block, dispatch: dispatch);
+}
+
+class _ActionDone extends StatefulWidget {
+  const _ActionDone({required this.block, required this.dispatch});
+
+  final WireBlock block;
+  final RendelDispatcher dispatch;
+
+  @override
+  State<_ActionDone> createState() => _ActionDoneState();
+}
+
+class _ActionDoneState extends State<_ActionDone> {
+  Timer? _closes;
+
+  DateTime? get _until => DateTime.tryParse(_str(widget.block.props['undo_until']) ?? '');
+
+  @override
+  void initState() {
+    super.initState();
+    // The Undo goes when its window closes, without waiting for a redraw.
+    final until = _until;
+    if (until != null && until.isAfter(DateTime.now())) {
+      _closes = Timer(until.difference(DateTime.now()), () {
+        if (mounted) setState(() {});
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _closes?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _undo() async {
+    final undo = widget.dispatch.onUndo;
+    if (undo == null) return;
+    final going = undo(widget.block);
+    setState(() {});
+    await going;
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final block = widget.block;
+    final phase = block.props['undone'] == true ? 'undone' : widget.dispatch.undoPhase?.call(block);
+    final undone = phase == 'undone';
+    final until = _until;
+    final offered = widget.dispatch.onUndo != null &&
+        phase != 'undoing' &&
+        !undone &&
+        until != null &&
+        until.isAfter(DateTime.now());
+    final words = _str(block.props['text']) ?? block.fallbackText;
+    final soft = theme.colors.onSurfaceSoft;
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 8, 10),
+        decoration: BoxDecoration(
+          color: theme.colors.surfaceRaised,
+          border: Border.all(color: theme.hairline),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                color: undone ? theme.colors.lineStrong : theme.colors.onSurface,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check_rounded, size: 14, color: theme.colors.surfaceRaised),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    words,
+                    style: theme.text.body.copyWith(
+                      fontSize: 14.5,
+                      height: 1.35,
+                      color: undone ? soft : theme.colors.onSurface,
+                      decoration: undone ? TextDecoration.lineThrough : null,
+                      decorationColor: theme.colors.lineStrong,
+                    ),
+                  ),
+                  if (phase == 'failed')
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(strings.actionUndoFailed, style: theme.text.body.copyWith(fontSize: 13, color: soft)),
+                    ),
+                ],
+              ),
+            ),
+            if (undone || phase == 'undoing')
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  undone ? strings.actionUndone : strings.actionUndoing,
+                  style: theme.text.labelEmphasis.copyWith(fontSize: 13.5, color: soft),
+                ),
+              )
+            else if (offered) ...[
+              const SizedBox(width: 8),
+              RendelPressable(
+                semanticLabel: strings.actionUndo,
+                onTap: () => unawaited(_undo()),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: theme.colors.surfaceRaised,
+                    border: Border.all(color: theme.hairline),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(strings.actionUndo, style: theme.text.labelEmphasis.copyWith(fontSize: 14)),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}

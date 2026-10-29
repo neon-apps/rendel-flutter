@@ -5,6 +5,20 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.69.0
+
+**Added**
+
+- A write that can be taken back runs without a confirmation card, and the
+  answer offers Undo instead (Tuna 2026-10-29: "sepete eklemek destructive
+  değil, onay kartına gerek yok; gerekirse kolayca geri alabilmeli"). An
+  action names its inverse (`undo`, e.g. add to cart ↔ remove from cart) and
+  then does not ask (`confirm`, `RendelUndo` / `RendelConfirm` in code); the
+  answer opens with a line ("Added … to your cart · Undo") that runs the
+  inverse once, for ten minutes. Destructive actions and writes without an
+  inverse still ask. The SDK declares the `action_done` block; older builds
+  keep the card.
+
 ## 0.68.0
 
 **Added**

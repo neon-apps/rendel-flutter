@@ -730,6 +730,68 @@ class ConversationController extends ChangeNotifier {
     }
   }
 
+  /// Where each line's Undo stands (`action_done`), by the invocation it
+  /// takes back: `undoing`, `undone` or `failed`; absent while it can be
+  /// tapped.
+  final Map<String, String> _undos = {};
+
+  /// Where [block]'s Undo stands: null while it can still be tapped.
+  String? undoPhase(WireBlock block) {
+    if (block.props['undone'] == true) return 'undone';
+    return _undos['${block.props['invocation_id']}'];
+  }
+
+  /// Whether [block]'s Undo is still offered: its window open, and not taken.
+  bool canUndo(WireBlock block, {DateTime? now}) {
+    final phase = undoPhase(block);
+    if (phase == 'undoing' || phase == 'undone') return false;
+    final until = DateTime.tryParse('${block.props['undo_until'] ?? ''}');
+    return until != null && until.isAfter(now ?? DateTime.now());
+  }
+
+  /// The Undo on [block]: once. The server claims it, then runs a console
+  /// action's inverse itself, or hands this device the inverse to run and
+  /// hears back. Returns where it stands after.
+  Future<String> undoAction(WireBlock block) async {
+    final id = '${block.props['invocation_id'] ?? ''}';
+    if (id.isEmpty || !canUndo(block)) return undoPhase(block) ?? 'failed';
+    void touch() {
+      for (final message in messages) {
+        if (message.blocks.contains(block)) message.touch();
+      }
+      _notify();
+    }
+
+    String settle(String phase) {
+      _undos[id] = phase;
+      touch();
+      return phase;
+    }
+
+    _undos[id] = 'undoing';
+    touch();
+    final asked = await api.undo(id, user: user());
+    final state = asked?['state'];
+    if (state == 'undone') return settle('undone');
+    if (state == 'undoing') return settle('undoing');
+    if (state != 'run') return settle('failed');
+    final name = '${asked!['name'] ?? ''}';
+    final undoId = '${asked['undo_id'] ?? ''}';
+    final params = asked['params'] is Map ? Map<String, dynamic>.from(asked['params'] as Map) : <String, dynamic>{};
+    final action = actions[name];
+    final result = action == null
+        ? RendelResult.fail('action not registered on this device')
+        : await _execute(action, params, invocationId: undoId);
+    final told = await api.undo(id, user: user(), report: {
+      'undo_id': undoId,
+      'status': result.ok ? 'success' : 'error',
+      if (result.ok) 'data': result.data,
+      if (!result.ok) 'error': result.error,
+    });
+    // The handler's own word stands if the report could not be delivered.
+    return settle(told?['state'] == 'undone' || (told == null && result.ok) ? 'undone' : 'failed');
+  }
+
   /// A channel of the `contact` block [block] was tapped (analytics-roi T3):
   /// its kind only, never the address. Fire and forget.
   void contactOpened(WireBlock block, String channel) {

@@ -194,6 +194,10 @@ class RendelStrings {
     this.memoryForgottenAll = 'I\'ve forgotten everything I remembered',
     this.memoryUndo = 'Undo',
     this.memoryUndone = 'Not saved',
+    this.actionUndo = 'Undo',
+    this.actionUndoing = 'Undoing…',
+    this.actionUndone = 'Undone',
+    this.actionUndoFailed = "Couldn't undo this. Try again.",
     this.memoryUsed = 'Based on your {label} preference',
     this.memoryUsedMany = 'Based on {count} of your preferences',
     this.memoryFromPreference = 'From your preferences',
@@ -584,6 +588,13 @@ class RendelStrings {
   final String memoryForgottenAll;
   final String memoryUndo;
   final String memoryUndone;
+
+  /// The line a write that ran with no card leaves (`action_done`): its
+  /// Undo, while it runs, once done, and when it failed.
+  final String actionUndo;
+  final String actionUndoing;
+  final String actionUndone;
+  final String actionUndoFailed;
   final String memoryUsed;
   final String memoryUsedMany;
   final String memoryFromPreference;
@@ -845,6 +856,10 @@ class RendelStrings {
     String? memoryForgottenAll,
     String? memoryUndo,
     String? memoryUndone,
+    String? actionUndo,
+    String? actionUndoing,
+    String? actionUndone,
+    String? actionUndoFailed,
     String? memoryUsed,
     String? memoryUsedMany,
     String? memoryFromPreference,
@@ -1017,6 +1032,10 @@ class RendelStrings {
       memoryForgottenAll: memoryForgottenAll ?? this.memoryForgottenAll,
       memoryUndo: memoryUndo ?? this.memoryUndo,
       memoryUndone: memoryUndone ?? this.memoryUndone,
+      actionUndo: actionUndo ?? this.actionUndo,
+      actionUndoing: actionUndoing ?? this.actionUndoing,
+      actionUndone: actionUndone ?? this.actionUndone,
+      actionUndoFailed: actionUndoFailed ?? this.actionUndoFailed,
       memoryUsed: memoryUsed ?? this.memoryUsed,
       memoryUsedMany: memoryUsedMany ?? this.memoryUsedMany,
       memoryFromPreference: memoryFromPreference ?? this.memoryFromPreference,
@@ -1206,6 +1225,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgottenAll: 'Hatırladığım her şeyi unuttum.',
     memoryUndo: 'Geri al',
     memoryUndone: 'Kaydetmedim',
+    actionUndo: 'Geri al',
+    actionUndoing: 'Geri alınıyor…',
+    actionUndone: 'Geri alındı',
+    actionUndoFailed: 'Geri alınamadı. Tekrar deneyin.',
     memoryUsed: '{label} tercihine göre',
     memoryUsedMany: '{count} tercihinize göre',
     memoryFromPreference: 'Tercihlerinizden',
@@ -1384,6 +1407,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgottenAll: 'Ich habe alles vergessen, was ich mir gemerkt hatte',
     memoryUndo: 'Rückgängig',
     memoryUndone: 'Nicht gespeichert',
+    actionUndo: 'Rückgängig',
+    actionUndoing: 'Wird rückgängig gemacht…',
+    actionUndone: 'Rückgängig gemacht',
+    actionUndoFailed: 'Konnte nicht rückgängig gemacht werden. Bitte erneut versuchen.',
     memoryUsed: 'Nach Ihrer Vorliebe: {label}',
     memoryUsedMany: 'Nach {count} Ihrer Vorlieben',
     memoryFromPreference: 'Aus Ihren Vorlieben',
@@ -1561,6 +1588,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgottenAll: 'J’ai oublié tout ce que j’avais retenu',
     memoryUndo: 'Annuler',
     memoryUndone: 'Non enregistré',
+    actionUndo: 'Annuler',
+    actionUndoing: 'Annulation…',
+    actionUndone: 'Annulé',
+    actionUndoFailed: "Impossible d'annuler. Réessayez.",
     memoryUsed: 'Selon votre préférence : {label}',
     memoryUsedMany: 'Selon {count} de vos préférences',
     memoryFromPreference: 'D’après vos préférences',
@@ -1737,6 +1768,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgottenAll: 'He olvidado todo lo que recordaba',
     memoryUndo: 'Deshacer',
     memoryUndone: 'No guardado',
+    actionUndo: 'Deshacer',
+    actionUndoing: 'Deshaciendo…',
+    actionUndone: 'Deshecho',
+    actionUndoFailed: 'No se pudo deshacer. Inténtalo de nuevo.',
     memoryUsed: 'Según tu preferencia: {label}',
     memoryUsedMany: 'Según {count} de tus preferencias',
     memoryFromPreference: 'De tus preferencias',
@@ -1912,6 +1947,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgottenAll: 'نسيت كل ما كنت أتذكره',
     memoryUndo: 'تراجع',
     memoryUndone: 'لم يُحفظ',
+    actionUndo: 'تراجع',
+    actionUndoing: 'جارٍ التراجع…',
+    actionUndone: 'تم التراجع',
+    actionUndoFailed: 'تعذّر التراجع. حاول مرة أخرى.',
     memoryUsed: 'بناءً على تفضيلك: {label}',
     memoryUsedMany: 'بناءً على {count} من تفضيلاتك',
     memoryFromPreference: 'من تفضيلاتك',

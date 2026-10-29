@@ -219,6 +219,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       fileSources: widget.attachSources,
       onUpload: _upload,
       onOpenMemory: _openMemory,
+      onUndo: widget.controller.undoAction,
+      undoPhase: widget.controller.undoPhase,
     );
     // Over a detail a reply, a form sent or an option picked is a question:
     // the sheet goes first and the answer opens as a new page. A link opens
@@ -244,6 +246,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       fileSources: widget.attachSources,
       onUpload: _upload,
       onOpenMemory: _openMemory,
+      onUndo: widget.controller.undoAction,
+      undoPhase: widget.controller.undoPhase,
     );
     widget.controller.addListener(_turnPages);
     final c = widget.controller;

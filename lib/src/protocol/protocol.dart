@@ -48,6 +48,7 @@ const List<String> supportedComponents = [
   'map',
   'pass',
   'code',
+  'action_done',
 ];
 
 /// Behaviours this build has beyond drawing [supportedComponents], declared in
@@ -823,6 +824,8 @@ Map<String, dynamic> buildManifest(
             if (a.fullText != null) 'fullText': a.fullText!.toJson(),
             if (a.confirmLabel != null) 'confirmLabel': a.confirmLabel,
             if (a.confirmLabels != null && a.confirmLabels!.isNotEmpty) 'confirmLabels': a.confirmLabels,
+            if (a.undo != null) 'undo': a.undo!.toJson(),
+            if (a.confirm != null) 'confirm': a.confirm!.name,
           },
         },
     ],

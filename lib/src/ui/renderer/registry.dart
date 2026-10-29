@@ -33,7 +33,18 @@ class RendelDispatcher {
     this.onContactOpen,
     this.cardSource,
     this.onOpenMemory,
+    this.onUndo,
+    this.undoPhase,
   });
+
+  /// The Undo on an `action_done` line: runs the inverse once and resolves
+  /// where it stands (`undone`, `failed`). Null where nothing can be undone:
+  /// the line is drawn without its Undo.
+  final Future<String> Function(WireBlock block)? onUndo;
+
+  /// Where an `action_done` line's Undo stands (`undoing`, `undone`,
+  /// `failed`), null while it can be tapped.
+  final String? Function(WireBlock block)? undoPhase;
 
   /// Opens "What I remember for you", from a value marked "From your
   /// preferences" (preference memory). Null draws the mark as text.
@@ -178,6 +189,7 @@ class ComponentRegistry {
     'map': buildMap,
     'pass': buildPass,
     'code': buildCode,
+    'action_done': buildActionDone,
   };
 
   static void register(String type, ComponentBuilder builder) {
