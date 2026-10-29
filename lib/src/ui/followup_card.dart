@@ -55,7 +55,8 @@ class RendelFollowupCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(followup.title, style: theme.text.labelStrong),
+                        // labelStrong is for an accent fill; on the card's surface it was white on white (QA R2-13).
+                        Text(followup.title, style: theme.text.labelEmphasis),
                         SizedBox(height: space.xs),
                         Text(followup.body, style: theme.text.labelSoft),
                       ],

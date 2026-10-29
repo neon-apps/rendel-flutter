@@ -472,6 +472,30 @@ void main() {
       expect(find.text('Three stores with the Aero Glide 2 in a 42.'), findsOneWidget);
     });
 
+    testWidgets('stores close together keep their labels apart: one that would overlap is a dot', (tester) async {
+      // Six Sydney stores, three of them a few streets apart (QA R2-10: their names drawn over each other).
+      final close = _wire('map', {
+        'pins': [
+          {'lat': -33.8688, 'lng': 151.2093, 'label': 'Grove Sydney CBD'},
+          {'lat': -33.8700, 'lng': 151.2080, 'label': 'Grove Town Hall'},
+          {'lat': -33.8675, 'lng': 151.2110, 'label': 'Grove Martin Place'},
+          {'lat': -33.8150, 'lng': 151.0010, 'label': 'Grove Parramatta'},
+        ],
+      });
+      await pump(tester, [close]);
+      final labels = ['Grove Sydney CBD', 'Grove Town Hall', 'Grove Martin Place', 'Grove Parramatta'];
+      final shown = [for (final label in labels) if (find.text(label).evaluate().isNotEmpty) tester.getRect(find.text(label))];
+      expect(shown.length, greaterThanOrEqualTo(2));
+      expect(shown.length, lessThan(labels.length));
+      for (var i = 0; i < shown.length; i++) {
+        for (var j = i + 1; j < shown.length; j++) {
+          expect(shown[i].overlaps(shown[j]), isFalse, reason: 'label $i over label $j');
+        }
+      }
+      // Every store is still named for a screen reader.
+      expect(find.bySemanticsLabel('Grove Town Hall'), findsWidgets);
+    });
+
     testWidgets('a drag on the page map scrolls the page', (tester) async {
       final scroll = await pump(tester, [_stores]);
       await tester.drag(find.byKey(const ValueKey('page-map')), const Offset(0, -120));

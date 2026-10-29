@@ -13,6 +13,7 @@ import 'package:rendel/rendel.dart';
 import 'package:rendel/src/core/followups.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/transport/api_client.dart';
+import 'package:rendel/src/ui/followup_card.dart';
 
 const _id = '0b8d3c1e-5f6a-4b7c-8d9e-0f1a2b3c4d5e';
 const _key = 'nc_pk_test_example_000000000000000000000000';
@@ -206,6 +207,32 @@ void main() {
     expect(server.of('followup_dismiss'), [
       {'type': 'followup_dismiss', 'followup_id': mailed['id']},
     ]);
+    Navigator.of(tester.element(find.byType(Scaffold).first)).maybePop();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('a card waiting over an answer sits above it, never on it, with a title that can be read', (tester) async {
+    await _init(tester, next: null, inbox: [pushed, mailed]);
+    await tester.pumpWidget(_app());
+    await tester.pump();
+    await tester.tap(find.byType(RendelLauncher));
+    await _settle(tester);
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+    // One card opens its conversation; the other still waits over that answer (QA R2-13).
+    await tester.tap(find.text('Bak'));
+    await _settle(tester);
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+    final answer = find.textContaining('Pegasus 41 artık', findRichText: true);
+    expect(answer, findsWidgets);
+    expect(find.text('Yeni sezon'), findsOneWidget);
+    final card = tester.getRect(find.ancestor(of: find.text('Yeni sezon'), matching: find.byType(RendelFollowupCard)));
+    expect(tester.getRect(answer.first).top, greaterThanOrEqualTo(card.bottom));
+    // The title is drawn in the surface's ink, not the accent's (it was white on the light card).
+    final title = tester.widget<Text>(find.text('Yeni sezon'));
+    final theme = tester.widget<RendelFollowupCard>(find.byType(RendelFollowupCard)).theme;
+    expect(title.style?.color, theme.colors.onSurface);
     Navigator.of(tester.element(find.byType(Scaffold).first)).maybePop();
     await tester.pumpAndSettle();
   });

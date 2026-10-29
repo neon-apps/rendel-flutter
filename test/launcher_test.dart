@@ -243,6 +243,29 @@ void main() {
       expect(place['y'], closeTo(after.top / 600, 0.0001));
     });
 
+    testWidgets("let go low, it stays above the app's tab bar, where its slot was", (tester) async {
+      await mount(
+        tester,
+        MaterialApp(
+          home: Scaffold(
+            floatingActionButton: const RendelLauncher(),
+            bottomNavigationBar: NavigationBar(
+              key: const ValueKey('tabs'),
+              destinations: const [
+                NavigationDestination(icon: Icon(Icons.home), label: 'Shop'),
+                NavigationDestination(icon: Icon(Icons.person), label: 'Account'),
+              ],
+            ),
+          ),
+        ),
+      );
+      final tabs = tester.getRect(find.byKey(const ValueKey('tabs')));
+      // Dragged to the bottom right corner, over the Account tab (QA R2-14).
+      await tester.drag(find.text('Ask'), const Offset(0, 400));
+      await tester.pumpAndSettle();
+      expect(tester.getRect(_button).bottom, lessThanOrEqualTo(tabs.top));
+    });
+
     testWidgets('a short move is a tap, and a longer one is not', (tester) async {
       await mount(tester, _fab());
       final at = tester.getRect(_button);

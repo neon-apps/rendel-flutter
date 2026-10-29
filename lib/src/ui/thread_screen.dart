@@ -180,15 +180,22 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// How tall the header floating over an answer page is, for the same
   /// reason at the other end.
   final _head = ValueNotifier<double>(0);
+
+  /// How tall the follow-up cards under the header are: the page starts below
+  /// them, so a card never covers the answer (QA R2-13, an Undo line hidden).
+  final _cards = ValueNotifier<double>(0);
   late final RendelDispatcher _dispatch;
 
   /// The conversation's language the screen is drawn in; see [_strings].
   String? _language;
 
   /// The words this screen draws: [ThreadScreen.strings], or the SDK's own
-  /// set for the language this conversation is answered in.
+  /// set for the language the page on screen was answered in, else the
+  /// conversation's.
   RendelStrings get _strings {
-    final language = _language;
+    final c = widget.controller;
+    final shown = c.page >= 0 && c.page < c.pages.length ? c.pages[c.page] : null;
+    final language = shown?.lang ?? _language;
     return widget.followAnswerLanguage && language != null && RendelStrings.ships(language)
         ? RendelStrings.forLocale(language)
         : widget.strings;
@@ -345,6 +352,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     _input.dispose();
     _dock.dispose();
     _head.dispose();
+    _cards.dispose();
     _voiceSent.dispose();
     _voiceLeaving.dispose();
     _voiceFalls.dispose();
@@ -1226,7 +1234,10 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           valueListenable: followups,
           builder: (context, waiting, _) {
             // Positioned even when empty: a sized child would size the stack.
-            if (waiting.isEmpty) return const Positioned(top: 0, left: 0, child: SizedBox.shrink());
+            if (waiting.isEmpty) {
+              if (_cards.value != 0) WidgetsBinding.instance.addPostFrameCallback((_) => _cards.value = 0);
+              return const Positioned(top: 0, left: 0, child: SizedBox.shrink());
+            }
             WidgetsBinding.instance.addPostFrameCallback((_) {
               for (final card in waiting) {
                 RendelFollowups.instance.shown(card.id);
@@ -1239,25 +1250,28 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                 left: theme.space.lg,
                 right: theme.space.lg,
                 // Three long ones on a small phone stay in reach: they scroll on their own past 58% of the screen.
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.58),
-                  child: SingleChildScrollView(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        for (final card in waiting)
-                          Padding(
-                            padding: EdgeInsets.only(bottom: theme.space.sm),
-                            child: RendelFollowupCard(
-                              key: ValueKey(card.id),
-                              followup: card,
-                              theme: theme,
-                              closeLabel: _strings.closeDetail,
-                              onOpen: () => widget.onFollowupOpen?.call(card.id),
-                              onDismiss: () => RendelFollowups.instance.dismiss(card.id),
+                child: _SizeReporter(
+                  onHeight: (height) => _cards.value = height,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.58),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (final card in waiting)
+                            Padding(
+                              padding: EdgeInsets.only(bottom: theme.space.sm),
+                              child: RendelFollowupCard(
+                                key: ValueKey(card.id),
+                                followup: card,
+                                theme: theme,
+                                closeLabel: _strings.closeDetail,
+                                onOpen: () => widget.onFollowupOpen?.call(card.id),
+                                onDismiss: () => RendelFollowups.instance.dismiss(card.id),
+                              ),
                             ),
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -1310,9 +1324,15 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final pages = controller.pages;
     final at = controller.page;
     final shown = at >= 0 && at < pages.length ? pages[at] : null;
-    return ValueListenableBuilder<double>(
-      valueListenable: _head,
-      builder: (context, head, _) => _Dissolve(
+    return ListenableBuilder(
+      listenable: Listenable.merge([_head, _cards]),
+      builder: (context, _) => _pageUnder(controller, shown, _head.value, _cards.value),
+    );
+  }
+
+  /// The page, below the header and any follow-up cards under it.
+  Widget _pageUnder(ConversationController controller, RendelMessage? shown, double head, double cards) {
+    return _Dissolve(
         on: _asked != null,
         /* The dock's height changes on every frame a keyboard moves, and only
            the padding follows it. The page is built once, outside: built
@@ -1333,7 +1353,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
               : _page(controller, [shown], bar: head),
           builder: (context, dock, page) => shown == null
               ? Padding(
-                  padding: EdgeInsets.only(top: head, bottom: dock),
+                  padding: EdgeInsets.only(top: head + cards, bottom: dock),
                   child: page,
                 )
               // Its own list per page, so a new page, and one stepped back
@@ -1342,14 +1362,13 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   key: ObjectKey(shown),
                   padding: EdgeInsets.fromLTRB(
                     _pageInset,
-                    head + 8,
+                    head + 8 + cards,
                     _pageInset,
                     dock + 40,
                   ),
                   children: [page!],
                 ),
         ),
-      ),
     );
   }
 

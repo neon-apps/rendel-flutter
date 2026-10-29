@@ -5,6 +5,22 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.69.2
+
+**Fixed**
+
+- A message waiting as a card at the top of the thread no longer covers the
+  answer: the page starts below the cards. Its title was drawn in the accent's
+  ink, white on the light card; it is in the surface's ink now.
+- A dragged launcher stays above the app's bottom bar: the slot the app placed
+  it in (a `floatingActionButton` sits above a `bottomNavigationBar`) is the
+  lowest it settles. A slot near the top limits nothing.
+- Each answer page keeps the language it was answered in: stepping back to an
+  English page after a Turkish turn draws it with the English words.
+- Map pins of places close together no longer draw their labels over each
+  other: one that would gives way to a dot, still named for a screen reader,
+  and full screen a tap on it opens its callout.
+
 ## 0.69.1
 
 **Fixed**

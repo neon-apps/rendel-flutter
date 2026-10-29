@@ -102,6 +102,12 @@ class RendelMessage extends ChangeNotifier {
   /// the answer's own speaker, which reads it on a tap. Local.
   RendelAnswerSpeech? speech;
 
+  /// The language this answer was written in, from its `turn.start`: the
+  /// thread draws its own words in it while this page is shown, so going back
+  /// to an English page after a Turkish turn reads English (QA R2-7). Null
+  /// for history and an older API, which take the conversation's.
+  String? lang;
+
   /// What this answer did to the person's memory, in the order the server
   /// said it: saves, changes and forgets, and the notes it relied on that no
   /// earlier answer in this thread named. For the chips under it; never in
@@ -1379,6 +1385,7 @@ class ConversationController extends ChangeNotifier {
             // Heard only when the language moved, for the thread's words.
             visible = lang != null && lang != answerLanguage;
             if (lang != null) answerLanguage = lang;
+            _openAssistant?.lang = lang;
           case TurnStatus(:final step):
             if (step == 'action' || step == 'composing') {
               turnStatus = step;

@@ -139,6 +139,49 @@ void main() {
     expect(find.text('Bu uygulamayla ilgili ne isterseniz sorun.'), findsNothing);
   });
 
+  testWidgets('an older page keeps the language it was answered in', (tester) async {
+    // An English answer, then a Turkish one (QA R2-7: going back drew the English page in Turkish).
+    final langs = ['en', 'tr'];
+    var turns = 0;
+    final c = ConversationController(
+      api: RendelApiClient(
+        appKey: 'nc_pk_test_x',
+        deviceId: 'd',
+        config: const RendelConfig(),
+        httpClient: MockClient((request) async {
+          if (!request.url.path.endsWith('/v1/chat')) return http.Response('{}', 200);
+          final n = turns++;
+          final text = n == 0 ? 'Your order arrives today.' : 'Siparişiniz bugün geliyor.';
+          final frames = sse([
+            ('turn.start', {'conversation_id': 'c1', 'message_id': 'm$n', 'request_id': 'r$n', 'lang': langs[n % langs.length]}),
+            ('block.start', {'index': 0, 'id': 'b$n', 'block_type': 'text'}),
+            ('block.ready', {
+              'index': 0,
+              'block': {'id': 'b$n', 'type': 'text', 'fallback_text': text, 'props': {'markdown': text}},
+            }),
+            ('turn.end', {'status': 'completed', 'pending': <String>[]}),
+          ]);
+          return http.Response.bytes(utf8.encode(frames), 200, headers: {'content-type': 'text/event-stream'});
+        }),
+      ),
+      actions: const {},
+      sdkVersion: 'flutter/test',
+    );
+    await pump(tester, c);
+    await tester.runAsync(() => c.send('where is my order'));
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.runAsync(() => c.send('siparişim nerede'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(c.pages.map((p) => p.lang), ['en', 'tr']);
+    expect(find.bySemanticsLabel('Önceki sayfa'), findsOneWidget);
+
+    await tester.tap(find.bySemanticsLabel('Önceki sayfa'));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(c.page, 0);
+    expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
+    expect(find.bySemanticsLabel('Önceki sayfa'), findsNothing);
+  });
+
   testWidgets("a language the SDK does not ship keeps the thread's words", (tester) async {
     final c = controller(lang: 'ja');
     await pump(tester, c);

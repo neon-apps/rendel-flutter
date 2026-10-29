@@ -553,7 +553,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
     if (drag == null) return;
     final screen = MediaQuery.sizeOf(context);
     final size = (_key.currentContext!.findRenderObject()! as RenderBox).size;
-    final top = _clampTop(drag.dy, screen, size, _safe);
+    final top = _clampTop(drag.dy, screen, size, _safe, _Floating.slot.value);
     setState(() {
       _right = drag.dx + size.width / 2 >= screen.width / 2;
       _top = screen.height == 0 ? 0 : top / screen.height;
@@ -573,9 +573,15 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
     _save();
   }
 
-  static double _clampTop(double top, Size screen, Size size, EdgeInsets safe) {
+  /// Inside the safe area, and never lower than the slot the app placed it
+  /// in when that slot is in the lower half: a `floatingActionButton` sits
+  /// above the app's bottom bar, and a launcher let go below it covered a tab
+  /// (QA R2-14). A slot near the top (an app bar) limits nothing.
+  static double _clampTop(double top, Size screen, Size size, EdgeInsets safe, Offset? slot) {
     final floor = safe.top + _FloatingLauncher.inset;
-    final ceiling = math.max(floor, screen.height - safe.bottom - _FloatingLauncher.inset - size.height);
+    var lowest = screen.height - safe.bottom - _FloatingLauncher.inset - size.height;
+    if (slot != null && slot.dy > screen.height / 2) lowest = math.min(lowest, slot.dy - size.height);
+    final ceiling = math.max(floor, lowest);
     return top.clamp(floor, ceiling);
   }
 
@@ -613,7 +619,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
               : slot != null
                   ? slot.dy - size.height
                   : screen.height;
-          return Offset(left, _clampTop(top, screen, size, safe));
+          return Offset(left, _clampTop(top, screen, size, safe, slot));
         },
       ),
       child: Listener(

@@ -12683,6 +12683,26 @@ double _pinRoom(List<_Pin> pins, double width, double least) {
   return math.max(least, math.min(widest / 2, width / 4));
 }
 
+/// Which pins keep their label where they stand: in order, a label that
+/// would overlap one already placed gives way to a dot, so close stores do not
+/// draw their names over each other (QA R2-10). [first] (the open callout)
+/// is placed before the rest. Sizes are estimated as [_pinRoom] does.
+List<bool> _labelled(List<_Pin> pins, List<Offset> points, {int? first}) {
+  final placed = <Rect>[];
+  final shown = List<bool>.filled(pins.length, false);
+  final order = [if (first != null && first >= 0 && first < pins.length) first, for (var i = 0; i < pins.length; i++) if (i != first) i];
+  for (final i in order) {
+    final width = math.min(180.0, 20 + pins[i].label.length * 7.2);
+    // The pill: 4 + 15 + 4 tall, standing on its point.
+    final rect = Rect.fromLTWH(points[i].dx - width / 2, points[i].dy - 23, width, 23);
+    if (i == first || !placed.any(rect.overlaps)) {
+      placed.add(rect);
+      shown[i] = true;
+    }
+  }
+  return shown;
+}
+
 List<_Pin> _pinsOf(Map props) => [
       for (final pin in _maps(props['pins']))
         if ((_dbl(pin['lat']), _dbl(pin['lng']), _str(pin['label'])) case (final lat?, final lng?, final label?)
@@ -12836,20 +12856,44 @@ class _PinLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
+    final points = [for (final pin in pins) camera.project(pin.lat, pin.lng, size)];
+    final labelled = _labelled(pins, points, first: selected);
     return Stack(
       clipBehavior: Clip.hardEdge,
       children: [
-        for (final (i, pin) in pins.indexed) _placed(camera.project(pin.lat, pin.lng, size), _pin(theme, i, pin)),
+        for (final (i, pin) in pins.indexed)
+          labelled[i] ? _placed(points[i], _pin(theme, i, pin)) : _placed(points[i], _dot(theme, i, pin), centred: true),
       ],
     );
   }
 
-  /// [pin] centred over [at] and standing on it.
-  Widget _placed(Offset at, Widget pin) => Positioned(
+  /// [pin] centred over [at] and standing on it, or with [centred] centred on it.
+  Widget _placed(Offset at, Widget pin, {bool centred = false}) => Positioned(
         left: at.dx,
         top: at.dy,
-        child: FractionalTranslation(translation: const Offset(-0.5, -1), child: pin),
+        child: FractionalTranslation(translation: Offset(-0.5, centred ? -0.5 : -1), child: pin),
       );
+
+  /// A pin whose label gave way: an ink dot on its point. Full screen, a tap
+  /// opens its callout, which carries the name.
+  Widget _dot(RendelTheme theme, int i, _Pin pin) {
+    final dot = Container(
+      width: 12,
+      height: 12,
+      decoration: BoxDecoration(
+        color: theme.colors.onSurface,
+        shape: BoxShape.circle,
+        border: Border.all(color: theme.colors.surfaceRaised, width: 2),
+      ),
+    );
+    final tap = onTap;
+    if (tap == null) return Semantics(label: pin.label, child: dot);
+    return RendelPressable(
+      semanticLabel: _joinParts([pin.label, pin.subtitle]),
+      onTap: () => tap(i),
+      child: SizedBox(width: 44, height: 44, child: Center(child: dot)),
+    );
+  }
 
   Widget _pin(RendelTheme theme, int i, _Pin pin) {
     final pill = Container(
