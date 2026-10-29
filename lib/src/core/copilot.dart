@@ -711,7 +711,11 @@ class Rendel {
   /// on every refresh, and null when the person turns notifications off.
   /// [timezone] is the device's IANA zone where the app knows it
   /// (`rendel_push` does); without it, the offset is sent.
-  static Future<void> setPushToken(String? token, {String? timezone}) async {
+  ///
+  /// [apns] says the token is an iOS device token, which Rendel sends
+  /// straight to Apple with the app's key (no Firebase): `rendel_push` reads
+  /// it, with the build's push environment, bundle id and Team ID.
+  static Future<void> setPushToken(String? token, {String? timezone, RendelApnsToken? apns}) async {
     final api = await _whenClient();
     if (api == null) return;
     final platform = switch (defaultTargetPlatform) {
@@ -728,7 +732,20 @@ class Rendel {
       platform: platform,
       timezone: timezone ?? offsetZone(DateTime.now().timeZoneOffset),
       locale: resolveLocale(_config.locale),
+      provider: apns == null ? null : 'apns',
+      environment: apns?.environment,
+      topic: apns?.bundleId,
+      teamId: apns?.teamId,
     );
+  }
+
+  /// The Firebase options for this Android app, read by Rendel from the
+  /// service account in Settings › Channels: what `rendel_push` starts
+  /// Firebase with when the app has no Firebase of its own. Null while push
+  /// is not set up there.
+  static Future<Map<String, String>?> pushFirebaseOptions(String androidPackage) async {
+    final api = await _whenClient();
+    return api?.pushFirebaseOptions(androidPackage);
   }
 
   // ————————————————————————— screens and goals —————————————————————————

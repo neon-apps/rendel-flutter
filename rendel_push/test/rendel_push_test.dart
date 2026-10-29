@@ -14,12 +14,15 @@ const _id = '0b8d3c1e-5f6a-4b7c-8d9e-0f1a2b3c4d5e';
 /// What reaches the API: push tokens and opened follow-ups.
 class _Server {
   final tokens = <Object?>[];
+  final bodies = <Map<String, dynamic>>[];
   final opened = <String>[];
 
   late final client = MockClient((request) async {
     final path = request.url.path;
     if (path.endsWith('/v1/push/token')) {
-      tokens.add((jsonDecode(request.body) as Map)['token']);
+      final body = (jsonDecode(request.body) as Map).cast<String, dynamic>();
+      tokens.add(body['token']);
+      bodies.add(body);
       return http.Response('', 204);
     }
     if (path.endsWith('/open')) {
@@ -62,20 +65,46 @@ void main() {
 
   testWidgets('hands the token and every refresh to Rendel', (tester) async {
     final (server, navigator) = await start(tester);
-    final refreshes = StreamController<String>();
+    final refreshes = StreamController<RendelPushToken>();
     await onAndroid(tester, () async {
       await RendelPush.wire(
         allowed: () async => true,
-        token: () async => 'token-1',
+        token: () async => const RendelPushToken('token-1'),
         refreshes: refreshes.stream,
         taps: const Stream.empty(),
         launchTap: () async => null,
         context: () => inside(navigator),
       );
-      refreshes.add('token-2');
+      refreshes.add(const RendelPushToken('token-2'));
       await Future<void>.delayed(const Duration(milliseconds: 50));
     });
     expect(server.tokens, ['token-1', 'token-2']);
+    // A Firebase token says nothing more, as every SDK before this one.
+    expect(server.bodies.first.containsKey('provider'), isFalse);
+  });
+
+  testWidgets("says an iOS token is Apple's, with its build's environment, bundle id and team", (tester) async {
+    final (server, navigator) = await start(tester);
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    try {
+      await tester.runAsync(() => RendelPush.wire(
+            allowed: () async => true,
+            token: () async => const RendelPushToken(
+              'ab12',
+              apns: RendelApnsToken(environment: 'sandbox', bundleId: 'co.neonapps.grove', teamId: 'UH5437SQWZ'),
+            ),
+            refreshes: const Stream.empty(),
+            taps: const Stream.empty(),
+            launchTap: () async => null,
+            context: () => inside(navigator),
+          ));
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+    expect(server.bodies.single, containsPair('provider', 'apns'));
+    expect(server.bodies.single, containsPair('environment', 'sandbox'));
+    expect(server.bodies.single, containsPair('topic', 'co.neonapps.grove'));
+    expect(server.bodies.single, containsPair('team_id', 'UH5437SQWZ'));
   });
 
   testWidgets('sends no token when notifications are off, and says so', (tester) async {

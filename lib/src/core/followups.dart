@@ -146,3 +146,21 @@ String? offsetZone(Duration offset) {
   if (hours == 0) return 'Etc/GMT';
   return hours > 0 ? 'Etc/GMT-$hours' : 'Etc/GMT+${-hours}';
 }
+
+/// What an iOS device token says about itself, for Rendel to send it straight
+/// to Apple (`Rendel.setPushToken(token, apns: ...)`): `rendel_push` reads
+/// all of it from the build.
+@immutable
+class RendelApnsToken {
+  const RendelApnsToken({required this.environment, this.bundleId, this.teamId});
+
+  /// `sandbox` for a debug build's token, `production` for TestFlight and the App Store.
+  final String environment;
+
+  /// The app's bundle id, Apple's topic for the push.
+  final String? bundleId;
+
+  /// The Team ID the build is signed with, which Settings › Channels offers
+  /// beside the key.
+  final String? teamId;
+}

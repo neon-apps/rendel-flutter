@@ -21,7 +21,7 @@ export 'src/core/pairing.dart' show RendelPairResult, RendelPairFailure;
 // Tap autocapture's markers: a stable name, no text, not counted.
 export 'src/core/taps.dart' show RendelName, RendelMask, RendelIgnore;
 export 'src/core/events.dart' show RendelEvent;
-export 'src/core/followups.dart' show RendelFollowup;
+export 'src/core/followups.dart' show RendelApnsToken, RendelFollowup;
 export 'src/core/schema.dart' show RendelSchema;
 // Part of RendelDispatcher's signature, so a host registering a custom
 // builder has to be able to name it.

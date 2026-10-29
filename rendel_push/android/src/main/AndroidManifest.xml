@@ -1,0 +1,24 @@
+<!--
+  Rendel's push on Android, merged into the app's manifest at build time.
+
+  POST_NOTIFICATIONS: Android 13 asks the person before an app may notify;
+  this only makes asking possible.
+
+  The messaging service takes Firebase's messages only where the app has no
+  service of its own: its priority is below any the app declares, so an app
+  that already handles FCM (its own code, or another provider's SDK) keeps
+  them, and Rendel's taps still open from the launch intent.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <application>
+        <service
+            android:name="ai.rendel.push.RendelMessagingService"
+            android:exported="false">
+            <intent-filter android:priority="-500">
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+    </application>
+</manifest>

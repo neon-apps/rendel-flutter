@@ -636,6 +636,10 @@ class RendelApiClient {
     required String platform,
     String? timezone,
     String? locale,
+    String? provider,
+    String? environment,
+    String? topic,
+    String? teamId,
   }) async {
     try {
       final response = await _http
@@ -647,12 +651,37 @@ class RendelApiClient {
               'platform': platform,
               if (timezone != null) 'timezone': timezone,
               if (locale != null) 'locale': locale,
+              if (provider != null) 'provider': provider,
+              if (environment != null) 'environment': environment,
+              if (topic != null) 'topic': topic,
+              if (teamId != null) 'team_id': teamId,
             }),
           )
           .timeout(config.requestTimeout);
       return response.statusCode == 204 || response.statusCode == 200;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// GET /v1/push/config: the Firebase options `rendel_push` starts Firebase
+  /// with on an Android app that has none of its own, read by the server from
+  /// the app's service account. Null while push is not set up, and on any
+  /// failure.
+  Future<Map<String, String>?> pushFirebaseOptions(String androidPackage) async {
+    try {
+      final response = await _http
+          .get(
+            Uri.parse('${config.apiBaseUrl}/v1/push/config').replace(queryParameters: {'package': androidPackage}),
+            headers: _headers,
+          )
+          .timeout(config.requestTimeout);
+      if (response.statusCode != 200) return null;
+      final firebase = (jsonDecode(response.body) as Map<String, dynamic>)['firebase'];
+      if (firebase is! Map) return null;
+      return {for (final e in firebase.entries) if (e.value is String) e.key as String: e.value as String};
+    } catch (_) {
+      return null;
     }
   }
 

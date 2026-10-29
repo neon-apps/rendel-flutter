@@ -1,8 +1,9 @@
 name: rendel_push
 description: >-
-  Push notifications for Rendel follow-ups on Firebase Cloud Messaging: asks
+  Push notifications for Rendel follow-ups: straight to Apple on iOS (no
+  Firebase), Firebase Cloud Messaging on Android without a version pin. Asks
   for permission, hands the token to Rendel, and opens Rendel's pushes.
-version: 0.1.0
+version: 0.2.0
 homepage: https://rendel.ai
 # Added from git, beside `rendel` in the same public repository; pub.dev takes
 # no package with a git dependency.
@@ -13,7 +14,6 @@ environment:
   flutter: ">=3.29.0"
 
 dependencies:
-  firebase_messaging: ^17.0.1
   flutter:
     sdk: flutter
   # The SDK as every snippet pins it, at the tag this package ships in: an app
@@ -22,10 +22,22 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.67.1
+      ref: v0.68.0
 
 dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
   http: ^1.6.0
+
+# Native on both platforms (design/plans/push-channels.md): iOS asks Apple for
+# the device token itself, and Android calls firebase-messaging from Gradle
+# with a wide version range, so no Dart-side Firebase pin comes with it.
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: ai.rendel.push
+        pluginClass: RendelPushPlugin
+      ios:
+        pluginClass: RendelPushPlugin

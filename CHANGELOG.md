@@ -5,6 +5,23 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.68.0
+
+**Added**
+
+- Push straight to Apple (design/plans/push-channels.md, Tuna 2026-10-29):
+  `Rendel.setPushToken(token, apns: RendelApnsToken(...))` says a token is an
+  iOS device token, with its build's environment (`sandbox` for a debug
+  build), bundle id and Team ID. Rendel sends it with the app's .p8 key, so
+  an iOS app needs no Firebase. A token without `apns` is a Firebase token,
+  as before.
+- `Rendel.pushFirebaseOptions(androidPackage)`: the Firebase options Rendel
+  read from the app's service account, for `rendel_push` to start Firebase
+  with on an Android app that has none of its own.
+- `rendel_push` 0.2.0, at the same tag, is native on both platforms: iOS
+  asks Apple for the token itself (no Firebase), Android calls
+  firebase-messaging from Gradle with a version range (no Dart-side pin, no
+  `google-services.json` needed). See its CHANGELOG.
 ## 0.67.1
 
 **Fixed**
