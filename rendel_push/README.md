@@ -31,12 +31,12 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.70.0
+      ref: v0.70.1
   rendel_push:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
       path: rendel_push
-      ref: v0.70.0
+      ref: v0.70.1
 ```
 
 3. After `Rendel.init(...)`:

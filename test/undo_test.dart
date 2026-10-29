@@ -145,6 +145,26 @@ void main() {
     expect(server.asked, hasLength(2));
   });
 
+  testWidgets('puts Undo under the words at the largest text size, so they are not broken a few letters a line', (tester) async {
+    tester.view.physicalSize = const Size(375, 667) * 2;
+    tester.view.devicePixelRatio = 2;
+    addTearDown(tester.view.reset);
+    final server = _Server(_turn(until: DateTime.now().add(const Duration(minutes: 10))), []);
+    final c = controller(server);
+    await tester.runAsync(() => c.send('Add oat milk'));
+    await tester.pumpWidget(MediaQuery(
+      data: const MediaQueryData(size: Size(375, 667), textScaler: TextScaler.linear(3.1)),
+      child: _app(ThreadScreen(controller: c)),
+    ));
+    await tester.pump(const Duration(milliseconds: 600));
+    final words = tester.getRect(find.text(_line));
+    final undo = tester.getRect(find.text('Undo'));
+    expect(undo.top, greaterThanOrEqualTo(words.bottom));
+    // The words keep the line's width: "INNER GOODNESS" is not cut into pieces.
+    expect(words.width, greaterThan(200));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('says plainly when it failed, and offers it again', (tester) async {
     fails = true;
     final server = _Server(_turn(until: DateTime.now().add(const Duration(minutes: 10))), [

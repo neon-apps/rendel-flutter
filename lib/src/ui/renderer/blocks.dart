@@ -14451,6 +14451,35 @@ class _ActionDoneState extends State<_ActionDone> {
         until.isAfter(DateTime.now());
     final words = _str(block.props['text']) ?? block.fallbackText;
     final soft = theme.colors.onSurfaceSoft;
+    // At the largest text sizes the line and its Undo no longer fit side by
+    // side: the words were broken a few letters a line (QA R9, SE at AX5).
+    // The Undo goes under the words there.
+    final stacked = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.35;
+    final Widget? trailing = undone || phase == 'undoing'
+        ? Padding(
+            padding: EdgeInsets.symmetric(horizontal: stacked ? 0 : 8),
+            child: Text(
+              undone ? strings.actionUndone : strings.actionUndoing,
+              style: theme.text.labelEmphasis.copyWith(fontSize: 13.5, color: soft),
+            ),
+          )
+        : offered
+            ? RendelPressable(
+                semanticLabel: strings.actionUndo,
+                onTap: () => unawaited(_undo()),
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: theme.colors.surfaceRaised,
+                    border: Border.all(color: theme.hairline),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(strings.actionUndo, style: theme.text.labelEmphasis.copyWith(fontSize: 14)),
+                ),
+              )
+            : null;
     return Semantics(
       liveRegion: true,
       child: Container(
@@ -14492,34 +14521,13 @@ class _ActionDoneState extends State<_ActionDone> {
                       padding: const EdgeInsets.only(top: 2),
                       child: Text(strings.actionUndoFailed, style: theme.text.body.copyWith(fontSize: 13, color: soft)),
                     ),
+                  if (stacked && trailing != null) Padding(padding: const EdgeInsets.only(top: 8), child: trailing),
                 ],
               ),
             ),
-            if (undone || phase == 'undoing')
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                child: Text(
-                  undone ? strings.actionUndone : strings.actionUndoing,
-                  style: theme.text.labelEmphasis.copyWith(fontSize: 13.5, color: soft),
-                ),
-              )
-            else if (offered) ...[
-              const SizedBox(width: 8),
-              RendelPressable(
-                semanticLabel: strings.actionUndo,
-                onTap: () => unawaited(_undo()),
-                child: Container(
-                  constraints: const BoxConstraints(minHeight: 36),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: theme.colors.surfaceRaised,
-                    border: Border.all(color: theme.hairline),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(strings.actionUndo, style: theme.text.labelEmphasis.copyWith(fontSize: 14)),
-                ),
-              ),
+            if (!stacked && trailing != null) ...[
+              if (offered) const SizedBox(width: 8),
+              trailing,
             ],
           ],
         ),

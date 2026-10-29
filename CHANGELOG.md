@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.70.1
+
+**Fixed**
+
+- At the largest text sizes the line a write without a card leaves in the
+  answer puts its Undo under the words. Beside them, on a small phone, the
+  words were broken a few letters a line.
+
 ## 0.70.0
 
 **Added**
