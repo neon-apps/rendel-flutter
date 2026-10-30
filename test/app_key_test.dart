@@ -22,7 +22,7 @@ void main() {
     );
     expect(logs.single.code, 'invalid_key');
     expect(logs.single.message, contains('placeholder'));
-    expect(logs.single.message, contains('Settings → API keys'));
+    expect(logs.single.message, contains('Settings → Keys & environments'));
     expect(Rendel.isInitialized, isFalse);
   });
 
@@ -40,7 +40,7 @@ void main() {
     await pumpEventQueue();
     final refused = logs.where((record) => record.code == 'invalid_key').toList();
     expect(refused, isNotEmpty);
-    expect(refused.first.message, contains('Settings → API keys'));
+    expect(refused.first.message, contains('Settings → Keys & environments'));
   });
 
   // Keys made since the rename start rd_pk_; the ones made before, nc_pk_.

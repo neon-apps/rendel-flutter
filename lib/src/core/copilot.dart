@@ -29,6 +29,7 @@ import 'platform.dart';
 import 'route.dart';
 import 'screens.dart';
 import 'taps.dart';
+import 'templates.dart' show rendelCardTemplates;
 import 'strings.dart';
 import 'remote_config.dart';
 
@@ -54,6 +55,7 @@ class Rendel {
   static final Map<String, RendelRoute> _routes = {};
   static final Map<String, Future<Map<String, dynamic>> Function()> _providers = {};
   static final StreamController<RendelEvent> _events = StreamController.broadcast();
+  static final StreamController<RendelChange> _changes = StreamController.broadcast();
   static String? _appKey;
   static bool _manifestSynced = false;
 
@@ -99,6 +101,9 @@ class Rendel {
   /// The last [identify] body, for an [identify] that arrived before [init]
   /// had a client to send it with.
   static Map<String, dynamic>? _identity;
+
+  /// A [reset] that ran before [init] had a client to tell the server with.
+  static bool _signOutUnsent = false;
 
   /// [pair] calls that ran before [init] had a client, waiting for one.
   static final List<Completer<RendelApiClient?>> _awaitingClient = [];
@@ -155,6 +160,17 @@ class Rendel {
   static final ValueNotifier<int> configRevision = ValueNotifier<int>(0);
 
   static Stream<RendelEvent> get events => _events.stream;
+
+  /// What Rendel changed in the app's own data, so the app can refresh what
+  /// it holds of it: once per write the server carried out for the person,
+  /// and once more when one is undone. Broadcast. See [RendelChange].
+  ///
+  /// ```dart
+  /// Rendel.changes.listen((change) {
+  ///   if (change.action.contains('list')) savedLists.reload();
+  /// });
+  /// ```
+  static Stream<RendelChange> get changes => _changes.stream;
 
   /// The theme the copilot is drawn in right now: the light one or the dark
   /// one, by [RendelConfig.themeMode] and the device's own setting.
@@ -262,6 +278,10 @@ class Rendel {
       httpClient: config.httpClient,
     );
     _handOverClient(_api);
+    if (_signOutUnsent) {
+      _signOutUnsent = false;
+      unawaited(_sendSignOut());
+    }
     RendelFollowups.instance.send = (event) => unawaited(_api?.sendEvent(event));
     // Whether this device counts at all, and what it registered, before
     // anything counted since launch leaves.
@@ -382,8 +402,13 @@ class Rendel {
     _user = user;
     unawaited(_storeUser(jsonEncode(user)));
     // Somebody else's thread is not this person's to read, on a phone they
-    // share. From anonymous to signed in it stays: it was theirs.
-    if (previous != null && previous != userId) _controller?.reset();
+    // share, nor their follow-ups. From anonymous to signed in it stays: it
+    // was theirs.
+    if (previous != null && previous != userId) {
+      _controller?.reset();
+      RendelFollowups.instance.clear();
+      _inboxAsked = null;
+    }
     final identity = {
       'external_user_id': userId,
       if (traits != null) 'traits': traits,
@@ -623,6 +648,7 @@ class Rendel {
         locale: _config.locale,
         languages: _config.languages,
         onEvent: _events.add,
+        onChange: _changes.add,
         onUnavailable: (reason) => _setAvailable(false, reason),
         user: () => _user,
         parallelReads: () => _parallelReads,
@@ -668,11 +694,29 @@ class Rendel {
   }
 
   /// Call on logout: clears the thread and the user. The next turn from this
-  /// phone is anonymous until the next [identify].
+  /// phone is anonymous until the next [identify], and the server is told, so
+  /// the last person's follow-ups, inbox and push stop reaching this phone.
   static void reset() {
     // Somebody was signed in: what waits goes as them, and a new session starts.
     if (_user != null) _rotateSession();
     _endSession(forget: true);
+    if (_api != null) {
+      unawaited(_sendSignOut());
+    } else {
+      _signOutUnsent = true;
+    }
+  }
+
+  /// Told after the phone has forgotten the person: a failure here leaves the
+  /// server's binding until the next turn, which says nobody is signed in.
+  static Future<void> _sendSignOut() async {
+    try {
+      // Somebody signed in since: their identify has the device, and this would undo it.
+      if (_user != null) return;
+      await _api?.signOut();
+    } catch (err) {
+      RendelLog.warn('transport_failed', 'sign-out did not reach the server', error: err);
+    }
   }
 
   static void _rotateSession() {
@@ -1031,6 +1075,7 @@ class Rendel {
     minimised.value = false;
     RendelPlatform.resetForTest();
     _api = null;
+    _signOutUnsent = false;
     _handOverClient(null);
     _appKey = null;
     _actions.clear();
@@ -1203,6 +1248,7 @@ class Rendel {
     _config = remote.applyToConfig(_codeConfig);
     _logoAssetId = remote.logoAssetId;
     _launcherIconAssetId = remote.launcherIconAssetId;
+    rendelCardTemplates = remote.cardTemplates;
     auditContrast(_theme);
     auditContrast(_darkTheme);
     configRevision.value++;

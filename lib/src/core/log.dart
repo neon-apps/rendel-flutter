@@ -11,7 +11,7 @@ enum RendelLogLevel { debug, warning, error }
 /// example's `rd_pk_test_...` used to pass the first check and fail later as
 /// a network error nobody could read. Not exported.
 const String rendelKeyHelp = "Copy your app's key from the Rendel console: "
-    'your app → Settings → API keys → Copy beside Test.';
+    'your app → Settings → Keys & environments → Copy beside Test.';
 
 class RendelLogRecord {
   const RendelLogRecord({

@@ -56,7 +56,7 @@ class MyApp extends StatelessWidget {
 Future<void> installMain() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Rendel.init(
-    // Your app's key: Rendel console → Settings → API keys → Copy.
+    // Your app's key: Rendel console → Settings → Keys & environments → Copy.
     // Start on the test key; swap in the live key for release builds.
     appKey: 'rd_pk_test_…',
     // The language Rendel answers in when a message does not say which
@@ -90,7 +90,7 @@ Future<void> identifySnippet() async {
 
 Future<void> userTokenSnippet() async {
   await Rendel.init(
-    // Your app's key: Rendel console → Settings → API keys → Copy.
+    // Your app's key: Rendel console → Settings → Keys & environments → Copy.
     appKey: 'rd_pk_test_...',
     config: RendelConfig(
       languages: ['tr'],

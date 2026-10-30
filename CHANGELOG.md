@@ -5,6 +5,28 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.72.0
+
+**Fixed**
+
+- `Rendel.reset()` tells the server the person signed out
+  (`POST /v1/identify/reset`). The device id outlives a logout, and the
+  server kept the device bound to them, so the next person on the phone was
+  served their follow-ups, inbox and push.
+- `Rendel.identify` with a different user drops the last person's
+  follow-ups, as `reset` does.
+
+## 0.71.0
+
+**Added**
+
+- `Rendel.changes`: a stream of `RendelChange`, one for every write the
+  server carried out on your API for the signed-in person (a confirmed card,
+  or a card-less write with an Undo), and one more with `undone` true when
+  they take it back. It carries the action's name and the values the call was
+  made with, so a screen that read its data at launch, such as a favourites
+  list, can reload it instead of showing the old state until the next launch.
+
 ## 0.70.1
 
 **Fixed**

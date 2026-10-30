@@ -534,6 +534,16 @@ sealed class RendelWireEvent {
           params: (data['params'] as Map?)?.cast<String, dynamic>() ?? const {},
           timeoutMs: _int(data['timeout_ms']) ?? 15000,
         );
+      case 'action.done':
+        final invocationId = _text(data['invocation_id']);
+        final name = _text(data['name']);
+        if (invocationId == null || name == null) return null;
+        return ActionDone(
+          invocationId: invocationId,
+          name: name,
+          risk: _text(data['risk']) ?? 'write',
+          params: (data['params'] as Map?)?.cast<String, dynamic>() ?? const {},
+        );
       case 'turn.end':
         final remaining = data['remaining'];
         return TurnEnd(
@@ -657,6 +667,21 @@ class ActionExecute extends RendelWireEvent {
   final String name;
   final Map<String, dynamic> params;
   final int timeoutMs;
+}
+
+/// A write the server carried out for the person has happened, so the app
+/// can refresh what it caches of its own data (`Rendel.changes`).
+class ActionDone extends RendelWireEvent {
+  const ActionDone({
+    required this.invocationId,
+    required this.name,
+    required this.risk,
+    required this.params,
+  });
+  final String invocationId;
+  final String name;
+  final String risk;
+  final Map<String, dynamic> params;
 }
 
 class TurnEnd extends RendelWireEvent {

@@ -17,10 +17,13 @@ import '../../protocol/protocol.dart';
 import '../../core/numbers.dart';
 import '../../core/strings.dart';
 import '../../core/config.dart' show RendelAttachment, RendelAttachSource;
+import '../../core/templates.dart';
 import '../../transport/api_client.dart' show RendelUploadFailure;
 import '../theme.dart';
 import 'map_engine.dart';
 import 'registry.dart';
+
+part 'templates.dart';
 
 /// Built-in renderers for the RDUI/1 catalog.
 ///

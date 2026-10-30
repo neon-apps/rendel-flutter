@@ -13,14 +13,14 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.70.1
+      ref: v0.72.0
 ```
 
 ## Three lines to a running assistant
 
 ```dart
 await Rendel.init(
-  // Your app's key: Rendel console → Settings → API keys → Copy.
+  // Your app's key: Rendel console → Settings → Keys & environments → Copy.
   appKey: 'rd_pk_test_...',
   // The languages Rendel answers in: ['tr'] is Turkish only,
   // ['tr', 'en'] Turkish or English. Leave out config for any language.
@@ -53,7 +53,7 @@ with no API key for you to issue:
 
 ```dart
 await Rendel.init(
-  // Your app's key: Rendel console → Settings → API keys → Copy.
+  // Your app's key: Rendel console → Settings → Keys & environments → Copy.
   appKey: 'rd_pk_test_...',
   config: RendelConfig(
     languages: ['tr'],

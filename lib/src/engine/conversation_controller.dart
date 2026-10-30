@@ -185,6 +185,7 @@ class ConversationController extends ChangeNotifier {
     this.locale,
     this.languages = const [],
     this.onEvent,
+    this.onChange,
     this.onUnavailable,
     this.user = _nobody,
     this.cardSources = const {},
@@ -269,6 +270,10 @@ class ConversationController extends ChangeNotifier {
   /// release and emitted by nothing, so a host that wired analytics to them
   /// recorded silence and had no way to tell that from an unused copilot.
   final void Function(RendelEvent event)? onEvent;
+
+  /// Where a change the server made for the person goes (`Rendel.changes`):
+  /// a console write that ran, or its Undo.
+  final void Function(RendelChange change)? onChange;
 
   /// A new conversation was refused because the app is paused (credit spent,
   /// budget reached, a daily ceiling): the SDK hides its way in and says
@@ -778,7 +783,11 @@ class ConversationController extends ChangeNotifier {
     touch();
     final asked = await api.undo(id, user: user());
     final state = asked?['state'];
-    if (state == 'undone') return settle('undone');
+    if (state == 'undone') {
+      // The server ran the inverse itself: the app's data moved back.
+      onChange?.call(RendelChange(action: '${block.props['action_name'] ?? ''}', risk: 'write', undone: true));
+      return settle('undone');
+    }
     if (state == 'undoing') return settle('undoing');
     if (state != 'run') return settle('failed');
     final name = '${asked!['name'] ?? ''}';
@@ -1478,6 +1487,10 @@ class ConversationController extends ChangeNotifier {
             structural = emptiedTurn;
           case ActionExecute():
             _pendingReads[event.invocationId] = event;
+            structural = false;
+          case ActionDone(:final name, :final risk, :final params):
+            // The server has already made the call; this only tells the app.
+            onChange?.call(RendelChange(action: name, risk: risk, params: params));
             structural = false;
           case TurnEnd(:final status, :final remainingHint, :final lang, :final speech):
             settled = true;

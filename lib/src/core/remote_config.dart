@@ -7,6 +7,7 @@ import '../ui/launcher_icons.dart';
 import '../ui/theme.dart';
 import 'analytics.dart' show RendelCapture;
 import 'config.dart';
+import 'templates.dart';
 
 /// Where the SDK keeps the last config it fetched successfully.
 ///
@@ -60,6 +61,7 @@ class RendelRemoteConfig {
     required this.copilot,
     required this.etag,
     this.themeDark = const {},
+    this.templates = const {},
     this.parallelReads = true,
     this.capture = RendelCapture.defaults,
   });
@@ -84,10 +86,17 @@ class RendelRemoteConfig {
   final Map<String, dynamic> themeDark;
   final Map<String, dynamic> copilot;
 
+  /// Kinds of card drawn from the customer's own layout, as published. Read
+  /// through [cardTemplates], which keeps only what this build can draw.
+  final Map<String, dynamic> templates;
+
+  /// [templates], each kind kept only when every value in it is in shape.
+  Map<String, RendelCardTemplate> get cardTemplates => RendelCardTemplate.parseAll(templates);
+
   /// The ETag the payload arrived with, so the next launch can ask for a 304.
   final String? etag;
 
-  bool get isEmpty => theme.isEmpty && themeDark.isEmpty && copilot.isEmpty;
+  bool get isEmpty => theme.isEmpty && themeDark.isEmpty && copilot.isEmpty && templates.isEmpty;
 
   /// Parses a stored or fetched envelope. Returns null rather than throwing:
   /// a payload from a newer server, a truncated cache file or a hand-edited
@@ -107,6 +116,7 @@ class RendelRemoteConfig {
         theme: _submap(body['theme']),
         themeDark: _submap(body['themeDark']),
         copilot: _submap(body['copilot']),
+        templates: _submap(body['templates']),
         // A cached envelope carries its own etag; a fresh one is handed the
         // header's.
         etag: etag ?? (map['_etag'] as String?),
@@ -130,6 +140,7 @@ class RendelRemoteConfig {
           if (theme.isNotEmpty) 'theme': theme,
           if (themeDark.isNotEmpty) 'themeDark': themeDark,
           if (copilot.isNotEmpty) 'copilot': copilot,
+          if (templates.isNotEmpty) 'templates': templates,
         },
       });
 

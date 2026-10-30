@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/config.dart' show RendelAttachment, RendelAttachSource;
+import '../../core/templates.dart' show rendelCardTemplates;
 import '../../engine/conversation_controller.dart' show RendelSubmitOutcome;
 import '../../protocol/protocol.dart';
 import '../theme.dart';
@@ -216,14 +217,22 @@ class ComponentRegistry {
     if (block.type == 'notice') return buildNotice(context, block, dispatch);
     final builder = _builders[block.type];
     if (builder == null) return buildFallback(context, block);
+    // A kind with a template of the customer's own is drawn from it, unless
+    // the template draws nothing for this block; then the built-in card.
+    final template = rendelCardTemplates[block.type];
+    ComponentBuilder drawn = builder;
+    if (template != null) {
+      drawn = (context, block, dispatch) =>
+          buildTemplated(context, block, dispatch, template) ?? builder(context, block, dispatch);
+    }
     // A kind of card the theme sets apart is drawn in its own theme: the same
     // one with that card's plate, well, corner and build.
     final theme = RendelThemeScope.of(context);
     final own = theme.forCard(block.type);
-    if (identical(own, theme)) return builder(context, block, dispatch);
+    if (identical(own, theme)) return drawn(context, block, dispatch);
     return RendelThemeScope(
       theme: own,
-      child: Builder(builder: (context) => builder(context, block, dispatch)),
+      child: Builder(builder: (context) => drawn(context, block, dispatch)),
     );
   }
 }

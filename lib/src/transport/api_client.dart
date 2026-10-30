@@ -587,6 +587,15 @@ class RendelApiClient {
         .timeout(config.requestTimeout);
   }
 
+  /// POST /v1/identify/reset: this device is nobody's until the next
+  /// [identify], so the last person's follow-ups, inbox and push stop
+  /// reaching it.
+  Future<void> signOut() async {
+    await _http
+        .post(Uri.parse('${config.apiBaseUrl}/v1/identify/reset'), headers: _headers)
+        .timeout(config.requestTimeout);
+  }
+
   /// The whole conversation, newest `limit` messages. Not convergence: the
   /// route takes no `after_seq` and this has no callers yet. Kept because the
   /// console and any host that wants to rehydrate a thread need it.
