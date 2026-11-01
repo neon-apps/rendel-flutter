@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.72.1
+
+**Fixed**
+
+- With `launcherDraggable` on, the launcher shows on the screens that place
+  `RendelLauncher`, as it does undragged. A home screen's placement kept it
+  over every screen pushed above it, so it could not be taken off one.
+
 ## 0.72.0
 
 **Fixed**

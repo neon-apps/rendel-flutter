@@ -17,7 +17,14 @@ const _productList = {
     'gap': 8,
     'children': [
       {'type': 'text', 'bind': 'price', 'weight': 'bold', 'color': 'accent'},
-      {'type': 'text', 'bind': 'title', 'grow': true},
+      // `grow` is a box's (the protocol's schema refuses it on a text).
+      {
+        'type': 'box',
+        'grow': true,
+        'children': [
+          {'type': 'text', 'bind': 'title'},
+        ],
+      },
       {'type': 'text', 'bind': 'badge', 'when': {'bind': 'badge'}},
     ],
   },

@@ -33,7 +33,8 @@ import 'theme.dart';
 /// With `RendelConfig.launcherDraggable` on, people may drag it: it then
 /// draws itself once, over the app, at the place this device last left it
 /// (the first time, where the first placement put it), and every placement
-/// keeps an empty slot.
+/// keeps an empty slot. It shows on the screens that place it, as the
+/// undragged one does, not on a screen pushed over one.
 ///
 /// An "In the app" message waiting for this person (`Rendel.followup`) shows
 /// on the app's screen while the thread is closed, as its send chose: over the
@@ -60,6 +61,11 @@ class _RendelLauncherState extends State<RendelLauncher> {
   /// Whether the popup and the banner were placed for the dragged launcher.
   bool _floating = false;
 
+  /// Whether this placement's screen is the one in front. Dragged, only such
+  /// a placement brings the launcher: a home screen's under a pushed screen
+  /// that places none kept it on every screen (inSepo, 2026-11-01).
+  bool _current = true;
+
   @override
   void initState() {
     super.initState();
@@ -69,6 +75,19 @@ class _RendelLauncherState extends State<RendelLauncher> {
     Rendel.configRevision.addListener(_schedule);
     _events = Rendel.events.listen((_) => _schedule());
     _schedule();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final current = ModalRoute.isCurrentOf(context) ?? true;
+    if (current == _current) return;
+    _current = current;
+    // Another placement may be the host now, with the popup to carry, and
+    // the launcher over the app shows or goes (after the frame, in _sync).
+    for (final state in _Floating.states) {
+      state._schedule();
+    }
   }
 
   @override
@@ -93,6 +112,7 @@ class _RendelLauncherState extends State<RendelLauncher> {
   void _sync() {
     if (!mounted) return;
     _Floating.sync();
+    _Floating.front.value = _Floating.host;
     // Dragged, there is one launcher over the app, and the first placement
     // shows the message over it, in the root overlay with it.
     final floating = Rendel.config.launcherDraggable;
@@ -389,12 +409,22 @@ class _SlotState extends State<_Slot> {
 }
 
 /// The dragged launcher: one, over the app, in its root overlay, while at
-/// least one [RendelLauncher] is mounted, however many screens place one.
+/// least one [RendelLauncher] is mounted, however many screens place one. It
+/// shows while the screen in front places one, and only then.
 abstract final class _Floating {
-  /// Every mounted placement, oldest first. The oldest is the host: its
-  /// label, its theme scope and its context to open from.
+  /// Every mounted placement, oldest first. The oldest on the screen in front
+  /// is the host: its label, its theme scope and its context to open from.
   static final states = <_RendelLauncherState>[];
-  static _RendelLauncherState? get host => states.isEmpty ? null : states.first;
+  static _RendelLauncherState? get host {
+    for (final state in states) {
+      if (state._current) return state;
+    }
+    return null;
+  }
+
+  /// [host] as the launcher over the app last drew it, so it redraws when
+  /// the screen in front changes.
+  static final front = ValueNotifier<_RendelLauncherState?>(null);
 
   static OverlayEntry? entry;
 
@@ -408,9 +438,10 @@ abstract final class _Floating {
   /// its own on this device.
   static final slot = ValueNotifier<Offset?>(null);
 
-  /// Up while dragging is on and anything places a launcher; down otherwise.
+  /// Up while dragging is on and anything places a launcher, on whichever
+  /// screen; down otherwise. [host] decides whether it shows.
   static void sync() {
-    final host = Rendel.config.launcherDraggable ? _Floating.host : null;
+    final host = Rendel.config.launcherDraggable && states.isNotEmpty ? states.first : null;
     if (host == null) {
       entry
         ?..remove()
@@ -433,7 +464,13 @@ abstract final class _Floating {
     for (final other in states) {
       other._schedule();
     }
-    if (states.isEmpty) sync();
+    if (states.isEmpty) {
+      sync();
+      // Not while the tree unmounts: after the frame, holding no gone state.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (states.isEmpty) front.value = null;
+      });
+    }
   }
 }
 
@@ -480,6 +517,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
     Rendel.configRevision.addListener(_changed);
     Rendel.minimised.addListener(_changed);
     _Floating.slot.addListener(_changed);
+    _Floating.front.addListener(_changed);
     _events = Rendel.events.listen((_) => _changed());
     unawaited(_load());
   }
@@ -489,6 +527,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
     Rendel.configRevision.removeListener(_changed);
     Rendel.minimised.removeListener(_changed);
     _Floating.slot.removeListener(_changed);
+    _Floating.front.removeListener(_changed);
     _events?.cancel();
     _settle.dispose();
     super.dispose();

@@ -373,6 +373,41 @@ void main() {
       await tester.pump();
       expect(find.text('Ask'), findsNothing);
     });
+
+    testWidgets('not on a screen pushed over one that places it (inSepo, 2026-11-01)', (tester) async {
+      await mount(
+        tester,
+        MaterialApp(
+          home: const Scaffold(floatingActionButton: RendelLauncher()),
+          routes: {
+            '/plain': (_) => const Scaffold(body: Text('plain')),
+            '/placed': (_) => const Scaffold(floatingActionButton: RendelLauncher(label: 'Help')),
+          },
+        ),
+      );
+      expect(find.text('Ask'), findsOneWidget);
+      final navigator = tester.state<NavigatorState>(find.byType(Navigator));
+
+      unawaited(navigator.pushNamed('/plain'));
+      await tester.pumpAndSettle();
+      expect(find.text('plain'), findsOneWidget);
+      expect(find.text('Ask'), findsNothing);
+
+      // A screen that places it shows it, with its own word.
+      unawaited(navigator.pushNamed('/placed'));
+      await tester.pumpAndSettle();
+      expect(find.text('Help'), findsOneWidget);
+      expect(find.text('Ask'), findsNothing);
+
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Help'), findsNothing);
+      expect(find.text('Ask'), findsNothing);
+
+      navigator.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Ask'), findsOneWidget);
+    });
   });
 }
 

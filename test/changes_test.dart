@@ -102,7 +102,9 @@ class _Server extends http.BaseClient {
     String frame(Map<String, dynamic> data) =>
         'event: ${data['type']}\ndata: ${jsonEncode({'v': 1, 'seq': seq++, ...data})}\n\n';
     final sse = StringBuffer(frame({'type': 'turn.start', 'conversation_id': 'c1', 'message_id': 'm1', 'model': 'test'}));
-    frames.forEach((data) => sse.write(frame(data)));
+    for (final data in frames) {
+      sse.write(frame(data));
+    }
     sse.write(frame({'type': 'turn.end', 'status': 'completed', 'pending': <String>[]}));
     return http.StreamedResponse(Stream.value(utf8.encode(sse.toString())), 200);
   }
