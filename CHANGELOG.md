@@ -5,6 +5,19 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.73.2
+
+**Fixed**
+
+- A thread reopened from a push, after a relaunch or from a follow-up shows
+  Rendel's own words (a confirmation's "This cannot be undone" and "Go back")
+  in its answers' language, as it did live, not in the device's. It takes each
+  answer's `lang` from the conversation's history.
+- "Your answer is ready" goes once the thread shows the conversation it is
+  about: its card no longer sits at the top of that very answer, and its popup
+  no longer comes back over the launcher. Opening Rendel read its cards in the
+  same moment it went back to the conversation, so the card stayed.
+
 ## 0.73.1
 
 **Added**

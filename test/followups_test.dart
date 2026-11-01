@@ -211,6 +211,39 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('"your answer is ready" is put away once the thread shows its conversation, in Rendel and over the launcher', (tester) async {
+    const ready = {'type': 'task_done', 'title': 'Grove', 'body': 'Yanıtınız hazır.', 'button': 'Göster', 'conversation_id': 'c-f'};
+    final server = await _init(
+      tester,
+      next: {'id': '3e1a6f4b-8c9d-4e0f-9a1b-2c3d4e5f6a7b', ...ready},
+      inbox: [pushed, {'id': '4f2b7a5c-9d0e-4f1a-8b2c-3d4e5f6a7b8c', 'channel': 'push', ...ready}],
+    );
+    await tester.pumpWidget(_app());
+    await tester.pump();
+    await tester.pump();
+    // Rendel closed: the notice brings the person back to it.
+    expect(Rendel.followup.value?.conversationId, 'c-f');
+    await tester.tap(find.byType(RendelLauncher));
+    await _settle(tester);
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+    expect(Rendel.followupCards.value.map((c) => c.title), ['Grove', 'Kasım indirimi', 'Grove']);
+
+    // The thread comes to that conversation: the answer is on screen, so both notices about it go.
+    await tester.tap(find.text('Bak'));
+    await _settle(tester);
+    await _settle(tester);
+    await tester.pump(const Duration(seconds: 1));
+    expect(find.textContaining('Pegasus 41 artık', findRichText: true), findsWidgets);
+    expect(find.text('Yanıtınız hazır.'), findsNothing);
+    expect(Rendel.followupCards.value, isEmpty);
+    expect(Rendel.followup.value, isNull);
+    // Seen, not put away with the cross.
+    expect(server.of('followup_dismiss'), isEmpty);
+    Navigator.of(tester.element(find.byType(Scaffold).first)).maybePop();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('a card waiting over an answer sits above it, never on it, with a title that can be read', (tester) async {
     await _init(tester, next: null, inbox: [pushed, mailed]);
     await tester.pumpWidget(_app());

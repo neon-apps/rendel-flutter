@@ -182,6 +182,40 @@ void main() {
     expect(find.bySemanticsLabel('Önceki sayfa'), findsNothing);
   });
 
+  /* Grove simulator, 1 November (item 8): a confirm card reopened from its
+     push read "This cannot be undone" and "Go back" under a Turkish card. */
+  testWidgets('a thread restored from history is framed in its answers\' language', (tester) async {
+    final c = controller();
+    final card = {
+      'id': 'b0',
+      'type': 'confirm_card',
+      'fallback_text': 'Cancel order 1042?',
+      'props': {
+        'invocation_id': 'inv_1',
+        'action_name': 'cancel_order',
+        'summary': '1042 numaralı siparişi iptal edelim mi?',
+        'risk': 'destructive',
+        'confirm': {'kind': 'confirm', 'invocation_id': 'inv_1'},
+        'cancel': {'kind': 'cancel', 'invocation_id': 'inv_1'},
+      },
+    };
+    c.loadHistory('c1', [
+      {'id': 'u1', 'role': 'user', 'blocks': [{'id': 'q', 'type': 'text', 'fallback_text': '', 'props': {'markdown': 'Siparişimi iptal et'}}]},
+      {'id': 'm1', 'role': 'assistant', 'lang': 'tr', 'blocks': [card]},
+    ]);
+    expect(c.answerLanguage, 'tr');
+    expect(c.pages.single.lang, 'tr');
+    await pump(tester, c);
+    expect(find.text('Geri'), findsOneWidget);
+    expect(find.text('Go back'), findsNothing);
+
+    // An older server says no language: the thread keeps its default.
+    c.loadHistory('c1', [
+      {'id': 'm1', 'role': 'assistant', 'blocks': [card]},
+    ]);
+    expect(c.answerLanguage, isNull);
+  });
+
   testWidgets("a language the SDK does not ship keeps the thread's words", (tester) async {
     final c = controller(lang: 'ja');
     await pump(tester, c);

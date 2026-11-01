@@ -1221,7 +1221,17 @@ class ConversationController extends ChangeNotifier {
       ];
       if (blocks.isEmpty) continue;
       final serverId = raw['id'];
-      messages.add(RendelMessage.history(role as String, blocks, serverId: serverId is String ? serverId : null));
+      // The language the server read the answer's question in (the
+      // messages endpoint's `lang`), so a restored thread draws the SDK's
+      // own words as it did live: a card reopened from its push read "Go
+      // back" under Turkish (Grove simulator, 1 November).
+      final lang = raw['lang'];
+      final message = RendelMessage.history(role as String, blocks, serverId: serverId is String ? serverId : null);
+      if (role == 'assistant' && lang is String && lang.trim().isNotEmpty) {
+        message.lang = lang;
+        answerLanguage = lang;
+      }
+      messages.add(message);
     }
     pages.addAll(messages.where((m) => m.role == 'assistant'));
     page = pages.length - 1;

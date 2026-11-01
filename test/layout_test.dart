@@ -231,8 +231,9 @@ void main() {
       ConversationController c, {
       required double scale,
       double width = 320,
+      double height = 800,
     }) async {
-      tester.view.physicalSize = Size(width * 3, 800 * 3);
+      tester.view.physicalSize = Size(width * 3, height * 3);
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
       await tester.pumpWidget(
@@ -340,6 +341,30 @@ void main() {
         c.dispose();
       });
     }
+
+    // An iPhone SE (375×667) at the largest accessibility text: the Grove
+    // simulator matrix's overflow scan (item 8, 2026-11-01).
+    group('an iPhone SE at the largest text', () {
+      testWidgets('a failed turn keeps its explanation and a whole retry', (tester) async {
+        const message = 'The connection dropped before the answer finished.';
+        final c = controller()
+          ..messages.add(RendelMessage.user('Where is my order?'))
+          ..errorText = message;
+        await pumpShell(tester, c, scale: 3.0, width: 375, height: 667);
+        expect(tester.takeException(), isNull);
+        expect(truncated(tester), isNot(anyElement(contains('Try again'))), reason: 'the retry label was cut');
+        c.dispose();
+      });
+
+      testWidgets('the test-mode badge keeps its word', (tester) async {
+        final c = controller(sandbox: true);
+        await pumpShell(tester, c, scale: 3.0, width: 375, height: 667);
+        expect(tester.takeException(), isNull);
+        expect(find.text('Test mode'), findsOneWidget);
+        expect(truncated(tester), isNot(anyElement(contains('Test mode'))), reason: 'the sandbox badge was cut');
+        c.dispose();
+      });
+    });
   });
 
   testWidgets('the header title is not starved by its own spacer',

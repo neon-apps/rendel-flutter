@@ -1647,6 +1647,8 @@ void main() {
     '320@2.0': (width: 320, scale: 2.0, dir: TextDirection.ltr),
     '320@1.0-rtl': (width: 320, scale: 1.0, dir: TextDirection.rtl),
     '390@2.0': (width: 390, scale: 2.0, dir: TextDirection.ltr),
+    // An iPhone SE (375pt) at the largest accessibility text (item 8, 2026-11-01).
+    '375@3.0': (width: 375, scale: 3.0, dir: TextDirection.ltr),
   };
 
   for (final env in envs.entries) {

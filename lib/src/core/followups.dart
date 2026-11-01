@@ -14,6 +14,7 @@ class RendelFollowup {
     required this.button,
     this.channel = 'in_app',
     this.style = 'popup',
+    this.conversationId,
   });
 
   final String id;
@@ -35,12 +36,16 @@ class RendelFollowup {
 
   bool get isBanner => style == 'banner';
 
+  /// For a task notice ("Your answer is ready"), the conversation it is
+  /// about: once the thread shows it, the notice is moot. Null for the rest.
+  final String? conversationId;
+
   /// One from `GET /v1/followups/next` or `/inbox`, or null when it is not whole.
   static RendelFollowup? tryParse(Object? raw) {
     if (raw is! Map) return null;
     final id = raw['id'], title = raw['title'], body = raw['body'], button = raw['button'];
     if (id is! String || title is! String || body is! String || button is! String) return null;
-    final type = raw['type'], channel = raw['channel'], style = raw['style'];
+    final type = raw['type'], channel = raw['channel'], style = raw['style'], conversation = raw['conversation_id'];
     return RendelFollowup(
       id: id,
       type: type is String ? type : '',
@@ -49,6 +54,7 @@ class RendelFollowup {
       button: button,
       channel: channel is String ? channel : 'in_app',
       style: style == 'banner' ? 'banner' : 'popup',
+      conversationId: conversation is String && conversation.isNotEmpty ? conversation : null,
     );
   }
 }
@@ -116,6 +122,16 @@ class RendelFollowups {
       current.value = null;
     } else {
       _recompute();
+    }
+  }
+
+  /// The thread shows [conversationId]: a task notice about it ("Your answer
+  /// is ready") is moot, on the app's screen and in Rendel alike. The server
+  /// has it opened from the same moment (`/away`, or the history read).
+  void seen(String? conversationId) {
+    if (conversationId == null) return;
+    for (final card in [if (current.value case final waiting?) waiting, ..._inbox]) {
+      if (card.conversationId == conversationId) forget(card.id);
     }
   }
 

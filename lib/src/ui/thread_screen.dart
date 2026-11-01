@@ -1266,7 +1266,13 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       if (widget.followups case final followups?)
         ValueListenableBuilder<List<RendelFollowup>>(
           valueListenable: followups,
-          builder: (context, waiting, _) {
+          builder: (context, all, _) {
+            // A task notice about the conversation on screen is moot over it: not drawn, and put away.
+            final onScreen = controller.conversationId;
+            final waiting = [for (final card in all) if (onScreen == null || card.conversationId != onScreen) card];
+            if (waiting.length != all.length) {
+              WidgetsBinding.instance.addPostFrameCallback((_) => RendelFollowups.instance.seen(onScreen));
+            }
             // Positioned even when empty: a sized child would size the stack.
             if (waiting.isEmpty) {
               if (_cards.value != 0) WidgetsBinding.instance.addPostFrameCallback((_) => _cards.value = 0);
