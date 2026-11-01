@@ -5,6 +5,26 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.73.1
+
+**Added**
+
+- Human support, ready to turn on from the console: `Rendel.openSupport`,
+  `Rendel.supportUnread` and `Rendel.supportOpen`. When someone asks for a
+  person, a panel opens with your team; lines arrive live, cards your team
+  sends draw as Rendel's own, and a push brings the person back to the thread.
+- A person can send a photo or a PDF to the team.
+- The launcher goes back to an open conversation with the team, and stays for
+  it while the assistant is paused.
+
+**Fixed**
+
+- Photos picked from the library are scaled to at most 2048 px, and an
+  iPhone's HEIC reaches the server as a JPEG.
+
+`rendel_push` 0.3.0 comes with this tag: a reply on the thread on screen makes
+no banner, and Android keeps one notification per conversation.
+
 ## 0.73.0
 
 **Added**
