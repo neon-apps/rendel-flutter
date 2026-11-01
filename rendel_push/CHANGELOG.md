@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.0
+
+- A reply from the team on the thread the person is looking at makes no banner:
+  it is already on the page.
+- On Android, one notification per conversation with the team: the next reply
+  replaces the last.
+
 ## 0.2.1
 
 - An Android token carries the app's package name, so Settings › Channels can

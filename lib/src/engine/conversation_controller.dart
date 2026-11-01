@@ -191,10 +191,16 @@ class ConversationController extends ChangeNotifier {
     this.cardSources = const {},
     this.parallelReads = _always,
     this.readsAloud = _never,
+    this.supportOn = _never,
   });
 
   static bool _always() => true;
   static bool _never() => false;
+
+  /// Whether the app's config has Support on: `support` is declared only
+  /// then, so a handoff never swallows a question in an app whose page for
+  /// the team this build will not open.
+  final bool Function() supportOn;
 
   /// Whether answers may be read aloud here: declared as `read_aloud`, so the
   /// server sends each opening's voice token as it is written. A token costs
@@ -938,7 +944,10 @@ class ConversationController extends ChangeNotifier {
     // network blip on this call must not cost the user the action they just
     // authorised. The server is the one that decides whether the record was
     // required.
-    final recorded = await api.recordDecision(invocationId, confirm: true, typed: typed);
+    // With the person and their token: a write the server makes as them
+    // then runs at the tap, so it is made even if the app is put away
+    // before the continuation below goes out.
+    final recorded = await api.recordDecision(invocationId, confirm: true, typed: typed, user: user());
     if (recorded == 'typed_mismatch') {
       // Not what the card asked for: open again, with the reason under the field.
       for (final message in messages) {
@@ -1153,6 +1162,11 @@ class ConversationController extends ChangeNotifier {
   /// when [loadHistory] puts a thread on screen: that is no new turn.
   void Function(String? conversationId)? onConversation;
 
+  /// A turn handed the person to the app's team (`support.handoff`): the
+  /// question went to them as the thread's first line, and the support page
+  /// opens on the thread. Null where Support is not wired: nothing opens.
+  void Function(String threadId)? onSupportHandoff;
+
   /// Starts over: the thread empties, and the conversation is not the one a
   /// relaunch opens on any more.
   void reset() {
@@ -1218,24 +1232,48 @@ class ConversationController extends ChangeNotifier {
   /// by its server id, while the server may still have finished it.
   String? _cutAnswerId;
 
-  /// Asked when the thread opens again: an answer whose stream was cut and
-  /// that the server has since stored whole is drawn from what it stored,
-  /// the conversation loaded as history. Nothing changes otherwise.
-  Future<void> recover() async {
+  /// How often, and how many times, [recover] asks for the answer a cut
+  /// stream left: the web's every 2 seconds, 30 times. The server finishes a
+  /// turn whether or not anyone is still reading it.
+  @visibleForTesting
+  static Duration recoverEvery = const Duration(seconds: 2);
+  static const int _recoverTries = 30;
+
+  /// A [recover] already asking: one at a time.
+  bool _recovering = false;
+
+  /// Asked when the thread opens again and when the app comes back to the
+  /// front: an answer whose stream was cut is asked for until the server has
+  /// stored it whole, and is then drawn from what it stored, the
+  /// conversation loaded as history. Nothing changes otherwise. True when it
+  /// was drawn.
+  Future<bool> recover() async {
     final id = conversationId;
     final cut = _cutAnswerId;
-    if (busy || id == null || cut == null) return;
+    if (busy || id == null || cut == null || _recovering) return false;
     final generation = _generation;
-    List<Map<String, dynamic>> history;
+    bool moved() => generation != _generation || busy || _cutAnswerId != cut;
+    _recovering = true;
     try {
-      history = await api.fetchMessages(id);
-    } catch (_) {
-      return;
+      for (var i = 0; i < _recoverTries; i++) {
+        if (i > 0) await Future<void>.delayed(recoverEvery);
+        if (moved()) return false;
+        List<Map<String, dynamic>> history;
+        try {
+          history = await api.fetchMessages(id);
+        } catch (_) {
+          continue;
+        }
+        if (moved()) return false;
+        final stored = history.where((m) => m['id'] == cut).firstOrNull;
+        if (stored == null || (stored['blocks'] as List? ?? const []).isEmpty) continue;
+        loadHistory(id, history);
+        return true;
+      }
+      return false;
+    } finally {
+      _recovering = false;
     }
-    if (generation != _generation || busy || _cutAnswerId != cut) return;
-    final stored = history.where((m) => m['id'] == cut).firstOrNull;
-    if (stored == null || (stored['blocks'] as List? ?? const []).isEmpty) return;
-    loadHistory(id, history);
   }
 
   // ————————————————————————— internals —————————————————————————
@@ -1326,7 +1364,11 @@ class ConversationController extends ChangeNotifier {
         'sdk': sdkVersion,
         'catalog_version': catalogVersion,
         'components': supportedComponents,
-        'capabilities': [...clientCapabilities, if (readsAloud()) 'read_aloud'],
+        'capabilities': [
+          for (final capability in clientCapabilities)
+            if (capability != 'support' || supportOn()) capability,
+          if (readsAloud()) 'read_aloud',
+        ],
         'actions': clientActions,
         if (manifestHash != null) 'manifest_hash': manifestHash,
         // The language this turn should be answered in.
@@ -1417,6 +1459,17 @@ class ConversationController extends ChangeNotifier {
             visible = lang != null && lang != answerLanguage;
             if (lang != null) answerLanguage = lang;
             _openAssistant?.lang = lang;
+          case SupportHandoff(:final threadId):
+            // The team answers on the support page: no answer here, and the
+            // question went with the handoff as the thread's first line.
+            final open = _openAssistant;
+            if (open != null) {
+              messages.remove(open);
+              _detail?.answers.remove(open);
+            }
+            final question = messages.lastIndexWhere((m) => m.role == 'user');
+            if (question >= 0) messages.removeAt(question);
+            onSupportHandoff?.call(threadId);
           case TurnStatus(:final step):
             if (step == 'action' || step == 'composing') {
               turnStatus = step;
@@ -1752,6 +1805,19 @@ class ConversationController extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  /// A confirmation card is open for the person and still in its time: the
+  /// launcher's dot says so while the sheet is closed.
+  bool get cardWaiting {
+    for (final message in messages) {
+      for (final block in message.blocks) {
+        if (block.type != 'confirm_card' || block.props[RendelLocalKeys.resolved] != null) continue;
+        final id = block.props['invocation_id'];
+        if (id is! String || !_isExpired(id)) return true;
+      }
+    }
+    return false;
   }
 
   bool _hasOpenConfirmCard() {

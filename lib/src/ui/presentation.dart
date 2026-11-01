@@ -65,6 +65,10 @@ class RendelPresentation extends ChangeNotifier {
   final BuildContext _origin;
   final NavigatorState _navigator;
 
+  /// Where the thread was opened from: a page opened over the thread (the
+  /// support page) is shown from here, so it lands above the sheet.
+  BuildContext get origin => _origin;
+
   /// The root overlay, so a screen the app pushes on a navigator of its own
   /// does not cover the bubble.
   final OverlayState _overlay;
@@ -209,8 +213,9 @@ class RendelPresentation extends ChangeNotifier {
     return openRoute(action);
   }
 
-  /// The app is paused (credit spent, budget reached): an open sheet closes,
-  /// with nothing said; conversations cannot start until it is back.
+  /// The app is paused (the organization's messages are used up, or its
+  /// budget paused new conversations): an open sheet closes, with nothing
+  /// said; conversations cannot start until it is back.
   void dismiss() {
     final sheet = _sheet;
     if (_phase == _Phase.sheet && sheet != null && sheet.mounted) Navigator.of(sheet).maybePop();

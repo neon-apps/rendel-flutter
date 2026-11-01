@@ -95,7 +95,7 @@ enum RendelLauncherStyle {
   }
 }
 
-/// Which of the copilot's two themes is drawn.
+/// Which of the assistant's two themes is drawn.
 ///
 /// The SDK's own enum rather than Flutter's `ThemeMode`, because this file is
 /// read without a widget in sight and the three answers are the same three.
@@ -112,7 +112,7 @@ enum RendelThemeMode {
   dark,
 }
 
-/// Everything about a copilot that is the host's choice rather than the
+/// Everything about Rendel that is the host's choice rather than the
 /// protocol's: where it points, what it is called, and how long it waits.
 ///
 /// Several of these fields are also publishable from the console, where they
@@ -163,12 +163,12 @@ class RendelConfig {
 
   final String apiBaseUrl;
 
-  /// Whether the copilot is drawn in its light theme, its dark one, or
+  /// Whether the assistant is drawn in its light theme, its dark one, or
   /// whichever the device is set to — the default, followed live, so the
   /// thread changes with the phone as the rest of a dark-aware app does.
   ///
   /// Set it to what your own app does. An app that is always light should
-  /// say [RendelThemeMode.light], or a phone in dark mode opens a dark copilot
+  /// say [RendelThemeMode.light], or a phone in dark mode opens a dark assistant
   /// over a light app. An app with an appearance switch of its own passes the
   /// choice it launches with here and calls `Rendel.setThemeMode` when the
   /// user changes it.
@@ -177,7 +177,7 @@ class RendelConfig {
   /// whatever the console publishes for each layered over them.
   final RendelThemeMode themeMode;
 
-  /// The family the copilot is set in, where your app's font is fetched at
+  /// The family the assistant is set in, where your app's font is fetched at
   /// runtime rather than bundled.
   ///
   /// A font declared under `fonts:` in your pubspec has the name it is
@@ -203,7 +203,7 @@ class RendelConfig {
   final String? displayFontFamily;
 
   /// The signed-in person's token, from your own sign-in — what lets the
-  /// copilot reach your API as them, with no API key.
+  /// the assistant reach your API as them, with no API key.
   ///
   /// Asked for before every question, so return the current one: your auth
   /// library already refreshes it (`await auth.currentUser?.getIdToken()`,
@@ -236,18 +236,18 @@ class RendelConfig {
   /// Everything interesting used to go to `debugPrint` and stop there: a
   /// handler that threw, a context provider that missed its budget, a manifest
   /// the server rejected, a transport failure and its code. None of it reached
-  /// the host's own logging, so the answer to "why did the copilot do that in
+  /// the host's own logging, so the answer to "why did the assistant do that in
   /// production" lived on a device nobody had. Point this at your crash
   /// reporter and the SDK stops being a black box.
   final void Function(RendelLogRecord record)? onLog;
 
-  /// The language the copilot answers in, as a BCP-47 tag: `'tr'`,
+  /// The language the assistant answers in, as a BCP-47 tag: `'tr'`,
   /// `'pt-BR'`, `'de-DE'`.
   ///
   /// Null means the device's own locale, which is right for most apps and
   /// wrong for the ones that matter here: an app with its own language picker
   /// knows what its user chose, and a phone set to English showing a Turkish
-  /// app should not make the copilot the one English thing on the screen. Pass
+  /// app should not make the assistant the one English thing on the screen. Pass
   /// what your app is rendering in.
   ///
   /// It is a default, not a rule. The server tells the model to answer in this
@@ -259,7 +259,7 @@ class RendelConfig {
   /// is what this field has always fed; answering in it is new.
   final String? locale;
 
-  /// The languages this app is willing to have the copilot answer in, in
+  /// The languages this app is willing to have the assistant answer in, in
   /// preference order.
   ///
   /// Different from [locale], which is one setting: this is what the app
@@ -277,11 +277,11 @@ class RendelConfig {
   /// the **first** in the list, so the order is a decision.
   ///
   /// Empty hands the decision to the list published from the console, and
-  /// absent that the copilot answers in whatever it is addressed in — which is
+  /// absent that the assistant answers in whatever it is addressed in — which is
   /// what it has always done.
   final List<String> languages;
 
-  /// What the copilot is called in the thread header. Set it to whatever your
+  /// What the assistant is called in the thread header. Set it to whatever your
   /// users already call the feature.
   final String assistantName;
 
@@ -296,7 +296,7 @@ class RendelConfig {
   /// The headline on an empty thread, in your own words.
   ///
   /// Null leaves the SDK's own, which is translated into the language the
-  /// copilot answers in. Yours is not: it is one sentence, so an app serving
+  /// the assistant answers in. Yours is not: it is one sentence, so an app serving
   /// several languages is usually better off leaving this alone or setting it
   /// through [strings].
   final String? emptyStateTitle;
@@ -312,7 +312,7 @@ class RendelConfig {
   final Future<void> Function(String url)? onOpenUrl;
 
   /// How far above the bottom edge, in logical pixels, the bubble sits while
-  /// a screen the copilot opened is showing (`design/NAVIGATE.md`): clear of
+  /// a screen the assistant opened is showing (`design/NAVIGATE.md`): clear of
   /// your own bottom bar. Never less than the safe area and a margin.
   final double bubbleOffset;
 
@@ -355,7 +355,7 @@ class RendelConfig {
   /// on the device, listening in [locale] — or the phone's language when
   /// that is null — when the device carries a model for it. [languages] does
   /// not narrow it: a phone set to Russian is listened to in Russian, and the
-  /// copilot answers in the language of what it heard. The microphone opens voice mode:
+  /// the assistant answers in the language of what it heard. The microphone opens voice mode:
   /// what it hears is written over the conversation as it is heard, and sent
   /// on its own when the speaker stops.
   ///
@@ -435,15 +435,15 @@ class RendelConfig {
   /// switched on from the console rather than here.
   final bool feedback;
 
-  /// Answers read aloud in a natural voice: a question asked out loud has its
-  /// answer's opening read by itself (the header's speaker mutes that), and
-  /// every answer has a speaker of its own that reads it on a tap. On unless
-  /// false; the app's console (Settings › Voice) can turn it off too, and
-  /// either off wins.
+  /// Answers read aloud in a natural voice: every answer's opening is read by
+  /// itself as it is written, however the question was asked (the header's
+  /// Voice replies switch turns that off on the phone). Voice is off until the
+  /// app's owner turns it on in the console (Assistant › Voice); false here
+  /// keeps it off whatever the console says, as either off wins.
   final bool readAloud;
 
   /// The kill switch, in code. The console can flip the published one, which
-  /// is how a customer pulls the copilot out of a shipped binary without an
+  /// is how a customer pulls Rendel out of a shipped binary without an
   /// App Store review. Setting it false here disables it regardless.
   ///
   /// It is not a security control. The API enforces suspension server-side;
@@ -451,7 +451,7 @@ class RendelConfig {
   final bool enabled;
 
   /// Whether to fetch the published appearance and opening surface at init.
-  /// False pins the copilot to exactly what this object says, which is the
+  /// False pins the assistant to exactly what this object says, which is the
   /// right choice for a host that wants its build reproducible.
   final bool remoteConfig;
 
@@ -470,7 +470,7 @@ class RendelConfig {
   /// changes one of them without giving up the rest.
   final RendelStrings? strings;
 
-  /// Where the published config is cached between launches, so the copilot
+  /// Where the published config is cached between launches, so the assistant
   /// paints in the app's colours before the network answers.
   ///
   /// Null — the default — keeps it in the app's preferences, through
@@ -485,7 +485,7 @@ class RendelConfig {
   /// that does not reset when the user swipes the app away, and memory that
   /// finds its way back to the person. Supply one to use your own storage.
   /// It is an anonymous per-install identifier, carries no personal data, and
-  /// the SDK never sends it anywhere but the copilot API; ordinary app
+  /// the SDK never sends it anywhere but the Rendel API; ordinary app
   /// storage, not the keychain, is the right place for it. Under
   /// `flutter test` the default is memory, so a widget test that calls `init`
   /// needs no plugin mocked.
@@ -538,7 +538,7 @@ class RendelConfig {
       feedback: feedback ?? this.feedback,
       // Off in code or off in the console: either is the floor, as for [enabled].
       readAloud: readAloud == null ? this.readAloud : (this.readAloud && readAloud),
-      // A host that turned the copilot off in code stays off whatever the
+      // A host that turned the assistant off in code stays off whatever the
       // console publishes: the local switch is the floor, not a default.
       enabled: enabled == null ? this.enabled : (this.enabled && enabled),
       remoteConfig: remoteConfig,
@@ -558,7 +558,7 @@ class RendelConfig {
 /// menu, and the three tools in the open message box.
 enum RendelAttachSource { photos, camera, files }
 
-/// A file the host's own picker produced, on its way to the copilot.
+/// A file the host's own picker produced, on its way to the assistant.
 ///
 /// Three things and no more: the SDK uploads the bytes, shows the name in the
 /// composer while the message is being written, and tells the server what the

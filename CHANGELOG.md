@@ -5,6 +5,38 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.73.0
+
+**Added**
+
+- A confirmation's yes carries the signed-in person and their token, so a
+  write the server makes as them runs at the tap and is done even if the app
+  is closed right after. The conversation says so when they come back.
+- Rendel tells the server when the person leaves the conversation (the sheet
+  closes, or the app goes to the background with it open) and comes back, so
+  "Your answer is ready" reaches someone who closed the sheet, and comes
+  sooner once they are gone.
+- A dot on `RendelLauncher` while the sheet is closed and an answer finished
+  unseen, or a confirmation card waits for the person, said to screen
+  readers. `Rendel.waiting` (`RendelWaiting.none`, `answer`, `approval`)
+  lets a button of your own show the same.
+- `RendelStrings.chooseOption`, `readMore`, `answerWaiting` and
+  `approvalWaiting`, in the six languages.
+- Includes the code for support with your team; it stays off until the console turns it on.
+
+**Fixed**
+
+- An answer whose stream was cut is asked for every 2 seconds, up to a
+  minute, and again when the app comes back to the front, instead of once
+  when the sheet opens.
+- A list field's placeholder and an article card's button without a label
+  were English in every language.
+- A filled button turning disabled (a form sending, say), or a chosen chip
+  let go, no longer throws "A borderRadius can only be given on borders with
+  uniform colors" in debug on every frame of the 180 ms change, which left the
+  control blank meanwhile. Release builds never asserted, and the lit fill
+  looks exactly as before.
+
 ## 0.72.2
 
 **Fixed**
@@ -37,6 +69,9 @@ asks of you.
   follow-ups, as `reset` does.
 
 ## 0.71.0
+
+Not published as a tag; use 0.72.0, which includes it.
+
 
 **Added**
 

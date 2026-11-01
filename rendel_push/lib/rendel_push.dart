@@ -150,6 +150,10 @@ class RendelPush {
   static void _listen() {
     if (_listening) return;
     _listening = true;
+    // A reply on the thread the person is watching shows on the page, not as a banner.
+    Rendel.supportOnScreen.addListener(() {
+      unawaited(_channel.invokeMethod<void>('supportOnScreen', {'thread': Rendel.supportOnScreen.value}));
+    });
     _channel.setMethodCallHandler((call) async {
       switch (call.method) {
         case 'tap':

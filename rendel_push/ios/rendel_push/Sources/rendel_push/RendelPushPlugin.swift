@@ -49,6 +49,9 @@ public class RendelPushPlugin: NSObject, FlutterPlugin, UNUserNotificationCenter
     }
   }
 
+  /// The thread with the team on screen, as `Rendel.supportOnScreen` says.
+  private var supportOnScreen: String?
+
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
     case "permission":
@@ -61,6 +64,9 @@ public class RendelPushPlugin: NSObject, FlutterPlugin, UNUserNotificationCenter
       let tap = launchTap
       launchTap = nil
       result(tap.flatMap { first($0) ? $0 : nil })
+    case "supportOnScreen":
+      supportOnScreen = (call.arguments as? [String: Any])?["thread"] as? String
+      result(nil)
     case "hasFirebase":
       result(false)
     case "package":
@@ -251,6 +257,11 @@ public class RendelPushPlugin: NSObject, FlutterPlugin, UNUserNotificationCenter
       } else {
         completionHandler([])
       }
+      return
+    }
+    // The team's reply on the thread the person is watching is already on the page.
+    if let thread = notification.request.content.userInfo["rendel_support"] as? String, thread == supportOnScreen {
+      completionHandler([])
       return
     }
     // Rendel's push shows while the app is open too: it is news the person asked for.

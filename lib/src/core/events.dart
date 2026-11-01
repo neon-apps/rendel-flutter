@@ -49,3 +49,16 @@ final class RendelChange {
   @override
   String toString() => 'RendelChange($action${undone ? ', undone' : ''})';
 }
+
+/// What waits for the person while Rendel's sheet is closed: what the dot on
+/// the launcher says (`Rendel.waiting`).
+enum RendelWaiting {
+  /// Nothing.
+  none,
+
+  /// An answer finished while the sheet was closed and has not been seen.
+  answer,
+
+  /// A confirmation card waits for the person to approve or decline it.
+  approval,
+}

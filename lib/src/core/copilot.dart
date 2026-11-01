@@ -10,6 +10,7 @@ import '../engine/conversation_controller.dart';
 import '../protocol/protocol.dart';
 import '../transport/api_client.dart';
 import '../ui/memory_sheet.dart';
+import '../ui/support_sheet.dart';
 import '../ui/presentation.dart';
 import '../ui/theme.dart';
 import '../ui/thread_screen.dart';
@@ -31,6 +32,7 @@ import 'screens.dart';
 import 'taps.dart';
 import 'templates.dart' show rendelCardTemplates;
 import 'strings.dart';
+import 'support.dart';
 import 'remote_config.dart';
 
 /// The SDK facade. One init per app run:
@@ -153,6 +155,112 @@ class Rendel {
   /// on screen (Tuna, 2026-10-13): [RendelLauncher] hides itself, and an app
   /// with its own button should hide it too, listening here.
   static final ValueNotifier<bool> minimised = ValueNotifier<bool>(false);
+
+  /// The team's lines this person has not read yet (human support), for a
+  /// badge on your own "Contact us"; [RendelLauncher] shows it on itself.
+  /// Read on init, on a push and when the support page closes, never polled.
+  static final ValueNotifier<int> supportUnread = ValueNotifier<int>(0);
+
+  /// What waits for the person while the sheet is closed, for the dot on
+  /// [RendelLauncher]: an answer that finished with the sheet closed and has
+  /// not been seen, or a confirmation card waiting for them. None while the
+  /// sheet is up; opening it sees the answer.
+  static final ValueNotifier<RendelWaiting> waiting = ValueNotifier<RendelWaiting>(RendelWaiting.none);
+
+  /// An answer finished while the sheet was closed and has not been seen.
+  static bool _answerUnseen = false;
+
+  /// Whether the conversation was busy when the controller last moved.
+  static bool _wasBusy = false;
+
+  static void _controllerMoved() {
+    final c = _controller;
+    if (c == null) return;
+    // An answer, not a thread cleared under a turn (a sign-out) nor a failure.
+    final answered = c.messages.isNotEmpty && c.messages.last.role == 'assistant';
+    if (_wasBusy && !c.busy && _presenting == 0 && c.errorText == null && answered) _answerUnseen = true;
+    _wasBusy = c.busy;
+    _sayWaiting();
+  }
+
+  static void _sayWaiting() {
+    final c = _controller;
+    waiting.value = c == null || _presenting > 0
+        ? RendelWaiting.none
+        : c.cardWaiting
+            ? RendelWaiting.approval
+            : _answerUnseen
+                ? RendelWaiting.answer
+                : RendelWaiting.none;
+  }
+
+  /// The conversation the server was last told the person left, and whether
+  /// that still holds.
+  static ({String id, bool away})? _awaySaid;
+
+  /// Tells the server the person left the conversation (the sheet closed,
+  /// the app put away) or came back to it, so an answer that finishes
+  /// meanwhile is known to be unseen (`/v1/conversations/:id/away`). Back is
+  /// said only after an away for the same conversation.
+  static void _sayAway(bool away) {
+    final api = _api;
+    final id = _controller?.conversationId;
+    if (api == null || id == null) return;
+    final last = _awaySaid?.id == id ? _awaySaid!.away : false;
+    if (last == away) return;
+    _awaySaid = (id: id, away: away);
+    unawaited(api.away(id, away: away));
+  }
+
+  /// The app put away and brought back, while a thread exists.
+  static AppLifecycleListener? _presence;
+
+  static void _resumed() {
+    if (_presenting > 0) _sayAway(false);
+    // An answer whose stream was cut while the app was away may be whole on the server now.
+    final c = _controller;
+    if (c == null) return;
+    unawaited(c.recover().then((drawn) {
+      if (drawn && _presenting == 0 && identical(c, _controller)) {
+        _answerUnseen = true;
+        _sayWaiting();
+      }
+    }));
+  }
+
+  /// Whether this person has an open conversation with the team.
+  static bool get supportOpen => _support?.open ?? false;
+
+  /// The thread with the team on screen right now, or null. `rendel_push`
+  /// reads it so a reply the person is already watching makes no banner.
+  static final ValueNotifier<String?> supportOnScreen = ValueNotifier<String?>(null);
+
+  /// Whether the app has Support on in its console: people can reach its
+  /// team from inside the app, with [openSupport] or by asking for someone.
+  static bool get supportOn => _supportTeam != null;
+
+  /// The team's name while Support is on, from the app's config.
+  static String? _supportTeam;
+
+  /// This person's thread with the team, made with the client.
+  static RendelSupport? _support;
+
+  static RendelSupport _supportOf(RendelApiClient api) {
+    final made = _support;
+    if (made != null) return made;
+    final support = RendelSupport(api, user: () => _user, locale: () => resolveLocale(_config.locale));
+    var open = false;
+    support.value.addListener(() {
+      supportUnread.value = support.value.value.unread;
+      // The launcher shows for an open conversation even with the assistant paused.
+      if (support.open != open) {
+        open = support.open;
+        configRevision.value++;
+      }
+    });
+    support.onScreen.addListener(() => supportOnScreen.value = support.onScreen.value);
+    return _support = support;
+  }
   static RendelConfigStore _store = RendelMemoryConfigStore();
   static String? _configEtag;
 
@@ -541,6 +649,12 @@ class Rendel {
     // one a device a day.
     unawaited(api.sendEvent({'type': 'assistant_open'}));
     final controller = _ensureController(api);
+    _presence ??= AppLifecycleListener(
+      onHide: () {
+        if (_presenting > 0) _sayAway(true);
+      },
+      onResume: _resumed,
+    );
     // The last conversation, if this person had one within the hour and the
     // app has been relaunched since.
     unawaited(_restoreConversation(api, controller));
@@ -621,6 +735,10 @@ class Rendel {
     void syncMinimised() => minimised.value = presentation.minimised;
     presentation.addListener(syncMinimised);
     _presenting++;
+    // Seen, and back in it.
+    _answerUnseen = false;
+    _sayWaiting();
+    _sayAway(false);
     try {
       // Until it is closed, not until it shrinks into the bubble: the thread
       // is still mounted then, in the overlay.
@@ -633,6 +751,10 @@ class Rendel {
       // In the finally, so a sheet that throws on present does not leak an
       // `opened` with no `closed` into whatever the host wired this stream to.
       _events.add(RendelEvent.closed);
+      if (_presenting == 0) {
+        _sayAway(true);
+        _sayWaiting();
+      }
     }
   }
 
@@ -657,9 +779,12 @@ class Rendel {
         user: () => _user,
         parallelReads: () => _parallelReads,
         readsAloud: () => _config.readAloud,
+        supportOn: () => supportOn,
       )
+        ..addListener(_controllerMoved)
         ..manifestHash = _currentManifestHash()
-        ..onConversation = _rememberConversation;
+        ..onConversation = _rememberConversation
+        ..onSupportHandoff = _onSupportHandoff;
 
   /// The thread on screen, in its sheet or in the bubble. Null when the
   /// copilot is closed.
@@ -695,6 +820,53 @@ class Rendel {
       theme: themeOf(context),
       strings: strings,
     );
+  }
+
+  /// Opens the page where the person writes to your team (human support),
+  /// for your app's own "Contact us": the thread they have, or a new one.
+  /// Works while the assistant is paused too. False, with nothing shown,
+  /// when Support is off for this app or the team could not be reached.
+  static Future<bool> openSupport(BuildContext context) async {
+    final api = await _whenClient();
+    final team = _supportTeam;
+    if (api == null || team == null) {
+      RendelLog.warn('support_off', 'openSupport() was called but Support is off for this app');
+      return false;
+    }
+    final support = _supportOf(api);
+    if (!await support.load()) {
+      final done = await support.handoff('open_support');
+      if (done != 'ok') {
+        RendelLog.warn('support_handoff_failed', 'the team could not be reached ($done)');
+        return false;
+      }
+    }
+    if (!context.mounted) return false;
+    final controller = _ensureController(api);
+    await showRendelSupport(
+      context,
+      support: support,
+      team: team,
+      onAction: controller.tapAction,
+      canHandle: controller.handles,
+      routeTitle: (route) => controller.routes[route]?.title,
+      onPick: switch (_config.onPickAttachment) {
+        final pick? => (_) => pick(),
+        null => pickFrom,
+      },
+      onUpload: (file) => api.upload(file.bytes, file.mediaType, fileName: file.name),
+      theme: themeOf(context),
+      strings: strings,
+    );
+    unawaited(support.refreshUnread());
+    return true;
+  }
+
+  /// A turn handed the person to the team: the support page opens over the thread.
+  static void _onSupportHandoff(String threadId) {
+    final presentation = _presentation;
+    if (presentation == null) return;
+    unawaited(openSupport(presentation.origin));
   }
 
   /// Call on logout: clears the thread and the user. The next turn from this
@@ -769,6 +941,13 @@ class Rendel {
   /// [context] is one below the app's navigator, a screen's, as for [open];
   /// `rendel_push` wires all of this for you.
   static Future<bool> handlePush(BuildContext context, Map<String, dynamic> data) async {
+    // The team wrote back: their page opens on the thread.
+    final thread = data['rendel_support'];
+    if (data['rendel'] == '1' && thread is String && thread.isNotEmpty) {
+      await _whenClient();
+      if (!context.mounted) return false;
+      return openSupport(context);
+    }
     final id = data['rendel_followup'];
     if (data['rendel'] != '1' || id is! String || id.isEmpty) return false;
     // A cold start from a push can tap before init has its client.
@@ -1033,6 +1212,13 @@ class Rendel {
   static void _endSession({required bool forget}) {
     _user = null;
     _identity = null;
+    // The thread with the team was this person's.
+    _support?.reset();
+    supportUnread.value = 0;
+    // And what waited for them.
+    _answerUnseen = false;
+    _awaySaid = null;
+    waiting.value = RendelWaiting.none;
     if (forget) {
       unawaited(_storeUser(''));
       // A follow-up was for whoever was signed in, on the app's screen and inside Rendel.
@@ -1077,6 +1263,9 @@ class Rendel {
     _presenting = 0;
     _presentation = null;
     minimised.value = false;
+    _wasBusy = false;
+    _presence?.dispose();
+    _presence = null;
     RendelPlatform.resetForTest();
     _api = null;
     _signOutUnsent = false;
@@ -1089,6 +1278,9 @@ class Rendel {
     _manifestEdits = 0;
     _manifestSyncing = null;
     _configEtag = null;
+    // Support is off until a config says otherwise, and the thread was made with the last client.
+    _supportTeam = null;
+    _support = null;
     _store = RendelMemoryConfigStore();
     _theme = RendelTheme.paper();
     _codeTheme = _theme;
@@ -1239,6 +1431,13 @@ class Rendel {
     // switched to one read at a time.
     _parallelReads = remote.parallelReads;
     RendelAnalytics.instance.capture = remote.capture;
+    // The launcher's count is read with the config: at launch and when the app comes back.
+    _supportTeam = remote.supportTeam;
+    if (_supportTeam != null) {
+      if (_api case final api?) unawaited(_supportOf(api).refreshUnread());
+    } else {
+      supportUnread.value = 0;
+    }
     if (remote.isEmpty) return;
     // Compared by PAYLOAD, not by object identity. `copyWith` always
     // allocates, so an identity check never held and the launcher rebuilt on

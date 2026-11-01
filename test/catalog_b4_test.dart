@@ -282,6 +282,23 @@ void main() {
       expect(api.sent, isEmpty, reason: 'no turn');
     });
 
+    testWidgets('the chat channel sends its reply, which hands the person to the team', (tester) async {
+      final api = _Api();
+      await pump(tester, [
+        _wire('contact', {
+          'title': 'Reach us',
+          'channels': [
+            {'kind': 'chat', 'label': 'Write to the team here', 'value': "I'd like to talk to a person"},
+          ],
+        }),
+      ], api);
+      await tester.tap(find.bySemanticsLabel('Write to the team here'));
+      await tester.pump();
+      expect(launcher.launched, isEmpty);
+      expect(api.sent.single['message'], containsPair('text', "I'd like to talk to a person"));
+      await api.answer(tester, const []);
+    });
+
     testWidgets('a link this build cannot open is drawn, as no button', (tester) async {
       final c = ConversationController(api: _Api(), actions: const {}, sdkVersion: 'flutter/test');
       addTearDown(c.dispose);
@@ -668,11 +685,11 @@ void main() {
         wireBlockErrors(_wire('contact', {
           'title': 'x',
           'channels': [
-            {'kind': 'chat', 'label': 'Chat', 'value': 'now'},
+            {'kind': 'fax', 'label': 'Fax', 'value': 'now'},
           ],
         })),
         isNotEmpty,
-        reason: 'no live chat',
+        reason: 'a kind the catalog does not have',
       );
       expect(
         wireBlockErrors(_wire('checklist', {

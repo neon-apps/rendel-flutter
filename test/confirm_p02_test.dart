@@ -16,7 +16,7 @@ class _Api extends RendelApiClient {
 
   final decisions = <List<Object?>>[];
   @override
-  Future<String?> recordDecision(String invocationId, {required bool confirm, String? typed}) async {
+  Future<String?> recordDecision(String invocationId, {required bool confirm, String? typed, Map<String, String>? user}) async {
     decisions.add([invocationId, confirm, typed]);
     return 'typed_mismatch';
   }

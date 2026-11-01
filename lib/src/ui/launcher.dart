@@ -240,21 +240,101 @@ class _RendelLauncherState extends State<RendelLauncher> {
         context.dependOnInheritedWidgetOfExactType<RendelThemeScope>()?.theme ??
             Rendel.themeOf(context);
     // Nothing at all when the copilot is off: an affordance that opens a sheet
-    // the SDK will refuse to present is worse than no affordance.
-    if (!Rendel.isInitialized || !Rendel.isEnabled) {
+    // the SDK will refuse to present is worse than no affordance. A conversation
+    // with the team stays reachable with the assistant paused (K7).
+    if (!Rendel.isInitialized || !(Rendel.isEnabled || Rendel.supportOpen)) {
       return const SizedBox.shrink();
     }
-    return _button(theme, widget.label ?? Rendel.config.launcherLabel, () => Rendel.open(context));
+    return _button(theme, widget.label ?? Rendel.config.launcherLabel, () => _tap(context));
   }
 }
 
-/// The launcher as drawn, wherever it is: in its slot, or over the app.
+/// A tap on the launcher: the thread, or the team's page while a conversation with them is open.
+void _tap(BuildContext context) {
+  if (Rendel.supportUnread.value > 0 || Rendel.supportOpen) {
+    unawaited(Rendel.openSupport(context));
+  } else {
+    unawaited(Rendel.open(context));
+  }
+}
+
+/// The launcher as drawn, wherever it is: in its slot, or over the app, with
+/// the count of the team's unread lines on its corner (human support), or a
+/// dot while an answer finished unseen or a card waits ([Rendel.waiting]).
 Widget _button(RendelTheme theme, String word, VoidCallback onTap) {
+  return ValueListenableBuilder<RendelWaiting>(
+    valueListenable: Rendel.waiting,
+    builder: (context, waiting, _) => ValueListenableBuilder<int>(
+      valueListenable: Rendel.supportUnread,
+      builder: (context, unread, _) => _marked(theme, word, onTap, unread: unread, waiting: waiting),
+    ),
+  );
+}
+
+Widget _marked(RendelTheme theme, String word, VoidCallback onTap, {required int unread, required RendelWaiting waiting}) {
+  final drawn = _plainButton(theme, word, onTap, unread: unread, waiting: waiting);
+  if (unread <= 0 && waiting == RendelWaiting.none) return drawn;
+  return Stack(
+    clipBehavior: Clip.none,
+    children: [
+      drawn,
+      // The team's count says more than the dot, and stands in its place.
+      if (unread > 0)
+        PositionedDirectional(
+          top: -4,
+          end: -4,
+          child: ExcludeSemantics(
+            child: Container(
+              constraints: const BoxConstraints(minWidth: 18),
+              height: 18,
+              padding: const EdgeInsets.symmetric(horizontal: 5),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: theme.danger,
+                borderRadius: BorderRadius.circular(9),
+                border: Border.all(color: theme.colors.surface, width: 1.5),
+              ),
+              child: Text(
+                unread > 9 ? '9+' : '$unread',
+                style: theme.text.caption.copyWith(color: theme.onDanger, fontSize: 11, height: 1),
+              ),
+            ),
+          ),
+        )
+      else
+        PositionedDirectional(
+          top: 0,
+          end: 0,
+          child: ExcludeSemantics(
+            child: Container(
+              key: const ValueKey('rendel-launcher-dot'),
+              width: 12,
+              height: 12,
+              decoration: BoxDecoration(
+                color: theme.danger,
+                shape: BoxShape.circle,
+                border: Border.all(color: theme.colors.surface, width: 2),
+              ),
+            ),
+          ),
+        ),
+    ],
+  );
+}
+
+Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {required int unread, RendelWaiting waiting = RendelWaiting.none}) {
   final iconOnly = Rendel.config.launcherStyle == RendelLauncherStyle.icon;
   final icon = _LauncherIcon(color: theme.colors.onAccent);
+  final said = iconOnly ? word : Rendel.strings.openCopilot;
   return RendelPressable(
     // The icon alone says nothing to a screen reader, so the word does.
-    semanticLabel: iconOnly ? word : Rendel.strings.openCopilot,
+    semanticLabel: unread > 0
+        ? '$said. ${Rendel.strings.supportUnreadOf(unread)}'
+        : switch (waiting) {
+            RendelWaiting.answer => '$said. ${Rendel.strings.answerWaiting}',
+            RendelWaiting.approval => '$said. ${Rendel.strings.approvalWaiting}',
+            RendelWaiting.none => said,
+          },
     onTap: onTap,
     child: Container(
       // Round, as tall as the button with its word: the same 12 above and
@@ -637,7 +717,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
     final hidden = !_read ||
         host == null ||
         !Rendel.isInitialized ||
-        !Rendel.isEnabled ||
+        !(Rendel.isEnabled || Rendel.supportOpen) ||
         Rendel.isOpen ||
         Rendel.minimised.value;
     if (hidden) return const SizedBox.shrink();
@@ -676,7 +756,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
           child: KeyedSubtree(
             key: _key,
             child: _button(theme, host.widget.label ?? Rendel.config.launcherLabel, () {
-              if (!_moved) unawaited(Rendel.open(host.context));
+              if (!_moved) _tap(host.context);
             }),
           ),
         ),

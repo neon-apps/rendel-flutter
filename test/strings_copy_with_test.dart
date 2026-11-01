@@ -187,6 +187,33 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'memoryUntil': (s) => s.memoryUntil,
   'memoryFooter': (s) => s.memoryFooter,
   'memoryOff': (s) => s.memoryOff,
+  'supportTeam': (s) => s.supportTeam,
+  'supportHere': (s) => s.supportHere,
+  'supportAway': (s) => s.supportAway,
+  'supportBack': (s) => s.supportBack,
+  'supportMistake': (s) => s.supportMistake,
+  'supportSorted': (s) => s.supportSorted,
+  'supportYou': (s) => s.supportYou,
+  'supportWriteTo': (s) => s.supportWriteTo,
+  'supportWriteTeam': (s) => s.supportWriteTeam,
+  'supportTyping': (s) => s.supportTyping,
+  'supportUnsent': (s) => s.supportUnsent,
+  'supportContactAsk': (s) => s.supportContactAsk,
+  'supportContactOptional': (s) => s.supportContactOptional,
+  'supportContactWhy': (s) => s.supportContactWhy,
+  'supportContactPlaceholder': (s) => s.supportContactPlaceholder,
+  'supportContactSend': (s) => s.supportContactSend,
+  'supportContactSaved': (s) => s.supportContactSaved,
+  'supportCodeLabel': (s) => s.supportCodeLabel,
+  'supportCodeWrong': (s) => s.supportCodeWrong,
+  'supportNewLine': (s) => s.supportNewLine,
+  'supportClosed': (s) => s.supportClosed,
+  'supportUnread': (s) => s.supportUnread,
+  'supportOpen': (s) => s.supportOpen,
+  'readMore': (s) => s.readMore,
+  'chooseOption': (s) => s.chooseOption,
+  'answerWaiting': (s) => s.answerWaiting,
+  'approvalWaiting': (s) => s.approvalWaiting,
 };
 
 const _source = 'lib/src/core/strings.dart';
@@ -224,6 +251,22 @@ void main() {
       _languages().keys,
       containsAll(['en', 'tr', 'de', 'fr', 'es', 'ar']),
     );
+  });
+
+  // No English in a Turkish thread: a field the Turkish table leaves out
+  // reads as its English default, as does one copied across. A value of
+  // placeholders only ('{label}') reads the same in both and is not English.
+  test('Turkish has every field, none of it left in English', () {
+    const english = RendelStrings();
+    final turkish = RendelStrings.forLocale('tr');
+    String said(Object value) => value is List ? value.join(' ') : '$value';
+    final left = [
+      for (final MapEntry(key: name, value: read) in _fields.entries)
+        if (said(read(english)).replaceAll(RegExp(r'\{\w+\}'), '').trim().isNotEmpty &&
+            said(read(turkish)) == said(read(english)))
+          name,
+    ];
+    expect(left, isEmpty);
   });
 
   test('copyWith() keeps every field of every language', () {

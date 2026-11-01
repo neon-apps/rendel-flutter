@@ -326,12 +326,25 @@ class RendelApiClient {
   /// be made at all. Null is not the same as a refusal: a customer who has not
   /// turned server-mediated confirmation on is served exactly as before, so a
   /// network blip here must not cost the user their tap.
-  Future<String?> recordDecision(String invocationId, {required bool confirm, String? typed}) async {
+  ///
+  /// A yes carries the signed-in person ([user]) and their token, as a turn
+  /// does, in headers only: a write the server makes as them then runs at
+  /// the tap (`succeeded` or `failed`), and is made even if the app is put
+  /// away before the turn is continued.
+  Future<String?> recordDecision(
+    String invocationId, {
+    required bool confirm,
+    String? typed,
+    Map<String, String>? user,
+  }) async {
     try {
+      final token = confirm ? await _userToken() : null;
       final response = await _http
           .post(
             Uri.parse('${config.apiBaseUrl}/v1/invocations/$invocationId/confirm'),
-            headers: _headers,
+            headers: confirm
+                ? {..._personHeaders(user), if (token != null) 'X-Rendel-User-Token': token}
+                : _headers,
             body: jsonEncode({
               'decision': confirm ? 'confirm' : 'decline',
               if (confirm && typed != null) 'typed': typed,
@@ -577,6 +590,83 @@ class RendelApiClient {
     }
   }
 
+  /// Human support (design/plans/human-support.md §9): `/v1/support/[path]`,
+  /// about the person [user] names or this install. The status and the JSON
+  /// body (null for 204 or a body that is not JSON); status 0 when the
+  /// request could not be made.
+  ///
+  /// [asPerson] sends the person's token too, for a call that runs a write as
+  /// them (a confirm card the team sent, continued).
+  Future<({int status, Map<String, dynamic>? json})> support(
+    String method,
+    String path, {
+    Map<String, String>? user,
+    Map<String, dynamic>? body,
+    bool asPerson = false,
+  }) async {
+    try {
+      final token = asPerson ? await _userToken() : null;
+      final request = http.Request(method, Uri.parse('${config.apiBaseUrl}/v1/support/$path'))
+        ..headers.addAll({..._personHeaders(user), if (token != null) 'X-Rendel-User-Token': token});
+      if (body != null) request.body = jsonEncode(body);
+      final response = await http.Response.fromStream(
+        await _http.send(request).timeout(config.requestTimeout),
+      );
+      Map<String, dynamic>? json;
+      if (response.statusCode != 204 && response.body.isNotEmpty) {
+        try {
+          final parsed = jsonDecode(response.body);
+          if (parsed is Map<String, dynamic>) json = parsed;
+        } catch (_) {
+          // Not the JSON the API answers with: the status says enough.
+        }
+      }
+      return (status: response.statusCode, json: json);
+    } catch (_) {
+      return (status: 0, json: null);
+    }
+  }
+
+  /// `GET /v1/support/threads/:id/stream?after=`: the thread live, each
+  /// event's JSON as it comes. The server holds it about a minute and ends it
+  /// with `support.reconnect`; cancelling the subscription ends it early.
+  /// Throws when the server does not open it.
+  Stream<Map<String, dynamic>> supportStream(String threadId, int after, {Map<String, String>? user}) async* {
+    final request = http.Request(
+      'GET',
+      Uri.parse('${config.apiBaseUrl}/v1/support/threads/${Uri.encodeComponent(threadId)}/stream?after=$after'),
+    )..headers.addAll({..._personHeaders(user), 'Accept': 'text/event-stream'});
+    final response = await _http.send(request).timeout(config.requestTimeout);
+    if (response.statusCode != 200) {
+      await response.stream.drain<void>();
+      throw StateError('support stream ${response.statusCode}');
+    }
+    final dataLines = <String>[];
+    await for (final line in response.stream.transform(utf8.decoder).transform(const LineSplitter())) {
+      if (line.isEmpty) {
+        if (dataLines.isNotEmpty) {
+          try {
+            final data = jsonDecode(dataLines.join('\n'));
+            if (data is Map<String, dynamic> && data['type'] is String) yield data;
+          } catch (_) {
+            // A frame this build cannot read is skipped; the next open reads `current`.
+          }
+        }
+        dataLines.clear();
+      } else if (line.startsWith('data:')) {
+        dataLines.add(line.substring(5).trimLeft());
+      }
+    }
+  }
+
+  /// The headers of a call about the person: who is signed in, and their
+  /// `hmac` when the app verifies identities.
+  Map<String, String> _personHeaders(Map<String, String>? user) => {
+        ..._headers,
+        if (user?['id'] case final who?) 'X-Rendel-User': who,
+        if (user?['hmac'] case final hmac?) 'X-Rendel-User-Hmac': hmac,
+      };
+
   Future<void> identify(Map<String, dynamic> body) async {
     await _http
         .post(
@@ -599,6 +689,24 @@ class RendelApiClient {
   /// The whole conversation, newest `limit` messages. Not convergence: the
   /// route takes no `after_seq` and this has no callers yet. Kept because the
   /// console and any host that wants to rehydrate a thread need it.
+  /// POST /v1/conversations/:id/away: the person left the conversation (the
+  /// sheet closed, the app put away) or is back in it, so the server knows an
+  /// answer that lands meanwhile went unseen. Nothing comes back, and a
+  /// failure costs only the timing of a notice.
+  Future<void> away(String conversationId, {required bool away}) async {
+    try {
+      await _http
+          .post(
+            Uri.parse('${config.apiBaseUrl}/v1/conversations/${Uri.encodeComponent(conversationId)}/away'),
+            headers: _headers,
+            body: jsonEncode({'away': away}),
+          )
+          .timeout(config.requestTimeout);
+    } catch (_) {
+      // Said again the next time the person leaves or comes back.
+    }
+  }
+
   Future<List<Map<String, dynamic>>> fetchMessages(String conversationId) async {
     final response = await _http
         .get(

@@ -82,6 +82,10 @@ const List<String> supportedComponents = [
 /// on the card, its `editable` control marked `required`; the card draws the
 /// control empty and cannot be confirmed until a redraw carries the value.
 /// The server only lets the model propose such a card to a build that says so.
+///
+/// `support`: the build has the support page (human support). Where the app
+/// has Support on, a person who asks plainly for someone is handed to the
+/// team (`support.handoff`) instead of answered.
 const List<String> clientCapabilities = [
   'form_update',
   'surface_update',
@@ -89,6 +93,7 @@ const List<String> clientCapabilities = [
   'detail_pages',
   'notices',
   'card_fill',
+  'support',
 ];
 
 /// The kinds of action this build carries out when a control is tapped,
@@ -544,6 +549,10 @@ sealed class RendelWireEvent {
           risk: _text(data['risk']) ?? 'write',
           params: (data['params'] as Map?)?.cast<String, dynamic>() ?? const {},
         );
+      case 'support.handoff':
+        final thread = _text(data['thread_id']);
+        if (thread == null) return null;
+        return SupportHandoff(threadId: thread, conversationId: _text(data['conversation_id']));
       case 'turn.end':
         final remaining = data['remaining'];
         return TurnEnd(
@@ -682,6 +691,14 @@ class ActionDone extends RendelWireEvent {
   final String name;
   final String risk;
   final Map<String, dynamic> params;
+}
+
+/// The person asked for the app's own team (human support): the turn hands
+/// them over instead of answering, and the support page opens on [threadId].
+class SupportHandoff extends RendelWireEvent {
+  const SupportHandoff({required this.threadId, this.conversationId});
+  final String threadId;
+  final String? conversationId;
 }
 
 class TurnEnd extends RendelWireEvent {

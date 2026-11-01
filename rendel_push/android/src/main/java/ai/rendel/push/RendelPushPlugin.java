@@ -75,6 +75,10 @@ public class RendelPushPlugin implements FlutterPlugin, MethodChannel.MethodCall
             case "package":
                 result.success(context.getPackageName());
                 break;
+            case "supportOnScreen":
+                RendelMessagingService.supportOnScreen = call.argument("thread");
+                result.success(null);
+                break;
             case "hasFirebase":
                 result.success(hasDefaultApp());
                 break;

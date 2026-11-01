@@ -369,6 +369,11 @@ Future<RendelAttachment?> pickImage() async {
     // closes an app that has no NSPhotoLibraryUsageDescription.
     file = await ImagePicker().pickImage(
       source: ImageSource.gallery,
+      // As the camera's: a phone's library holds the full sensor, and scaling
+      // also turns an iPhone's HEIC into a JPEG the server takes.
+      maxWidth: 2048,
+      maxHeight: 2048,
+      imageQuality: 85,
       requestFullMetadata: false,
     );
   } catch (err) {

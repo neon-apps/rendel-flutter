@@ -5234,7 +5234,7 @@ class _FormBlockState extends State<_FormBlock> {
         return _numText(_stepperValue(field, raw));
     }
     if (raw is List && raw.isEmpty) return null;
-    return raw == null ? null : _displayValue(field, raw);
+    return raw == null ? null : _displayValue(field, raw, RendelStringsScope.of(context));
   }
 
   Widget _fieldOf(Map field) {
@@ -5339,8 +5339,8 @@ class _FormBlockState extends State<_FormBlock> {
       );
 }
 
-String _displayValue(Map field, Object? value) {
-  if (value is bool) return value ? 'Yes' : 'No';
+String _displayValue(Map field, Object? value, RendelStrings strings) {
+  if (value is bool) return value ? strings.yes : strings.no;
   if (value is List) {
     final labels = {
       for (final option in _maps(field['options']))
@@ -5535,7 +5535,7 @@ class _Field extends StatelessWidget {
                 // 44pt however small the track is drawn.
                 child: row(
                   Icons.toggle_on_outlined,
-                  labelled(Text(on ? 'Yes' : 'No', style: valueStyle)),
+                  labelled(Text(on ? strings.yes : strings.no, style: valueStyle)),
                   end: _SwitchMark(on: on, enabled: enabled),
                 ),
               ),
@@ -5547,7 +5547,7 @@ class _Field extends StatelessWidget {
         final selected = options.where((o) => o['value'] == value).firstOrNull;
         final shown = selected != null
             ? (_str(selected['label']) ?? '')
-            : (placeholder ?? 'Choose an option');
+            : (placeholder ?? strings.chooseOption);
         content = _Unfolding(
           key: ValueKey('select:$name'),
           enabled: enabled,
@@ -8326,21 +8326,62 @@ BoxDecoration _white(RendelTheme theme, double radius) => BoxDecoration(
 /// and a soft shadow, with no edge.
 BoxDecoration _lit(RendelTheme theme, BorderRadiusGeometry radius,
         {List<BoxShadow> shadow = RendelTheme.litShadow}) =>
-    BoxDecoration(
-      gradient: theme.litFill,
-      // Only the top is drawn; the other three sides keep their point of
-      // inset unpainted, so a lit control is exactly the size of a quiet one.
-      border: const Border(
-        top: BorderSide(color: RendelTheme.litEdge),
-        left: _unpainted,
-        right: _unpainted,
-        bottom: _unpainted,
-      ),
-      borderRadius: radius,
-      boxShadow: shadow,
-    );
+    _Lit(gradient: theme.litFill, borderRadius: radius, boxShadow: shadow);
 
 const BorderSide _unpainted = BorderSide(width: 1, style: BorderStyle.none);
+
+/// The lit fill: a ring of nothing, so a lit control is exactly the size of a
+/// quiet one, and the highlight along its top painted over it on its own.
+///
+/// The highlight used to be the border itself, one painted side and three
+/// unpainted. Tweened into a hairline ring (a button turning disabled, a
+/// chosen chip let go), that gave four sides in four colours on a rounded
+/// box, and every frame between threw "A borderRadius can only be given on
+/// borders with uniform colors" in debug and left the control blank (inSepo,
+/// 0.63.4). A uniform ring tweens into any other ring; the highlight simply
+/// leaves with the first frame and comes back with the last.
+class _Lit extends BoxDecoration {
+  const _Lit({super.gradient, super.borderRadius, super.boxShadow})
+      : super(border: const Border.fromBorderSide(
+          BorderSide(color: Color(0x00FFFFFF)),
+        ));
+
+  static const Border _highlight = Border(
+    top: BorderSide(color: RendelTheme.litEdge),
+    left: _unpainted,
+    right: _unpainted,
+    bottom: _unpainted,
+  );
+
+  @override
+  BoxPainter createBoxPainter([VoidCallback? onChanged]) =>
+      _LitPainter(this, super.createBoxPainter(onChanged), onChanged);
+}
+
+class _LitPainter extends BoxPainter {
+  _LitPainter(this._lit, this._fill, super.onChanged);
+
+  final _Lit _lit;
+  final BoxPainter _fill;
+
+  @override
+  void paint(Canvas canvas, Offset offset, ImageConfiguration configuration) {
+    _fill.paint(canvas, offset, configuration);
+    final direction = configuration.textDirection;
+    _Lit._highlight.paint(
+      canvas,
+      offset & configuration.size!,
+      borderRadius: _lit.borderRadius?.resolve(direction),
+      textDirection: direction,
+    );
+  }
+
+  @override
+  void dispose() {
+    _fill.dispose();
+    super.dispose();
+  }
+}
 
 /// A glyph on its tile: 34 square, white with a hairline, the glyph in the
 /// soft ink unless a tone asks for another.
@@ -10977,7 +11018,7 @@ Widget buildArticleCard(BuildContext context, WireBlock block, RendelDispatcher 
           SizedBox(height: theme.space.lg),
           _actionButton(
             context,
-            label: _str(cta['label']) ?? 'Read more',
+            label: _str(cta['label']) ?? RendelStringsScope.of(context).readMore,
             action: cta['action'],
             dispatch: dispatch,
             quiet: true,
@@ -11582,7 +11623,10 @@ Widget buildContact(BuildContext context, WireBlock block, RendelDispatcher disp
 Widget _contactButton(WireBlock block, Map channel, {required bool quiet, required RendelDispatcher dispatch}) {
   final label = _str(channel['label'])!;
   final value = _str(channel['value'])!.trim();
-  final (UIAction? action, String words) = switch (_str(channel['kind'])) {
+  final kind = _str(channel['kind']);
+  final (UIAction? action, String words) = switch (kind) {
+    // The app's team, in the app: the plain reply that hands the person over.
+    'chat' => (ReplyAction(value), label),
     'call' => (CallAction(value, label: label), '$label $value'),
     'email' => (EmailAction(value), '$label $value'),
     // The protocol's own reading of a link, which takes https alone.
@@ -11595,7 +11639,8 @@ Widget _contactButton(WireBlock block, Map channel, {required bool quiet, requir
     // than left out: the app listed it, and the user can still read it.
     onTap: action != null && dispatch.canHandle(action)
         ? () {
-            dispatch.onContactOpen?.call(block, _str(channel['kind'])!);
+            // A handoff is its own record, so a `chat` tap is not counted as a contact open.
+            if (kind != 'chat') dispatch.onContactOpen?.call(block, kind!);
             dispatch.onAction(action);
           }
         : null,

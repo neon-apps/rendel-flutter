@@ -64,7 +64,13 @@ class RendelRemoteConfig {
     this.templates = const {},
     this.parallelReads = true,
     this.capture = RendelCapture.defaults,
+    this.supportTeam,
   });
+
+  /// The team's name when the app has Support on (human support), sent only
+  /// then: null means people cannot reach the team from inside the app. Kept
+  /// in the cache like [parallelReads], so a 304 keeps it too.
+  final String? supportTeam;
 
   /// What the server says about tap capture (`capture`, sent only when it is
   /// not the default): kept in the cache like [parallelReads], so a 304 keeps
@@ -122,6 +128,7 @@ class RendelRemoteConfig {
         etag: etag ?? (map['_etag'] as String?),
         parallelReads: map['parallel_reads'] != false,
         capture: RendelCapture.parse(map['capture']),
+        supportTeam: _supportTeam(map['support']),
       );
     } catch (_) {
       return null;
@@ -136,6 +143,7 @@ class RendelRemoteConfig {
         if (etag != null) '_etag': etag,
         if (!parallelReads) 'parallel_reads': false,
         if (!capture.isDefault) 'capture': capture.toJson(),
+        if (supportTeam != null) 'support': {'enabled': true, 'team': supportTeam},
         'config': {
           if (theme.isNotEmpty) 'theme': theme,
           if (themeDark.isNotEmpty) 'themeDark': themeDark,
@@ -143,6 +151,12 @@ class RendelRemoteConfig {
           if (templates.isNotEmpty) 'templates': templates,
         },
       });
+
+  static String? _supportTeam(Object? value) {
+    if (value is! Map || value['enabled'] != true) return null;
+    final team = value['team'];
+    return team is String && team.trim().isNotEmpty ? team.trim() : null;
+  }
 
   static Map<String, dynamic> _submap(Object? value) =>
       value is Map ? value.cast<String, dynamic>() : const <String, dynamic>{};

@@ -202,6 +202,29 @@ class RendelStrings {
     this.memoryUsedMany = 'Based on {count} of your preferences',
     this.memoryFromPreference = 'From your preferences',
     this.memoryTitle = 'What I remember for you',
+    this.supportTeam = '{team} team',
+    this.supportHere = 'Here',
+    this.supportAway = 'Away',
+    this.supportBack = 'Back to the assistant',
+    this.supportMistake = 'By mistake? Back to the assistant',
+    this.supportSorted = 'I\'m sorted',
+    this.supportYou = 'You',
+    this.supportWriteTo = 'Write to {name}…',
+    this.supportWriteTeam = 'Write to the {team} team…',
+    this.supportTyping = '{name} is typing…',
+    this.supportUnsent = 'Not sent. Tap to try again.',
+    this.supportContactAsk = 'Where should we send the reply? Add your email to keep going.',
+    this.supportContactOptional = 'Want the reply by email too?',
+    this.supportContactWhy = 'We only use this address to reply to this conversation.',
+    this.supportContactPlaceholder = 'you@example.com',
+    this.supportContactSend = 'Save',
+    this.supportContactSaved = 'Thanks. Check your inbox to confirm the address.',
+    this.supportCodeLabel = 'Got a code by email? Enter it here',
+    this.supportCodeWrong = 'That code didn\'t match. Try again.',
+    this.supportNewLine = 'New message',
+    this.supportClosed = 'This conversation is closed. Write any time and the team will pick it up.',
+    this.supportUnread = 'New messages from the team: {count}',
+    this.supportOpen = 'Talk to the team',
     this.memoryEmpty = 'Tell me a preference once, like “always lactose-free”, and I\'ll keep it in mind.',
     this.memoryForget = 'Forget',
     this.memoryForgetAll = 'Forget all',
@@ -211,6 +234,10 @@ class RendelStrings {
     this.memoryUntil = 'Until {date}',
     this.memoryFooter = 'The app\'s team can see these too.',
     this.memoryOff = 'This app doesn\'t keep preferences.',
+    this.readMore = 'Read more',
+    this.chooseOption = 'Choose an option',
+    this.answerWaiting = 'Your answer is ready',
+    this.approvalWaiting = 'Something is waiting for your approval',
   });
 
   /// The two controls on a confirmation card. The ones that matter most.
@@ -599,6 +626,30 @@ class RendelStrings {
   final String memoryUsedMany;
   final String memoryFromPreference;
   final String memoryTitle;
+  /// Human support (the page where the person writes to the app's own team).
+  final String supportTeam;
+  final String supportHere;
+  final String supportAway;
+  final String supportBack;
+  final String supportMistake;
+  final String supportSorted;
+  final String supportYou;
+  final String supportWriteTo;
+  final String supportWriteTeam;
+  final String supportTyping;
+  final String supportUnsent;
+  final String supportContactAsk;
+  final String supportContactOptional;
+  final String supportContactWhy;
+  final String supportContactPlaceholder;
+  final String supportContactSend;
+  final String supportContactSaved;
+  final String supportCodeLabel;
+  final String supportCodeWrong;
+  final String supportNewLine;
+  final String supportClosed;
+  final String supportUnread;
+  final String supportOpen;
   final String memoryEmpty;
   final String memoryForget;
   final String memoryForgetAll;
@@ -608,6 +659,21 @@ class RendelStrings {
   final String memoryUntil;
   final String memoryFooter;
   final String memoryOff;
+
+  /// An article card's button when the answer gave it no label of its own.
+  final String readMore;
+
+  /// A form's list field before anything is picked, when the form gave it no
+  /// placeholder of its own.
+  final String chooseOption;
+
+  /// Said after the launcher's name while its dot shows an answer that
+  /// finished with the sheet closed.
+  final String answerWaiting;
+
+  /// Said after the launcher's name while its dot shows a confirmation card
+  /// waiting for the person.
+  final String approvalWaiting;
 
   String formFailedWith(String submit) => formFailed.replaceAll('{submit}', submit);
   String removeFileNamed(String name) => removeFile.replaceAll('{name}', name);
@@ -626,6 +692,11 @@ class RendelStrings {
   String memoryUsedOf(String label) => memoryUsed.replaceAll('{label}', label);
   String memoryUsedManyOf(int count) => memoryUsedMany.replaceAll('{count}', '$count');
   String memoryUntilOf(String date) => memoryUntil.replaceAll('{date}', date);
+  String supportTeamOf(String team) => supportTeam.replaceAll('{team}', team);
+  String supportWriteToOf(String name) => supportWriteTo.replaceAll('{name}', name);
+  String supportWriteTeamOf(String team) => supportWriteTeam.replaceAll('{team}', team);
+  String supportTypingOf(String name) => supportTyping.replaceAll('{name}', name);
+  String supportUnreadOf(int count) => supportUnread.replaceAll('{count}', '$count');
   String stepOfCount(int step, int count) =>
       stepOf.replaceAll('{step}', '$step').replaceAll('{count}', '$count');
   /// [now] for a label that is itself a when ("Today"): no "in" before it.
@@ -864,6 +935,29 @@ class RendelStrings {
     String? memoryUsedMany,
     String? memoryFromPreference,
     String? memoryTitle,
+    String? supportTeam,
+    String? supportHere,
+    String? supportAway,
+    String? supportBack,
+    String? supportMistake,
+    String? supportSorted,
+    String? supportYou,
+    String? supportWriteTo,
+    String? supportWriteTeam,
+    String? supportTyping,
+    String? supportUnsent,
+    String? supportContactAsk,
+    String? supportContactOptional,
+    String? supportContactWhy,
+    String? supportContactPlaceholder,
+    String? supportContactSend,
+    String? supportContactSaved,
+    String? supportCodeLabel,
+    String? supportCodeWrong,
+    String? supportNewLine,
+    String? supportClosed,
+    String? supportUnread,
+    String? supportOpen,
     String? memoryEmpty,
     String? memoryForget,
     String? memoryForgetAll,
@@ -873,6 +967,10 @@ class RendelStrings {
     String? memoryUntil,
     String? memoryFooter,
     String? memoryOff,
+    String? readMore,
+    String? chooseOption,
+    String? answerWaiting,
+    String? approvalWaiting,
   }) {
     return RendelStrings(
       confirm: confirm ?? this.confirm,
@@ -1040,6 +1138,29 @@ class RendelStrings {
       memoryUsedMany: memoryUsedMany ?? this.memoryUsedMany,
       memoryFromPreference: memoryFromPreference ?? this.memoryFromPreference,
       memoryTitle: memoryTitle ?? this.memoryTitle,
+      supportTeam: supportTeam ?? this.supportTeam,
+      supportHere: supportHere ?? this.supportHere,
+      supportAway: supportAway ?? this.supportAway,
+      supportBack: supportBack ?? this.supportBack,
+      supportMistake: supportMistake ?? this.supportMistake,
+      supportSorted: supportSorted ?? this.supportSorted,
+      supportYou: supportYou ?? this.supportYou,
+      supportWriteTo: supportWriteTo ?? this.supportWriteTo,
+      supportWriteTeam: supportWriteTeam ?? this.supportWriteTeam,
+      supportTyping: supportTyping ?? this.supportTyping,
+      supportUnsent: supportUnsent ?? this.supportUnsent,
+      supportContactAsk: supportContactAsk ?? this.supportContactAsk,
+      supportContactOptional: supportContactOptional ?? this.supportContactOptional,
+      supportContactWhy: supportContactWhy ?? this.supportContactWhy,
+      supportContactPlaceholder: supportContactPlaceholder ?? this.supportContactPlaceholder,
+      supportContactSend: supportContactSend ?? this.supportContactSend,
+      supportContactSaved: supportContactSaved ?? this.supportContactSaved,
+      supportCodeLabel: supportCodeLabel ?? this.supportCodeLabel,
+      supportCodeWrong: supportCodeWrong ?? this.supportCodeWrong,
+      supportNewLine: supportNewLine ?? this.supportNewLine,
+      supportClosed: supportClosed ?? this.supportClosed,
+      supportUnread: supportUnread ?? this.supportUnread,
+      supportOpen: supportOpen ?? this.supportOpen,
       memoryEmpty: memoryEmpty ?? this.memoryEmpty,
       memoryForget: memoryForget ?? this.memoryForget,
       memoryForgetAll: memoryForgetAll ?? this.memoryForgetAll,
@@ -1049,6 +1170,10 @@ class RendelStrings {
       memoryUntil: memoryUntil ?? this.memoryUntil,
       memoryFooter: memoryFooter ?? this.memoryFooter,
       memoryOff: memoryOff ?? this.memoryOff,
+      readMore: readMore ?? this.readMore,
+      chooseOption: chooseOption ?? this.chooseOption,
+      answerWaiting: answerWaiting ?? this.answerWaiting,
+      approvalWaiting: approvalWaiting ?? this.approvalWaiting,
     );
   }
 }
@@ -1233,6 +1358,29 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUsedMany: '{count} tercihinize göre',
     memoryFromPreference: 'Tercihlerinizden',
     memoryTitle: 'Sizin için hatırladıklarım',
+    supportTeam: '{team} ekibi',
+    supportHere: 'Burada',
+    supportAway: 'Uzakta',
+    supportBack: 'Asistana dön',
+    supportMistake: 'Yanlışlıkla mı oldu? Asistana dön',
+    supportSorted: 'Sorunum çözüldü',
+    supportYou: 'Siz',
+    supportWriteTo: '{name} — mesajınızı yazın…',
+    supportWriteTeam: '{team} ekibine yazın…',
+    supportTyping: '{name} yazıyor…',
+    supportUnsent: 'Gönderilemedi. Tekrar denemek için dokunun.',
+    supportContactAsk: 'Yanıtı nereye gönderelim? Devam etmek için e-posta adresinizi ekleyin.',
+    supportContactOptional: 'Yanıtı e-posta ile de almak ister misiniz?',
+    supportContactWhy: 'Bu adresi yalnızca bu sohbete yanıt vermek için kullanırız.',
+    supportContactPlaceholder: 'adiniz@ornek.com',
+    supportContactSend: 'Kaydet',
+    supportContactSaved: 'Teşekkürler. Adresi onaylamak için gelen kutunuzu kontrol edin.',
+    supportCodeLabel: 'E-posta ile bir kod mu aldınız? Buraya girin',
+    supportCodeWrong: 'Bu kod eşleşmedi. Tekrar deneyin.',
+    supportNewLine: 'Yeni mesaj',
+    supportClosed: 'Bu sohbet kapatıldı. İstediğiniz zaman yazın, ekip ilgilenecektir.',
+    supportUnread: 'Ekipten yeni mesajlar: {count}',
+    supportOpen: 'Ekiple konuşun',
     memoryEmpty: 'Bana \'hep laktozsuz\' gibi bir tercihinizi söyleyin, sonraki seferler için aklımda tutayım.',
     memoryForget: 'Unut',
     memoryForgetAll: 'Tümünü unut',
@@ -1242,6 +1390,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUntil: '{date} gününe dek',
     memoryFooter: 'Uygulama ekibi de bu notları görebilir.',
     memoryOff: 'Bu uygulama tercihlerinizi akılda tutmuyor.',
+    readMore: 'Devamını oku',
+    chooseOption: 'Bir seçenek seçin',
+    answerWaiting: 'Yanıtınız hazır',
+    approvalWaiting: 'Bir işlem onayınızı bekliyor',
   ),
   'de': RendelStrings(
     nothingHeard: 'Es wurde nichts gehört. Prüfen Sie das Mikrofon.',
@@ -1415,6 +1567,29 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUsedMany: 'Nach {count} Ihrer Vorlieben',
     memoryFromPreference: 'Aus Ihren Vorlieben',
     memoryTitle: 'Was ich mir für Sie merke',
+    supportTeam: 'Team von {team}',
+    supportHere: 'Erreichbar',
+    supportAway: 'Abwesend',
+    supportBack: 'Zurück zum Assistenten',
+    supportMistake: 'Aus Versehen? Zurück zum Assistenten',
+    supportSorted: 'Hat sich erledigt',
+    supportYou: 'Sie',
+    supportWriteTo: 'Nachricht an {name}…',
+    supportWriteTeam: 'Nachricht an das Team von {team}…',
+    supportTyping: '{name} schreibt…',
+    supportUnsent: 'Nicht gesendet. Zum erneuten Senden tippen.',
+    supportContactAsk: 'Wohin sollen wir die Antwort schicken? Geben Sie Ihre E-Mail-Adresse an, um fortzufahren.',
+    supportContactOptional: 'Möchten Sie die Antwort auch per E-Mail?',
+    supportContactWhy: 'Wir nutzen diese Adresse nur, um auf dieses Gespräch zu antworten.',
+    supportContactPlaceholder: 'sie@beispiel.de',
+    supportContactSend: 'Speichern',
+    supportContactSaved: 'Danke. Bitte bestätigen Sie die Adresse in Ihrem Postfach.',
+    supportCodeLabel: 'Code per E-Mail erhalten? Hier eingeben',
+    supportCodeWrong: 'Der Code stimmt nicht. Bitte erneut versuchen.',
+    supportNewLine: 'Neue Nachricht',
+    supportClosed: 'Dieses Gespräch ist abgeschlossen. Schreiben Sie jederzeit, das Team meldet sich.',
+    supportUnread: 'Neue Nachrichten vom Team: {count}',
+    supportOpen: 'Mit dem Team sprechen',
     memoryEmpty: 'Sagen Sie mir einmal eine Vorliebe, etwa „immer laktosefrei“, und ich behalte sie im Kopf.',
     memoryForget: 'Vergessen',
     memoryForgetAll: 'Alles vergessen',
@@ -1424,6 +1599,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUntil: 'Bis {date}',
     memoryFooter: 'Das Team der App kann diese Notizen auch sehen.',
     memoryOff: 'Diese App speichert keine Vorlieben.',
+    readMore: 'Mehr lesen',
+    chooseOption: 'Option wählen',
+    answerWaiting: 'Ihre Antwort ist da',
+    approvalWaiting: 'Etwas wartet auf Ihre Bestätigung',
   ),
   'fr': RendelStrings(
     nothingHeard: "Rien n'a été entendu. Vérifiez le microphone.",
@@ -1596,6 +1775,29 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUsedMany: 'Selon {count} de vos préférences',
     memoryFromPreference: 'D’après vos préférences',
     memoryTitle: 'Ce que je retiens pour vous',
+    supportTeam: 'Équipe {team}',
+    supportHere: 'Disponible',
+    supportAway: 'Absente',
+    supportBack: 'Retour à l’assistant',
+    supportMistake: 'Par erreur ? Retour à l’assistant',
+    supportSorted: 'C’est réglé',
+    supportYou: 'Vous',
+    supportWriteTo: 'Écrire à {name}…',
+    supportWriteTeam: 'Écrire à l’équipe {team}…',
+    supportTyping: '{name} écrit…',
+    supportUnsent: 'Non envoyé. Touchez pour réessayer.',
+    supportContactAsk: 'Où devons-nous envoyer la réponse ? Ajoutez votre e-mail pour continuer.',
+    supportContactOptional: 'Voulez-vous aussi la réponse par e-mail ?',
+    supportContactWhy: 'Nous utilisons cette adresse uniquement pour répondre à cette conversation.',
+    supportContactPlaceholder: 'vous@exemple.fr',
+    supportContactSend: 'Enregistrer',
+    supportContactSaved: 'Merci. Vérifiez votre boîte de réception pour confirmer l’adresse.',
+    supportCodeLabel: 'Vous avez reçu un code par e-mail ? Saisissez-le ici',
+    supportCodeWrong: 'Ce code ne correspond pas. Réessayez.',
+    supportNewLine: 'Nouveau message',
+    supportClosed: 'Cette conversation est terminée. Écrivez quand vous voulez, l’équipe reprendra.',
+    supportUnread: 'Nouveaux messages de l’équipe : {count}',
+    supportOpen: 'Parler à l’équipe',
     memoryEmpty: 'Dites-moi une préférence une fois, comme « toujours sans lactose », et je la garderai en tête.',
     memoryForget: 'Oublier',
     memoryForgetAll: 'Tout oublier',
@@ -1605,6 +1807,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUntil: 'Jusqu’au {date}',
     memoryFooter: 'L’équipe de l’application peut aussi voir ces notes.',
     memoryOff: 'Cette application ne garde pas de préférences.',
+    readMore: 'En savoir plus',
+    chooseOption: 'Choisir une option',
+    answerWaiting: 'Votre réponse est prête',
+    approvalWaiting: 'Une action attend votre accord',
   ),
   'es': RendelStrings(
     nothingHeard: 'No se oyó nada. Comprueba el micrófono.',
@@ -1776,6 +1982,29 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUsedMany: 'Según {count} de tus preferencias',
     memoryFromPreference: 'De tus preferencias',
     memoryTitle: 'Lo que recuerdo para ti',
+    supportTeam: 'Equipo de {team}',
+    supportHere: 'Disponible',
+    supportAway: 'Ausente',
+    supportBack: 'Volver al asistente',
+    supportMistake: '¿Por error? Volver al asistente',
+    supportSorted: 'Ya está resuelto',
+    supportYou: 'Tú',
+    supportWriteTo: 'Escribe a {name}…',
+    supportWriteTeam: 'Escribe al equipo de {team}…',
+    supportTyping: '{name} está escribiendo…',
+    supportUnsent: 'No enviado. Toca para volver a intentarlo.',
+    supportContactAsk: '¿Dónde te enviamos la respuesta? Añade tu correo para continuar.',
+    supportContactOptional: '¿Quieres recibir la respuesta también por correo?',
+    supportContactWhy: 'Solo usamos esta dirección para responder a esta conversación.',
+    supportContactPlaceholder: 'tu@ejemplo.com',
+    supportContactSend: 'Guardar',
+    supportContactSaved: 'Gracias. Revisa tu bandeja de entrada para confirmar la dirección.',
+    supportCodeLabel: '¿Te llegó un código por correo? Escríbelo aquí',
+    supportCodeWrong: 'Ese código no coincide. Inténtalo de nuevo.',
+    supportNewLine: 'Mensaje nuevo',
+    supportClosed: 'Esta conversación está cerrada. Escribe cuando quieras y el equipo la retomará.',
+    supportUnread: 'Mensajes nuevos del equipo: {count}',
+    supportOpen: 'Hablar con el equipo',
     memoryEmpty: 'Dime una preferencia una vez, como «siempre sin lactosa», y la tendré en cuenta.',
     memoryForget: 'Olvidar',
     memoryForgetAll: 'Olvidar todo',
@@ -1785,6 +2014,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUntil: 'Hasta el {date}',
     memoryFooter: 'El equipo de la app también puede ver estas notas.',
     memoryOff: 'Esta app no guarda preferencias.',
+    readMore: 'Leer más',
+    chooseOption: 'Elige una opción',
+    answerWaiting: 'Tu respuesta está lista',
+    approvalWaiting: 'Hay algo pendiente de tu aprobación',
   ),
   'ar': RendelStrings(
     nothingHeard: 'لم يُسمع شيء. تحقّق من الميكروفون.',
@@ -1955,6 +2188,29 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUsedMany: 'بناءً على {count} من تفضيلاتك',
     memoryFromPreference: 'من تفضيلاتك',
     memoryTitle: 'ما أتذكره لك',
+    supportTeam: 'فريق {team}',
+    supportHere: 'متاح',
+    supportAway: 'غير متاح',
+    supportBack: 'العودة إلى المساعد',
+    supportMistake: 'عن طريق الخطأ؟ العودة إلى المساعد',
+    supportSorted: 'تم حل مشكلتي',
+    supportYou: 'أنت',
+    supportWriteTo: 'اكتب إلى {name}…',
+    supportWriteTeam: 'اكتب إلى فريق {team}…',
+    supportTyping: '{name} يكتب…',
+    supportUnsent: 'لم تُرسل. اضغط لإعادة المحاولة.',
+    supportContactAsk: 'إلى أين نرسل الرد؟ أضف بريدك الإلكتروني للمتابعة.',
+    supportContactOptional: 'هل تريد الرد عبر البريد الإلكتروني أيضًا؟',
+    supportContactWhy: 'نستخدم هذا العنوان فقط للرد على هذه المحادثة.',
+    supportContactPlaceholder: 'you@example.com',
+    supportContactSend: 'حفظ',
+    supportContactSaved: 'شكرًا. تحقق من بريدك لتأكيد العنوان.',
+    supportCodeLabel: 'وصلك رمز عبر البريد؟ أدخله هنا',
+    supportCodeWrong: 'الرمز غير مطابق. حاول مرة أخرى.',
+    supportNewLine: 'رسالة جديدة',
+    supportClosed: 'هذه المحادثة مغلقة. اكتب في أي وقت وسيتابع الفريق.',
+    supportUnread: 'رسائل جديدة من الفريق: {count}',
+    supportOpen: 'تحدث إلى الفريق',
     memoryEmpty: 'أخبرني بتفضيل مرة واحدة، مثل «دائمًا خالٍ من اللاكتوز»، وسأتذكره.',
     memoryForget: 'انسَ',
     memoryForgetAll: 'انسَ الكل',
@@ -1964,6 +2220,10 @@ const Map<String, RendelStrings> _byLocale = {
     memoryUntil: 'حتى {date}',
     memoryFooter: 'يمكن لفريق التطبيق رؤية هذه الملاحظات أيضًا.',
     memoryOff: 'لا يحتفظ هذا التطبيق بالتفضيلات.',
+    readMore: 'اقرأ المزيد',
+    chooseOption: 'اختر خيارًا',
+    answerWaiting: 'إجابتك جاهزة',
+    approvalWaiting: 'هناك ما ينتظر موافقتك',
   ),
 };
 

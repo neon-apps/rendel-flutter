@@ -26,6 +26,9 @@ import java.util.Map;
 public class RendelMessagingService extends FirebaseMessagingService {
     private static final String CHANNEL = "rendel";
 
+    /** The thread with the team on screen, as `Rendel.supportOnScreen` says: its reply is already on the page. */
+    static volatile String supportOnScreen;
+
     @Override
     public void onNewToken(@NonNull String token) {
         RendelPushPlugin.newToken(getApplicationContext(), token);
@@ -36,12 +39,16 @@ public class RendelMessagingService extends FirebaseMessagingService {
         Map<String, String> data = message.getData();
         RemoteMessage.Notification notification = message.getNotification();
         if (!"1".equals(data.get("rendel")) || notification == null) return;
+        String thread = data.get("rendel_support");
+        if (thread != null && thread.equals(supportOnScreen)) return;
         Context context = getApplicationContext();
         Intent launch = context.getPackageManager().getLaunchIntentForPackage(context.getPackageName());
         if (launch == null) return;
         launch.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
         for (Map.Entry<String, String> entry : data.entrySet()) launch.putExtra(entry.getKey(), entry.getValue());
-        int id = (data.containsKey("rendel_followup") ? data.get("rendel_followup") : String.valueOf(System.currentTimeMillis())).hashCode();
+        // One notification per conversation: the team's next reply replaces the last.
+        String key = thread != null ? thread : data.get("rendel_followup");
+        int id = (key != null ? key : String.valueOf(System.currentTimeMillis())).hashCode();
         PendingIntent open = PendingIntent.getActivity(context, id, launch, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
         if (Build.VERSION.SDK_INT >= 26) {
