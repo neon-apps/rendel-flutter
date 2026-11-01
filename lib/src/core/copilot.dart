@@ -130,9 +130,10 @@ class Rendel {
   /// Why a new conversation cannot start now (the organization's credit
   /// spent, its budget paused, a daily ceiling), or null. Tuna, 2026-10-12:
   /// "yarım kalan sohbetler için devam eder, diğerleri için asistan butonu
-  /// kalkar". The launcher goes, an open sheet closes, and the user is told
-  /// nothing; it comes back when the server says so, asked again every few
-  /// minutes and when the app comes back to the foreground.
+  /// kalkar" — reversed 2026-11-01: "kendini gizlememeli hiç". The launcher
+  /// stays and a question asked meanwhile is answered with a calm notice;
+  /// this only drives [available], asked again every few minutes and when
+  /// the app comes back to the foreground.
   static String? _unavailable;
   static Timer? _recheck;
   static AppLifecycleListener? _lifecycle;
@@ -142,8 +143,9 @@ class Rendel {
   static bool _parallelReads = true;
 
   /// Whether a new conversation can start now. False while the
-  /// organization's usage is paused: the launcher is hidden, and an app with
-  /// its own way in should hide it too, listening here.
+  /// organization's usage is paused or the API cannot be reached. The
+  /// launcher stays on screen either way; a question asked meanwhile is
+  /// answered with a calm notice, or fails with a retry.
   static final ValueNotifier<bool> available = ValueNotifier<bool>(true);
 
   /// Whether the thread is shrunk into its bubble while a screen it opened is
@@ -209,7 +211,9 @@ class Rendel {
   /// published a kill switch, or when the server refuses this app its
   /// copilot — a live key before the app has gone live, or a suspended app.
   /// [RendelLauncher] draws nothing and [open] returns without presenting.
-  static bool get isEnabled => _config.enabled && _refusal == null && _unavailable == null;
+  /// A pause or an outage is not one of these: the launcher never comes and
+  /// goes with them ([available]).
+  static bool get isEnabled => _config.enabled && _refusal == null;
   static bool get isInitialized => _api != null;
 
   /// Starts the copilot. [darkTheme] is drawn while the device is in dark mode (see
@@ -1138,8 +1142,8 @@ class Rendel {
     final answer = await api.fetchConfig(etag: _configEtag);
     // Null is an error status the SDK does not act on: no new config today.
     if (answer == null) return;
-    // The API could not be reached: hide the launcher rather than offer a
-    // button whose every press fails, and look again every minute.
+    // The API could not be reached: say so on [available], and look again
+    // every minute. The launcher stays; a question fails with a retry.
     if (answer.unreachable) {
       _setAvailable(false, 'unreachable');
       return;
@@ -1193,7 +1197,7 @@ class Rendel {
     if (next != null) {
       RendelLog.warn(
         'unavailable',
-        'New conversations are paused ($next), so Rendel is hidden until they can start again.',
+        'New conversations are paused ($next); Rendel stays on screen and answers with a notice until they can start again.',
       );
       _recheck = Timer.periodic(
         next == 'unreachable' ? const Duration(minutes: 1) : const Duration(minutes: 5),
@@ -1202,7 +1206,6 @@ class Rendel {
       _lifecycle ??= AppLifecycleListener(onResume: () {
         if (_unavailable != null) unawaited(_refreshConfig());
       });
-      _presentation?.dismiss();
     }
     available.value = next == null;
     configRevision.value++;

@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.72.2
+
+**Fixed**
+
+- `RendelLauncher` no longer hides itself and comes back a minute later. It
+  went away while Rendel's API could not be reached (a slow or failed config
+  fetch) and while new conversations were paused for your organization; now
+  it stays. A question asked while paused is answered with a calm notice, one
+  asked during an outage fails with a retry. `Rendel.available` still says
+  when either is the case. Only `enabled: false`, the console's switch, a
+  suspended app and a live key before Go live hide it.
+
 ## 0.72.1
 
 **Fixed**

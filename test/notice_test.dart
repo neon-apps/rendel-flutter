@@ -69,7 +69,7 @@ void main() {
     expect(find.byType(TextField), findsNothing);
   });
 
-  testWidgets('a paused app closes quietly: no error, no answer, the question gone', (tester) async {
+  testWidgets('a paused app answers calmly: the notice, the question kept, no error', (tester) async {
     String? told;
     final c = controller(
       sse([
@@ -82,14 +82,15 @@ void main() {
     await tester.runAsync(() => c.send('hello?'));
     expect(told, 'paused');
     expect(c.errorText, isNull);
-    expect(c.messages, isEmpty);
-    // Nothing on screen still thinks: the sheet is back to its empty state.
+    expect(c.messages.first.role, 'user');
+    expect(c.messages.last.blocks.single.type, 'notice');
     expect(c.busy, isFalse);
     await tester.pumpWidget(MaterialApp(
       home: RendelThemeScope(theme: RendelTheme.paper(), child: Scaffold(body: ThreadScreen(controller: c))),
     ));
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.textContaining('Thinking'), findsNothing);
+    expect(find.text('The assistant is taking a break.'), findsOneWidget);
   });
 
   testWidgets('says when one question is left, until the next is sent', (tester) async {

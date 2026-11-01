@@ -276,8 +276,8 @@ class ConversationController extends ChangeNotifier {
   final void Function(RendelChange change)? onChange;
 
   /// A new conversation was refused because the app is paused (credit spent,
-  /// budget reached, a daily ceiling): the SDK hides its way in and says
-  /// nothing to the user. The argument is for the developer's log.
+  /// budget reached, a daily ceiling): the person reads the notice, and
+  /// [Rendel.available] turns false. The argument is for the developer's log.
   final void Function(String reason)? onUnavailable;
 
   /// An answer that may be read aloud: the message, its opening's words when
@@ -1506,17 +1506,12 @@ class ConversationController extends ChangeNotifier {
               _lastErrorRetryable = true;
             }
             awaitingReads = status == 'awaiting_tool_results' && _pendingReads.isNotEmpty;
-          case final RendelNotice told when told.kind == 'paused':
-            // The app is paused: no conversation starts, and the user is told
-            // nothing. The question goes with the sheet.
-            settled = true;
-            noticed = true;
-            final asked = messages.lastIndexOf(_openAssistant!) - 1;
-            if (asked >= 0 && messages[asked].role == 'user') messages.removeAt(asked);
-            onUnavailable?.call(told.kind);
           case final RendelNotice told:
             settled = true;
             noticed = true;
+            // A paused app is told like a limit: the calm answer, the sheet
+            // and the launcher staying (Tuna, 2026-11-01: "hiç gizlenmemeli").
+            if (told.kind == 'paused') onUnavailable?.call(told.kind);
             _openAssistant!.blocks.add(WireBlock(
               id: 'notice',
               type: 'notice',
