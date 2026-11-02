@@ -5,6 +5,20 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.74.0
+
+**Changed**
+
+- On iOS, `add_to_calendar` opens the event in the system's own "Add to
+  Calendar" sheet, by way of a calendar file from the API in the in-app
+  browser, instead of Apple's event editor. The package links no EventKit any
+  more, so App Store Connect no longer asks your app for
+  `NSCalendarsUsageDescription`: it scans the binary rather than running it,
+  and refused a build over that line on 2026-11-02 although the editor had
+  needed no permission since iOS 17. An app that added the line for an
+  earlier release can remove it. The button now works before iOS 17 too,
+  where the editor used to open nothing. Android is unchanged.
+
 ## 0.73.4
 
 **Fixed**

@@ -97,15 +97,16 @@ class RendelPlatform {
     );
   }
 
-  /// The device's own event editor, filled in, for an `add_to_calendar`
+  /// Android's own event editor, filled in, for an `add_to_calendar`
   /// button: the user saves it, or does not. True once the editor is up.
   ///
-  /// The SDK's own native code again (`RendelPlugin`): Android's insert
-  /// intent, and iOS's `EKEventEditViewController` from iOS 17, work without
-  /// a calendar permission, where a calendar package asks for one to write
-  /// the event itself. Before iOS 17 the editor needs the host's
-  /// `NSCalendarsUsageDescription`, and without it this is false rather than
-  /// a closed app. A missing end is left to the editor's own default.
+  /// The SDK's own native code again (`RendelPlugin`): the insert intent
+  /// needs no calendar permission, where a calendar package asks for one to
+  /// write the event itself. iOS no longer comes here: its editor needed
+  /// EventKit in the binary, and App Store Connect refuses such a binary
+  /// without `NSCalendarsUsageDescription` in the host's Info.plist, so iOS
+  /// opens a calendar file instead (`openCalendarEvent` in batteries.dart).
+  /// A missing end is left to the editor's own default.
   static Future<bool> addToCalendar({
     required String title,
     required DateTime startsAt,

@@ -69,8 +69,8 @@ class RendelLogRecord {
   /// * `call_failed` — the dialler could not be opened for a `call` tap
   /// * `mail_failed` — the mail app could not be opened for an `email` tap
   /// * `copy_failed` — the clipboard refused a `copy` tap's value
-  /// * `calendar_failed` — the event editor could not be opened for an
-  ///   `add_to_calendar` tap
+  /// * `calendar_failed` — the event editor (Android) or the calendar file
+  ///   (iOS) could not be opened for an `add_to_calendar` tap
   /// * `invalid_goal` — `track` was given a goal name that is not one, or a
   ///   value without a three-letter currency; nothing was sent
   /// * `invalid_screen` — `setScreen` was given an empty name

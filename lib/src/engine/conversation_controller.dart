@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../core/action.dart';
-import '../core/batteries.dart' show dial, mail, openExternally;
+import '../core/batteries.dart' show dial, mail, openCalendarEvent, openExternally;
 import '../core/events.dart';
 import '../core/locale.dart';
 import '../core/log.dart';
@@ -1136,6 +1136,19 @@ class ConversationController extends ChangeNotifier {
           return false;
         }
       case AddToCalendarAction():
+        // iOS gets the system's event sheet through the in-app browser, so
+        // the SDK links no EventKit and no host needs a calendar line in its
+        // Info.plist (`openCalendarEvent` says why); Android its insert intent.
+        if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+          return openCalendarEvent(
+            api.config.apiBaseUrl,
+            title: action.title,
+            startsAt: action.startsAt,
+            endsAt: action.endsAt,
+            location: action.location,
+            notes: action.notes,
+          );
+        }
         return RendelPlatform.addToCalendar(
           title: action.title,
           startsAt: action.startsAt,

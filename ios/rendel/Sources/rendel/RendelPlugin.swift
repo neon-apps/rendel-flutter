@@ -1,6 +1,4 @@
 import AVFoundation
-import EventKit
-import EventKitUI
 import Flutter
 import PassKit
 import UIKit
@@ -25,10 +23,13 @@ import UIKit
 /// for purpose strings it never needed. The system document picker needs no
 /// permission: the app only ever sees the one file somebody chose.
 ///
-/// And it opens the system's event editor for an `add_to_calendar` button,
-/// filled in, for the user to save or cancel. Since iOS 17 that editor runs
-/// outside the app and needs no calendar permission, which is the only reason
-/// it is here rather than in a calendar package that writes the event itself.
+/// It links no EventKit. An `add_to_calendar` button used to open Apple's
+/// event editor from here, which needs no permission from iOS 17; but App
+/// Store Connect scans the binary rather than running it, and a binary that
+/// names `EKEventStore` is refused without `NSCalendarsUsageDescription` in
+/// the host's Info.plist (ITMS-90683, inSepo 2026-11-02). On iOS the SDK now
+/// opens a calendar file from the API in the in-app browser, and Safari hands
+/// it to the system's own event sheet (`batteries.dart`, `openCalendarEvent`).
 ///
 /// And it draws Apple's own "Add to Apple Wallet" button under a `pass` block,
 /// `PKAddPassButton` as a platform view, which iOS draws in the user's
@@ -36,9 +37,7 @@ import UIKit
 /// `PKAddPassesViewController`, where the user adds it or does not. Apple asks
 /// for its own button rather than a drawing of one, and the sheet needs no
 /// entitlement: it is the user who adds the pass.
-public class RendelPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate,
-  EKEventEditViewDelegate
-{
+public class RendelPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate {
   public static func register(with registrar: FlutterPluginRegistrar) {
     let channel = FlutterMethodChannel(
       name: "rendel/platform",
@@ -64,8 +63,6 @@ public class RendelPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate,
       })
     case "pickDocument":
       pickDocument(result)
-    case "addToCalendar":
-      addToCalendar(call.arguments as? [String: Any] ?? [:], result)
     case "voiceSession":
       voiceSession(active: call.arguments as? Bool ?? false, result)
     default:
@@ -139,67 +136,6 @@ public class RendelPlugin: NSObject, FlutterPlugin, UIDocumentPickerDelegate,
     let result = picking
     picking = nil
     result?(value)
-  }
-
-  private func addToCalendar(_ args: [String: Any], _ result: @escaping FlutterResult) {
-    guard let title = args["title"] as? String,
-      let start = (args["starts_at"] as? NSNumber)?.doubleValue
-    else {
-      result(FlutterError(code: "bad_args", message: "an event needs a title and a start", details: nil))
-      return
-    }
-    let present = {
-      guard let presenter = Self.topController() else {
-        result(FlutterError(code: "no_view", message: "nothing on screen to present the editor from", details: nil))
-        return
-      }
-      let store = EKEventStore()
-      let event = EKEvent(eventStore: store)
-      event.title = title
-      event.startDate = Date(timeIntervalSince1970: start / 1000)
-      // An hour when no end was given, which is what the editor itself
-      // offers for a new event.
-      let end = (args["ends_at"] as? NSNumber)?.doubleValue
-      event.endDate = end.map { Date(timeIntervalSince1970: $0 / 1000) } ?? event.startDate.addingTimeInterval(3600)
-      event.location = args["location"] as? String
-      event.notes = args["notes"] as? String
-      let editor = EKEventEditViewController()
-      editor.eventStore = store
-      editor.event = event
-      editor.editViewDelegate = self
-      presenter.present(editor, animated: true)
-      result(true)
-    }
-    if #available(iOS 17.0, *) {
-      present()
-      return
-    }
-    // Before iOS 17 the editor runs inside the app and needs full calendar
-    // access, and iOS closes an app that asks for it without
-    // NSCalendarsUsageDescription in its Info.plist. An app that has the line
-    // gets the system's prompt first; one that does not gets no editor rather
-    // than a crash.
-    let usage = Bundle.main.infoDictionary?["NSCalendarsUsageDescription"] as? String ?? ""
-    guard !usage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-      result(FlutterError(
-        code: "usage_description_missing",
-        message: "before iOS 17 the event editor needs NSCalendarsUsageDescription in Info.plist",
-        details: nil
-      ))
-      return
-    }
-    EKEventStore().requestAccess(to: .event) { granted, _ in
-      DispatchQueue.main.async {
-        if granted { present() } else { result(false) }
-      }
-    }
-  }
-
-  public func eventEditViewController(
-    _ controller: EKEventEditViewController,
-    didCompleteWith action: EKEventEditViewAction
-  ) {
-    controller.dismiss(animated: true)
   }
 
   /// Whatever is frontmost: the copilot is itself a sheet over the host's app.

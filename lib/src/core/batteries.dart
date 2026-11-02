@@ -277,6 +277,55 @@ Future<void> openLink(String url) async {
   }
 }
 
+/// The calendar file for an `add_to_calendar` tap on iOS: the API's
+/// `/v1/calendar/event.ics`, with the event in its query. Times go as UTC
+/// instants, so the file means the same in every zone.
+String calendarEventUrl(
+  String apiBaseUrl, {
+  required String title,
+  required DateTime startsAt,
+  DateTime? endsAt,
+  String? location,
+  String? notes,
+}) {
+  return Uri.parse('$apiBaseUrl/v1/calendar/event.ics').replace(queryParameters: {
+    'title': title,
+    'starts_at': startsAt.toUtc().toIso8601String(),
+    if (endsAt != null) 'ends_at': endsAt.toUtc().toIso8601String(),
+    if (location != null) 'location': location,
+    if (notes != null) 'notes': notes,
+  }).toString();
+}
+
+/// Opens the system's own event sheet for an `add_to_calendar` tap on iOS,
+/// by way of the in-app browser: Safari hands a `text/calendar` response to
+/// it, and the person adds the event there or does not. True once the browser
+/// is up.
+///
+/// Not Apple's event editor, which the SDK's native half opened until 0.73:
+/// that editor needs no permission from iOS 17, but App Store Connect scans
+/// the binary, and one that names `EKEventStore` is refused unless the host's
+/// Info.plist carries `NSCalendarsUsageDescription` (ITMS-90683, inSepo
+/// 2026-11-02). A line every customer must remember is one some customer
+/// forgets; this way the SDK links no EventKit and no host is asked for
+/// anything. Android keeps its insert intent (`RendelPlatform.addToCalendar`).
+Future<bool> openCalendarEvent(
+  String apiBaseUrl, {
+  required String title,
+  required DateTime startsAt,
+  DateTime? endsAt,
+  String? location,
+  String? notes,
+}) async {
+  final url = calendarEventUrl(apiBaseUrl, title: title, startsAt: startsAt, endsAt: endsAt, location: location, notes: notes);
+  try {
+    return await launchUrl(Uri.parse(url), mode: LaunchMode.inAppBrowserView);
+  } catch (err) {
+    RendelLog.warn('calendar_failed', 'the calendar file could not be opened', error: err);
+    return false;
+  }
+}
+
 /// Hands [url] to the operating system, for an `open_url` marked `external`:
 /// a maps link opens the maps app, a wallet link the wallet. Reports whether
 /// anything opened.

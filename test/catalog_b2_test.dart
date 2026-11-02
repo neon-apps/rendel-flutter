@@ -9,6 +9,7 @@
 // gallery's and the overflow suite's are.
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart' show RenderParagraph;
 import 'package:flutter/services.dart';
@@ -415,6 +416,33 @@ void main() {
         'title': 'Fitting',
         'starts_at': DateTime.parse(_calendarStart).millisecondsSinceEpoch,
         'ends_at': DateTime.parse('2026-10-14T10:45:00+02:00').millisecondsSinceEpoch,
+        'location': 'Haarlemmerstraat 24',
+      });
+    });
+
+    testWidgets('on iOS, add_to_calendar opens the API\'s calendar file in the in-app browser, not EventKit',
+        (tester) async {
+      // App Store Connect refuses a binary that names EKEventStore unless the
+      // host's Info.plist has NSCalendarsUsageDescription (inSepo, 2026-11-02),
+      // so iOS never reaches the native half: Safari hands the file to the
+      // system's own event sheet.
+      debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+      final browser = _Dialler();
+      UrlLauncherPlatform.instance = browser;
+      await pump(tester, [_booking()]);
+      await tester.tap(find.bySemanticsLabel(RegExp(r'^Add to calendar, ')));
+      await tester.pump();
+      // Before the test ends, which is when the framework checks it.
+      debugDefaultTargetPlatformOverride = null;
+      expect(native, isEmpty);
+      final (url, mode) = browser.launched.single;
+      expect(mode, PreferredLaunchMode.inAppBrowserView);
+      final uri = Uri.parse(url);
+      expect(uri.toString(), startsWith('${const RendelConfig().apiBaseUrl}/v1/calendar/event.ics?'));
+      expect(uri.queryParameters, {
+        'title': 'Fitting',
+        'starts_at': DateTime.parse(_calendarStart).toUtc().toIso8601String(),
+        'ends_at': DateTime.parse('2026-10-14T10:45:00+02:00').toUtc().toIso8601String(),
         'location': 'Haarlemmerstraat 24',
       });
     });
