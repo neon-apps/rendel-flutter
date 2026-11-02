@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -41,18 +42,22 @@ Future<void> showRendelSupport(
       borderRadius: BorderRadius.vertical(top: Radius.circular(drawn.radius.hero)),
     ),
     clipBehavior: Clip.antiAlias,
-    builder: (_) => RendelThemeScope(
-      theme: drawn,
-      child: RendelStringsScope(
-        strings: words,
-        child: RendelSupportSheet(
-          support: support,
-          team: team,
-          onAction: onAction,
-          canHandle: canHandle,
-          routeTitle: routeTitle,
-          onPick: onPick,
-          onUpload: onUpload,
+    // The keyboard takes the bottom of the screen: the page sits on it, and the place to write stays in sight.
+    builder: (sheet) => Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheet).bottom),
+      child: RendelThemeScope(
+        theme: drawn,
+        child: RendelStringsScope(
+          strings: words,
+          child: RendelSupportSheet(
+            support: support,
+            team: team,
+            onAction: onAction,
+            canHandle: canHandle,
+            routeTitle: routeTitle,
+            onPick: onPick,
+            onUpload: onUpload,
+          ),
         ),
       ),
     ),
@@ -236,7 +241,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final inset = theme.space.plate;
     final resolved = state?.resolved ?? false;
     final contact = state?.contactState ?? 'not_needed';
-    final needsContact = state?.contactRequired ?? false;
+    // The first line always goes (the server takes it); the one after it waits for an email.
+    final needsContact = (state?.contactRequired ?? false) && v.entries.any((e) => e.author == RendelSupportAuthorKind.user);
     // The optional box is for the wait: once the team is talking, it gives the page back.
     final offersContact = !needsContact &&
         contact == 'none' &&
@@ -272,7 +278,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     return SafeArea(
       top: false,
       child: SizedBox(
-        height: MediaQuery.sizeOf(context).height * 0.88,
+        height: math.max(MediaQuery.sizeOf(context).height * 0.88 - MediaQuery.viewInsetsOf(context).bottom, 200),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [

@@ -142,6 +142,32 @@ Future<void> _open(WidgetTester tester, RendelSupport support) async {
   await _settle(tester);
 }
 
+Future<void> _openArabic(WidgetTester tester, RendelSupport support) async {
+  await tester.pumpWidget(MaterialApp(
+    builder: (context, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
+    home: RendelThemeScope(
+      theme: RendelTheme.paper(),
+      child: Scaffold(
+        body: Builder(
+          builder: (context) => TextButton(
+            onPressed: () => showRendelSupport(
+              context,
+              support: support,
+              team: 'Grove',
+              onAction: (_) async => true,
+              canHandle: (_) => true,
+              strings: RendelStrings.forLocale('ar'),
+            ),
+            child: const Text('open'),
+          ),
+        ),
+      ),
+    ),
+  ));
+  await tester.tap(find.text('open'));
+  await _settle(tester);
+}
+
 Future<void> _close(WidgetTester tester) async {
   await tester.tap(find.byIcon(Icons.close_rounded));
   await _settle(tester);
@@ -168,6 +194,51 @@ void main() {
       // The team has answered: no "By mistake?", but "I'm sorted".
       expect(find.text("I'm sorted"), findsOneWidget);
       expect(find.text('Write to Ayşe…'), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets('keeps the place to write above the keyboard', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Bakıyorum.')], state: _state(mode: 'human'));
+      await _open(tester, server.support());
+      final height = tester.view.physicalSize.height / tester.view.devicePixelRatio;
+      tester.view.viewInsets = FakeViewPadding(bottom: 300 * tester.view.devicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      final field = find.byType(TextField).last;
+      expect(tester.getBottomLeft(field).dy, lessThanOrEqualTo(height - 300));
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('reads right to left in Arabic, with its words and nothing cut', (tester) async {
+      final server = _Server(
+        entries: [
+          _entry(1, kind: 'marker', author: 'system', text: 'رسالتك لدى فريق Grove.'),
+          _entry(2, text: 'لم تصل شحنتي بعد، والطلب رقم M-2021'),
+          _entry(3, author: 'agent', name: 'Ayşe', text: 'سأتحقق من ذلك الآن.'),
+        ],
+        state: _state(mode: 'human'),
+      );
+      await _openArabic(tester, server.support());
+      expect(tester.takeException(), isNull);
+      final ar = RendelStrings.forLocale('ar');
+      expect(find.text(ar.supportSorted), findsOneWidget);
+      // The page's start is on the right: the person's line hugs it, the close is at the other end.
+      final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      final line = tester.getTopRight(find.text('لم تصل شحنتي بعد، والطلب رقم M-2021'));
+      expect(line.dx, greaterThan(width * 0.8));
+      expect(tester.getCenter(find.byIcon(Icons.close_rounded)).dx, lessThan(width / 2));
+      await _close(tester);
+    });
+
+    testWidgets('lets the first line go before asking for an email, as the server does', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.')],
+        state: _state(contact: {'state': 'none', 'required': true}),
+      );
+      await _open(tester, server.support());
+      expect(find.widgetWithText(TextField, 'Write to the Grove team…'), findsOneWidget);
+      expect(find.text('Where should we send the reply? Add your email to keep going.'), findsNothing);
       await _close(tester);
     });
 
@@ -278,6 +349,9 @@ void main() {
       await tester.runAsync(() => c.send('I want to talk to a person'));
       expect(opened, _thread);
       expect(c.messages, isEmpty);
+      // Handed over is an answer: no "No answer came back" waits under the thread when the team's page closes.
+      expect(c.errorCode, isNull);
+      expect(c.errorText, isNull);
     });
   });
 

@@ -1452,6 +1452,8 @@ class ConversationController extends ChangeNotifier {
     var settled = false;
     // The answer is a notice: not a failure, and not "no answer".
     var noticed = false;
+    // The person went to the team: the answer is on the support page, not "no answer".
+    var handedOff = false;
     // A turn whose only blocks were older drawings of something already on
     // screen did answer; there is just nothing new to show for it.
     var droppedStale = false;
@@ -1492,6 +1494,7 @@ class ConversationController extends ChangeNotifier {
             }
             final question = messages.lastIndexWhere((m) => m.role == 'user');
             if (question >= 0) messages.removeAt(question);
+            handedOff = true;
             onSupportHandoff?.call(threadId);
           case TurnStatus(:final step):
             if (step == 'action' || step == 'composing') {
@@ -1701,7 +1704,7 @@ class ConversationController extends ChangeNotifier {
     }
     _cutAnswerId = errorCode == 'stream_dropped' || errorCode == 'copilot_stalled' ? open?.serverId : null;
 
-    final produced = _turnBlocks.isNotEmpty || droppedStale || noticed;
+    final produced = _turnBlocks.isNotEmpty || droppedStale || noticed || handedOff;
 
     // Kept past the prune, which lets go of it, for whoever reads it aloud.
     final answer = open;

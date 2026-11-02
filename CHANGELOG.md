@@ -5,6 +5,19 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.73.4
+
+**Fixed**
+
+- A turn that hands the person to the app's team no longer ends as "No
+  answer came back. Try again." under the thread once the support page
+  closes: the handoff is the answer, as the web SDK already treated it.
+- The support page sits on the keyboard: its place to write was drawn
+  under it on Android, so the person could not see what they typed.
+- A person the team cannot reach any other way writes their first line
+  before the email box: the box hid the field from the start, though the
+  server takes one line and asks for the email after it.
+
 ## 0.73.3
 
 **Added**
