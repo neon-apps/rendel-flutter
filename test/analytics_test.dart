@@ -41,10 +41,12 @@ class _Api extends RendelApiClient {
   }
 
   @override
-  Future<bool> sendFeedback(Map<String, dynamic> body) async {
+  Future<Map<String, dynamic>?> sendFeedback(Map<String, dynamic> body) async {
     feedback.add(body);
-    return true;
+    return feedbackAnswer;
   }
+
+  Map<String, dynamic> feedbackAnswer = const {'ok': true};
 
   @override
   Future<void> sendEvent(Map<String, dynamic> event) async => events.add(event);
@@ -75,9 +77,17 @@ WireBlock _block(String type, Map<String, dynamic> props) => WireBlock.tryParse(
 void main() {
   setUp(() => UrlLauncherPlatform.instance = _Launcher());
 
-  Future<_Api> answered(WidgetTester tester, WireBlock block, {bool feedback = false}) async {
+  Future<_Api> answered(
+    WidgetTester tester,
+    WireBlock block, {
+    bool feedback = false,
+    Map<String, dynamic>? feedbackAnswer,
+    void Function()? onOpenTeam,
+  }) async {
     final api = _Api();
-    final c = ConversationController(api: api, actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true);
+    if (feedbackAnswer != null) api.feedbackAnswer = feedbackAnswer;
+    final c = ConversationController(api: api, actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true)
+      ..onOpenTeam = onOpenTeam;
     addTearDown(c.dispose);
     await tester.pumpWidget(MaterialApp(
       home: RendelThemeScope(
@@ -121,6 +131,31 @@ void main() {
         {'message_id': 'm1', 'rating': 1},
       ]);
       expect(find.text('Thanks for telling us'), findsOneWidget);
+    });
+
+    testWidgets('offer the team after a thumb down, where the server says so', (tester) async {
+      var opened = 0;
+      await answered(tester, sure, feedback: true, feedbackAnswer: {'ok': true, 'offer_team': true}, onOpenTeam: () => opened++);
+      expect(find.text('Talk to the team'), findsNothing);
+      await tap(tester, 'Not good');
+      expect(find.text('Talk to the team'), findsOneWidget);
+      await tester.runAsync(() async {
+        await tester.tap(find.text('Talk to the team'));
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      });
+      expect(opened, 1);
+    });
+
+    testWidgets('offer nothing after a thumb up, or where Support is not wired', (tester) async {
+      await answered(tester, sure, feedback: true, feedbackAnswer: {'ok': true, 'offer_team': true}, onOpenTeam: () {});
+      await tap(tester, 'Good');
+      expect(find.text('Talk to the team'), findsNothing);
+    });
+
+    testWidgets('offer nothing where Support is not wired', (tester) async {
+      await answered(tester, sure, feedback: true, feedbackAnswer: {'ok': true, 'offer_team': true});
+      await tap(tester, 'Not good');
+      expect(find.text('Talk to the team'), findsNothing);
     });
 
     test('are read from the published config', () {

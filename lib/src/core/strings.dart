@@ -222,6 +222,7 @@ class RendelStrings {
     this.supportCodeLabel = 'Got a code by email? Enter it here',
     this.supportCodeWrong = 'That code didn\'t match. Try again.',
     this.supportNewLine = 'New message',
+    this.supportOfferTeam = 'Talk to the team',
     this.supportClosed = 'This conversation is closed. Write any time and the team will pick it up.',
     this.supportUnread = 'New messages from the team: {count}',
     this.supportOpen = 'Talk to the team',
@@ -647,6 +648,9 @@ class RendelStrings {
   final String supportCodeLabel;
   final String supportCodeWrong;
   final String supportNewLine;
+
+  /// Under an answer rated down, where the app offers its team then: opens the team's page.
+  final String supportOfferTeam;
   final String supportClosed;
   final String supportUnread;
   final String supportOpen;
@@ -955,6 +959,7 @@ class RendelStrings {
     String? supportCodeLabel,
     String? supportCodeWrong,
     String? supportNewLine,
+    String? supportOfferTeam,
     String? supportClosed,
     String? supportUnread,
     String? supportOpen,
@@ -1158,6 +1163,7 @@ class RendelStrings {
       supportCodeLabel: supportCodeLabel ?? this.supportCodeLabel,
       supportCodeWrong: supportCodeWrong ?? this.supportCodeWrong,
       supportNewLine: supportNewLine ?? this.supportNewLine,
+      supportOfferTeam: supportOfferTeam ?? this.supportOfferTeam,
       supportClosed: supportClosed ?? this.supportClosed,
       supportUnread: supportUnread ?? this.supportUnread,
       supportOpen: supportOpen ?? this.supportOpen,
@@ -1378,6 +1384,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportCodeLabel: 'E-posta ile bir kod mu aldınız? Buraya girin',
     supportCodeWrong: 'Bu kod eşleşmedi. Tekrar deneyin.',
     supportNewLine: 'Yeni mesaj',
+    supportOfferTeam: 'Ekibimizle görüşün',
     supportClosed: 'Bu sohbet kapatıldı. İstediğiniz zaman yazın, ekip ilgilenecektir.',
     supportUnread: 'Ekipten yeni mesajlar: {count}',
     supportOpen: 'Ekiple konuşun',
@@ -1587,6 +1594,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportCodeLabel: 'Code per E-Mail erhalten? Hier eingeben',
     supportCodeWrong: 'Der Code stimmt nicht. Bitte erneut versuchen.',
     supportNewLine: 'Neue Nachricht',
+    supportOfferTeam: 'Mit dem Team sprechen',
     supportClosed: 'Dieses Gespräch ist abgeschlossen. Schreiben Sie jederzeit, das Team meldet sich.',
     supportUnread: 'Neue Nachrichten vom Team: {count}',
     supportOpen: 'Mit dem Team sprechen',
@@ -1795,6 +1803,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportCodeLabel: 'Vous avez reçu un code par e-mail ? Saisissez-le ici',
     supportCodeWrong: 'Ce code ne correspond pas. Réessayez.',
     supportNewLine: 'Nouveau message',
+    supportOfferTeam: 'Parler à l’équipe',
     supportClosed: 'Cette conversation est terminée. Écrivez quand vous voulez, l’équipe reprendra.',
     supportUnread: 'Nouveaux messages de l’équipe : {count}',
     supportOpen: 'Parler à l’équipe',
@@ -2002,6 +2011,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportCodeLabel: '¿Te llegó un código por correo? Escríbelo aquí',
     supportCodeWrong: 'Ese código no coincide. Inténtalo de nuevo.',
     supportNewLine: 'Mensaje nuevo',
+    supportOfferTeam: 'Hablar con el equipo',
     supportClosed: 'Esta conversación está cerrada. Escribe cuando quieras y el equipo la retomará.',
     supportUnread: 'Mensajes nuevos del equipo: {count}',
     supportOpen: 'Hablar con el equipo',
@@ -2208,6 +2218,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportCodeLabel: 'وصلك رمز عبر البريد؟ أدخله هنا',
     supportCodeWrong: 'الرمز غير مطابق. حاول مرة أخرى.',
     supportNewLine: 'رسالة جديدة',
+    supportOfferTeam: 'تحدّث مع الفريق',
     supportClosed: 'هذه المحادثة مغلقة. اكتب في أي وقت وسيتابع الفريق.',
     supportUnread: 'رسائل جديدة من الفريق: {count}',
     supportOpen: 'تحدث إلى الفريق',

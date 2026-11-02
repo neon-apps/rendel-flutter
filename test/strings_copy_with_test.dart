@@ -207,6 +207,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'supportCodeLabel': (s) => s.supportCodeLabel,
   'supportCodeWrong': (s) => s.supportCodeWrong,
   'supportNewLine': (s) => s.supportNewLine,
+  'supportOfferTeam': (s) => s.supportOfferTeam,
   'supportClosed': (s) => s.supportClosed,
   'supportUnread': (s) => s.supportUnread,
   'supportOpen': (s) => s.supportOpen,

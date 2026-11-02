@@ -429,8 +429,9 @@ class RendelApiClient {
 
   /// POST /v1/feedback. Best effort by design: a thumb is a nicety, and a
   /// failed one must never surface an error over the answer it was about.
-  /// Returns whether the server accepted it, for the tests.
-  Future<bool> sendFeedback(Map<String, dynamic> body) async {
+  /// Returns the server's answer once it accepted it (`offer_team` after a
+  /// thumb down where the team is offered), else null.
+  Future<Map<String, dynamic>?> sendFeedback(Map<String, dynamic> body) async {
     try {
       final response = await _http
           .post(
@@ -439,9 +440,11 @@ class RendelApiClient {
             body: jsonEncode(body),
           )
           .timeout(config.requestTimeout);
-      return response.statusCode == 200;
+      if (response.statusCode != 200) return null;
+      final decoded = jsonDecode(response.body);
+      return decoded is Map<String, dynamic> ? decoded : const {};
     } catch (_) {
-      return false;
+      return null;
     }
   }
 

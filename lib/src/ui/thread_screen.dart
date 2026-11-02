@@ -1555,6 +1555,15 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   ],
                 ),
               ),
+            // After a thumb down, where the app offers its team then.
+            if (!detail && finished && widget.feedback && answered.offerTeam && answered.rating == -1 && controller.onOpenTeam != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: RendelActionButton(label: _strings.supportOfferTeam, quiet: true, onTap: () => controller.onOpenTeam?.call()),
+                ),
+              ),
           ],
         );
       },

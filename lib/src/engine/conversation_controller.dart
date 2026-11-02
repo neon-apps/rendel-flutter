@@ -87,6 +87,11 @@ class RendelMessage extends ChangeNotifier {
   /// interrupting anyone about.
   int? rating;
 
+  /// The server asked, after a thumb down, that the team be offered under
+  /// this answer: the app's customer turned "after someone rates an answer
+  /// down" on in Support's settings.
+  bool offerTeam = false;
+
   /// The first picture the user sent with this question, kept on this device
   /// for the line its answer page opens with. Null for every other message.
   Uint8List? image;
@@ -724,7 +729,11 @@ class ConversationController extends ChangeNotifier {
     message.touch();
     if (cleared) return;
 
-    await api.sendFeedback({'message_id': id, 'rating': rating});
+    final answer = await api.sendFeedback({'message_id': id, 'rating': rating});
+    if (answer?['offer_team'] == true && message.rating == -1) {
+      message.offerTeam = true;
+      message.touch();
+    }
   }
 
   /// Takes back [change], a save shown under an answer ("I'll remember: … ·
@@ -1166,6 +1175,10 @@ class ConversationController extends ChangeNotifier {
   /// question went to them as the thread's first line, and the support page
   /// opens on the thread. Null where Support is not wired: nothing opens.
   void Function(String threadId)? onSupportHandoff;
+
+  /// The person took the team offered under an answer they rated down: the
+  /// support page opens. Null where Support is not wired: no offer is drawn.
+  void Function()? onOpenTeam;
 
   /// Starts over: the thread empties, and the conversation is not the one a
   /// relaunch opens on any more.

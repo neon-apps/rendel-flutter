@@ -784,7 +784,8 @@ class Rendel {
         ..addListener(_controllerMoved)
         ..manifestHash = _currentManifestHash()
         ..onConversation = _rememberConversation
-        ..onSupportHandoff = _onSupportHandoff;
+        ..onSupportHandoff = _onSupportHandoff
+        ..onOpenTeam = _onOpenTeam;
 
   /// The thread on screen, in its sheet or in the bubble. Null when the
   /// copilot is closed.
@@ -868,6 +869,9 @@ class Rendel {
     if (presentation == null) return;
     unawaited(openSupport(presentation.origin));
   }
+
+  /// The team offered under an answer rated down, taken: the support page opens.
+  static void _onOpenTeam() => _onSupportHandoff('');
 
   /// Call on logout: clears the thread and the user. The next turn from this
   /// phone is anonymous until the next [identify], and the server is told, so
