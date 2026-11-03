@@ -5,6 +5,36 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.75.0
+
+**Changed**
+
+- The page where a person writes to the app's team reads like a messaging
+  app, as on the web (Web 0.51.0). The person's lines sit at the end of the
+  page in the app's accent, the team's at the start under the name and
+  initial of whoever answered, and one speaker's lines within five minutes
+  read as one run with the time under it. A line on its way says
+  "Sending…", one that did not go is outlined with a way to send it again,
+  the team typing shows three dots, and when the team is away the card says
+  when they are back. "I'm sorted" (or "Back to the assistant", before the
+  team has written) is a button in the header instead of a link at the
+  bottom, and the box to write in always names the team. Photos and files
+  are behind one paperclip. The person still never sees whether the team
+  has read their line; only the team sees that.
+
+**Added**
+
+- A conversation with the team that is not sorted no longer disappears when
+  its page closes: while it is open, the top of the thread shows "Your
+  conversation with the {team} team" with the newest line and the team's
+  unread count, and a tap opens it again. It is there after the app is
+  relaunched, because the thread is read from the server, so an app that
+  opens Rendel from its own button (`Rendel.open`) finds it too. The count
+  is read when the thread opens and every minute while that conversation is
+  open. New strings `supportRowTitle` and `supportSending` in every
+  language; `ThreadScreen` takes `support`, `supportTeam` and
+  `onSupportOpen`.
+
 ## 0.74.0
 
 **Changed**

@@ -624,6 +624,8 @@ class Rendel {
     if (api == null || !isEnabled) return;
     // The messages waiting for this person, as cards at the top of what opens.
     unawaited(_refreshInbox());
+    // And their conversation with the team, if one is open: its row says what came since.
+    if (_supportTeam != null) unawaited(_supportOf(api).refreshUnread());
     // Already presented: in the bubble while a screen it opened is in front,
     // the launcher does what the bubble does. Over the app, a second sheet of
     // the same thread is not drawn.
@@ -729,6 +731,10 @@ class Rendel {
           voice: _config.readAloud ? _voice : null,
           followups: RendelFollowups.instance.cards,
           onFollowupOpen: (id) => unawaited(openFollowup(context, id: id)),
+          // An open conversation with the team waits at the top, for a host whose own button opens Rendel.
+          support: _supportTeam != null ? _supportOf(api) : null,
+          supportTeam: _supportTeam,
+          onSupportOpen: () => unawaited(openSupport(presentation.origin)),
         ),
       ),
     );

@@ -33,6 +33,7 @@ import 'memory_chips.dart';
 import 'memory_sheet.dart';
 import '../core/log.dart';
 import '../core/followups.dart';
+import '../core/support.dart';
 import '../core/strings.dart';
 import 'followup_card.dart';
 import 'theme.dart';
@@ -76,6 +77,9 @@ class ThreadScreen extends StatefulWidget {
     this.voice,
     this.followups,
     this.onFollowupOpen,
+    this.support,
+    this.supportTeam,
+    this.onSupportOpen,
   });
 
   final ConversationController controller;
@@ -171,6 +175,17 @@ class ThreadScreen extends StatefulWidget {
   final ValueListenable<List<RendelFollowup>>? followups;
   final void Function(String id)? onFollowupOpen;
 
+  /// This person's conversation with the app's team. While it is open and its
+  /// page is not on screen, a row at the top of the thread says so, with the
+  /// team's unread count, and [onSupportOpen] opens it again: a host's own
+  /// button opens the thread, and the conversation is found there (Tuna,
+  /// 2026-11-03: "support mesajları kaybolmamalı"). Null draws none.
+  final RendelSupport? support;
+
+  /// The team's name, while Support is on.
+  final String? supportTeam;
+  final VoidCallback? onSupportOpen;
+
   @override
   State<ThreadScreen> createState() => _ThreadScreenState();
 }
@@ -190,6 +205,13 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// them, so a card never covers the answer (QA R2-13, an Undo line hidden).
   final _cards = ValueNotifier<double>(0);
   late final RendelDispatcher _dispatch;
+
+  /// The team's count is read again every minute while their conversation is open, so the row keeps up.
+  Timer? _supportBeat;
+
+  /// Not asked for twice while the row waits for the thread's lines; read again when the count moves.
+  bool _rowLoading = false;
+  int _rowUnread = 0;
 
   /// The conversation's language the screen is drawn in; see [_strings].
   String? _language;
@@ -212,6 +234,10 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   @override
   void initState() {
     super.initState();
+    _supportBeat = Timer.periodic(const Duration(minutes: 1), (_) {
+      final support = widget.support;
+      if (support != null && support.open) unawaited(support.refreshUnread());
+    });
     _dispatch = RendelDispatcher(
       onAction: _act,
       onSubmitForm: widget.controller.submitForm,
@@ -350,6 +376,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    _supportBeat?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_turnPages);
     if (widget.controller.onAnswered == _readAloud) widget.controller.onAnswered = null;
@@ -1263,10 +1290,12 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           ),
         ),
       ),
-      if (widget.followups case final followups?)
-        ValueListenableBuilder<List<RendelFollowup>>(
-          valueListenable: followups,
-          builder: (context, all, _) {
+      if (widget.followups != null || widget.support != null)
+        ListenableBuilder(
+          listenable: Listenable.merge([widget.followups, widget.support?.value]),
+          builder: (context, _) {
+            final all = widget.followups?.value ?? const <RendelFollowup>[];
+            final row = _supportRow(theme);
             // A task notice about the conversation on screen is moot over it: not drawn, and put away.
             final onScreen = controller.conversationId;
             final waiting = [for (final card in all) if (onScreen == null || card.conversationId != onScreen) card];
@@ -1274,7 +1303,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
               WidgetsBinding.instance.addPostFrameCallback((_) => RendelFollowups.instance.seen(onScreen));
             }
             // Positioned even when empty: a sized child would size the stack.
-            if (waiting.isEmpty) {
+            if (waiting.isEmpty && row == null) {
               if (_cards.value != 0) WidgetsBinding.instance.addPostFrameCallback((_) => _cards.value = 0);
               return const Positioned(top: 0, left: 0, child: SizedBox.shrink());
             }
@@ -1298,6 +1327,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          if (row != null) Padding(padding: EdgeInsets.only(bottom: theme.space.sm), child: row),
                           for (final card in waiting)
                             Padding(
                               padding: EdgeInsets.only(bottom: theme.space.sm),
@@ -1320,6 +1350,93 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           },
         ),
     ];
+  }
+
+  /// An open conversation with the team, at the top of the thread: it opens
+  /// again from here, saying the newest line and how many the team wrote
+  /// since. Null while there is none, or its page is on screen.
+  Widget? _supportRow(RendelTheme theme) {
+    final support = widget.support;
+    final team = widget.supportTeam;
+    if (support == null || team == null || !support.open) return null;
+    final strings = _strings;
+    final v = support.value.value;
+    // New lines from the team since this screen read the thread: the row says the newest, not the last it saw.
+    if ((v.entries.isEmpty || v.unread != _rowUnread) && !_rowLoading) {
+      _rowUnread = v.unread;
+      _rowLoading = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(support.load().whenComplete(() => _rowLoading = false));
+      });
+    }
+    final last = v.entries.reversed.where((e) => !e.marker).firstOrNull;
+    final who = last == null ? null : (last.author == RendelSupportAuthorKind.user ? strings.supportYou : (last.authorName ?? team));
+    final said = last == null
+        ? ((v.state?.teamHere ?? false) ? strings.supportHere : strings.supportAway)
+        : '$who: ${(last.text?.isNotEmpty ?? false) ? last.text : last.files.join(', ')}';
+    final agent = v.entries.reversed.where((e) => e.author == RendelSupportAuthorKind.agent).firstOrNull?.authorName;
+    final title = strings.supportRowTitleOf(team);
+    final unread = v.unread;
+    final initial = (agent ?? team).trim();
+    return RendelPressable(
+      semanticLabel: unread > 0 ? '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}' : title,
+      onTap: () => widget.onSupportOpen?.call(),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: theme.space.md, vertical: theme.space.sm + 4),
+        decoration: BoxDecoration(
+          color: theme.colors.surfaceRaised,
+          borderRadius: BorderRadius.circular(theme.radius.card),
+          border: Border.all(color: theme.colors.line),
+          boxShadow: theme.lift,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: theme.colors.surfaceHigh, border: Border.all(color: theme.hairline)),
+              child: Text(
+                initial.isEmpty ? '·' : initial.characters.first.toUpperCase(),
+                style: theme.text.caption.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w600, fontSize: 15, height: 1),
+              ),
+            ),
+            SizedBox(width: theme.space.sm + 4),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(title, style: theme.text.labelEmphasis),
+                  const SizedBox(height: 1),
+                  Text(said, style: theme.text.labelSoft, maxLines: 1, overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ),
+            SizedBox(width: theme.space.sm),
+            if (unread > 0)
+              Container(
+                constraints: const BoxConstraints(minWidth: 22),
+                height: 22,
+                padding: const EdgeInsets.symmetric(horizontal: 7),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: theme.colors.accent, borderRadius: BorderRadius.circular(11)),
+                child: Text(
+                  unread > 9 ? '9+' : '$unread',
+                  style: theme.text.caption.copyWith(color: theme.colors.onAccent, fontWeight: FontWeight.w700, height: 1),
+                ),
+              )
+            else
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: theme.tint),
+                child: Icon(Icons.arrow_forward_rounded, size: 16, color: theme.colors.onSurfaceSoft),
+              ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// The question, written over the screen until the answer starts.

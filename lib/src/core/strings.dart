@@ -226,6 +226,8 @@ class RendelStrings {
     this.supportClosed = 'This conversation is closed. Write any time and the team will pick it up.',
     this.supportUnread = 'New messages from the team: {count}',
     this.supportOpen = 'Talk to the team',
+    this.supportRowTitle = 'Your conversation with the {team} team',
+    this.supportSending = 'Sending…',
     this.memoryEmpty = 'Tell me a preference once, like “always lactose-free”, and I\'ll keep it in mind.',
     this.memoryForget = 'Forget',
     this.memoryForgetAll = 'Forget all',
@@ -654,6 +656,12 @@ class RendelStrings {
   final String supportClosed;
   final String supportUnread;
   final String supportOpen;
+
+  /// At the top of the thread while a conversation with the team is open: it opens again from there.
+  final String supportRowTitle;
+
+  /// Under the person's line while it is on its way to the team.
+  final String supportSending;
   final String memoryEmpty;
   final String memoryForget;
   final String memoryForgetAll;
@@ -699,6 +707,7 @@ class RendelStrings {
   String supportTeamOf(String team) => supportTeam.replaceAll('{team}', team);
   String supportWriteToOf(String name) => supportWriteTo.replaceAll('{name}', name);
   String supportWriteTeamOf(String team) => supportWriteTeam.replaceAll('{team}', team);
+  String supportRowTitleOf(String team) => supportRowTitle.replaceAll('{team}', team);
   String supportTypingOf(String name) => supportTyping.replaceAll('{name}', name);
   String supportUnreadOf(int count) => supportUnread.replaceAll('{count}', '$count');
   String stepOfCount(int step, int count) =>
@@ -963,6 +972,8 @@ class RendelStrings {
     String? supportClosed,
     String? supportUnread,
     String? supportOpen,
+    String? supportRowTitle,
+    String? supportSending,
     String? memoryEmpty,
     String? memoryForget,
     String? memoryForgetAll,
@@ -1167,6 +1178,8 @@ class RendelStrings {
       supportClosed: supportClosed ?? this.supportClosed,
       supportUnread: supportUnread ?? this.supportUnread,
       supportOpen: supportOpen ?? this.supportOpen,
+      supportRowTitle: supportRowTitle ?? this.supportRowTitle,
+      supportSending: supportSending ?? this.supportSending,
       memoryEmpty: memoryEmpty ?? this.memoryEmpty,
       memoryForget: memoryForget ?? this.memoryForget,
       memoryForgetAll: memoryForgetAll ?? this.memoryForgetAll,
@@ -1388,6 +1401,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportClosed: 'Bu sohbet kapatıldı. İstediğiniz zaman yazın, ekip ilgilenecektir.',
     supportUnread: 'Ekipten yeni mesajlar: {count}',
     supportOpen: 'Ekiple konuşun',
+    supportRowTitle: '{team} ekibiyle görüşmeniz',
+    supportSending: 'Gönderiliyor…',
     memoryEmpty: 'Bana \'hep laktozsuz\' gibi bir tercihinizi söyleyin, sonraki seferler için aklımda tutayım.',
     memoryForget: 'Unut',
     memoryForgetAll: 'Tümünü unut',
@@ -1598,6 +1613,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportClosed: 'Dieses Gespräch ist abgeschlossen. Schreiben Sie jederzeit, das Team meldet sich.',
     supportUnread: 'Neue Nachrichten vom Team: {count}',
     supportOpen: 'Mit dem Team sprechen',
+    supportRowTitle: 'Ihr Gespräch mit dem Team von {team}',
+    supportSending: 'Wird gesendet…',
     memoryEmpty: 'Sagen Sie mir einmal eine Vorliebe, etwa „immer laktosefrei“, und ich behalte sie im Kopf.',
     memoryForget: 'Vergessen',
     memoryForgetAll: 'Alles vergessen',
@@ -1807,6 +1824,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportClosed: 'Cette conversation est terminée. Écrivez quand vous voulez, l’équipe reprendra.',
     supportUnread: 'Nouveaux messages de l’équipe : {count}',
     supportOpen: 'Parler à l’équipe',
+    supportRowTitle: 'Votre conversation avec l’équipe {team}',
+    supportSending: 'Envoi…',
     memoryEmpty: 'Dites-moi une préférence une fois, comme « toujours sans lactose », et je la garderai en tête.',
     memoryForget: 'Oublier',
     memoryForgetAll: 'Tout oublier',
@@ -2015,6 +2034,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportClosed: 'Esta conversación está cerrada. Escribe cuando quieras y el equipo la retomará.',
     supportUnread: 'Mensajes nuevos del equipo: {count}',
     supportOpen: 'Hablar con el equipo',
+    supportRowTitle: 'Tu conversación con el equipo de {team}',
+    supportSending: 'Enviando…',
     memoryEmpty: 'Dime una preferencia una vez, como «siempre sin lactosa», y la tendré en cuenta.',
     memoryForget: 'Olvidar',
     memoryForgetAll: 'Olvidar todo',
@@ -2222,6 +2243,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportClosed: 'هذه المحادثة مغلقة. اكتب في أي وقت وسيتابع الفريق.',
     supportUnread: 'رسائل جديدة من الفريق: {count}',
     supportOpen: 'تحدث إلى الفريق',
+    supportRowTitle: 'محادثتك مع فريق {team}',
+    supportSending: 'جارٍ الإرسال…',
     memoryEmpty: 'أخبرني بتفضيل مرة واحدة، مثل «دائمًا خالٍ من اللاكتوز»، وسأتذكره.',
     memoryForget: 'انسَ',
     memoryForgetAll: 'انسَ الكل',

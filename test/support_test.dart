@@ -1,9 +1,10 @@
 // Human support on a phone (design/plans/human-support.md §3, §10): an
 // explicit ask hands the turn to the team; the support page draws the thread
-// as lines with an author whenever the speaker changes, never "Seen"; a
-// person nobody can reach is asked for an email after the first line; a line
-// that did not go says so and goes again under the same id; and the config
-// says when an app's Support is on.
+// as a messaging app does, a speaker's lines as one run under who wrote them,
+// never "Seen" or "Read"; a person nobody can reach is asked for an email
+// after the first line; a line that did not go says so and goes again under
+// the same id; an open conversation waits at the top of the thread once its
+// page is closed; and the config says when an app's Support is on.
 
 import 'dart:async';
 import 'dart:convert';
@@ -17,6 +18,7 @@ import 'package:rendel/src/core/support.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/support_sheet.dart';
+import 'package:rendel/src/ui/thread_screen.dart';
 
 const _thread = '00000000-0000-4000-8000-000000000001';
 const _invocation = '00000000-0000-4000-8000-0000000000aa';
@@ -68,7 +70,7 @@ class _Server {
     http.StreamedResponse json(Object value, [int status = 200]) =>
         http.StreamedResponse(Stream.value(utf8.encode(jsonEncode(value))), status, headers: {'content-type': 'application/json'});
     if (path == '/v1/support/current') return json({'thread_id': _thread, 'conversation_id': 'c1', 'state': state, 'entries': entries});
-    if (path == '/v1/support/unread') return json({'unread': 2});
+    if (path == '/v1/support/unread') return json({'unread': 2, 'open': state['state'] != 'resolved'});
     if (request.method == 'POST') posts.add((path: path.split('/threads/$_thread/').last, body: sent));
     if (path.endsWith('/messages')) {
       final status = messageStatus.isEmpty ? 200 : messageStatus.removeAt(0);
@@ -175,7 +177,7 @@ Future<void> _close(WidgetTester tester) async {
 
 void main() {
   group('the support page', () {
-    testWidgets('draws an author line only when the speaker changes, and never says Seen', (tester) async {
+    testWidgets("groups a speaker's lines, names who answered, and never says Seen or Read (K9)", (tester) async {
       final server = _Server(
         entries: [
           _entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'),
@@ -188,13 +190,47 @@ void main() {
       await _open(tester, server.support());
       expect(find.text('Grove team'), findsOneWidget);
       expect(find.text('Your message is with the Grove team.'), findsOneWidget);
-      expect(find.textContaining('You · '), findsOneWidget);
-      expect(find.textContaining('Ayşe · '), findsOneWidget);
+      // The person's two lines are one run; the team's is under who wrote it, once.
+      expect(find.text('Ayşe'), findsOneWidget);
+      expect(find.text('You'), findsNothing);
       expect(find.textContaining('Seen'), findsNothing);
-      // The team has answered: no "By mistake?", but "I'm sorted".
+      expect(find.textContaining('Read'), findsNothing);
+      // The person's lines on the end, the team's on the start.
+      final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
+      expect(tester.getTopRight(find.text('Kargom gelmedi')).dx, greaterThan(width * 0.8));
+      expect(tester.getTopLeft(find.text('Hemen bakıyorum.')).dx, lessThan(width * 0.3));
+      // The team has answered: "I'm sorted" in the header, no "Back to the assistant".
       expect(find.text("I'm sorted"), findsOneWidget);
-      expect(find.text('Write to Ayşe…'), findsNothing);
+      expect(find.text('Back to the assistant'), findsNothing);
+      // The box names the team, never the person in it.
+      expect(find.widgetWithText(TextField, 'Write to the Grove team…'), findsOneWidget);
       await _close(tester);
+    });
+
+    testWidgets("keeps an open conversation at the top of the thread with the team's count, and opens it from there", (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Hemen bakıyorum.')],
+        state: _state(mode: 'human'),
+      );
+      final support = server.support();
+      final controller = ConversationController(api: server.api(), actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true);
+      addTearDown(controller.dispose);
+      var opened = 0;
+      // As after a restart: the API says a conversation is open, and the row reads its lines.
+      await tester.runAsync(support.refreshUnread);
+      await tester.pumpWidget(_app(ThreadScreen(controller: controller, support: support, supportTeam: 'Grove', onSupportOpen: () => opened++)));
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.text('Your conversation with the Grove team'), findsOneWidget);
+      expect(find.text('Ayşe: Hemen bakıyorum.'), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('New messages from the team: 2')), findsOneWidget);
+      await tester.tap(find.text('Your conversation with the Grove team'));
+      expect(opened, 1);
+      // Sorted: the row goes.
+      server.state = {..._state(mode: 'human'), 'state': 'resolved'};
+      await tester.runAsync(support.load);
+      await tester.pump();
+      expect(find.text('Your conversation with the Grove team'), findsNothing);
     });
 
     testWidgets('keeps the place to write above the keyboard', (tester) async {
@@ -223,11 +259,11 @@ void main() {
       expect(tester.takeException(), isNull);
       final ar = RendelStrings.forLocale('ar');
       expect(find.text(ar.supportSorted), findsOneWidget);
-      // The page's start is on the right: the person's line hugs it, the close is at the other end.
+      // The page's start is on the right: the team's line and the close are there, the person's own line on the other side.
       final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
-      final line = tester.getTopRight(find.text('لم تصل شحنتي بعد، والطلب رقم M-2021'));
-      expect(line.dx, greaterThan(width * 0.8));
-      expect(tester.getCenter(find.byIcon(Icons.close_rounded)).dx, lessThan(width / 2));
+      expect(tester.getTopLeft(find.text('لم تصل شحنتي بعد، والطلب رقم M-2021')).dx, lessThan(width * 0.2));
+      expect(tester.getTopRight(find.text('سأتحقق من ذلك الآن.')).dx, greaterThan(width * 0.7));
+      expect(tester.getCenter(find.byIcon(Icons.close_rounded)).dx, greaterThan(width / 2));
       await _close(tester);
     });
 
