@@ -353,6 +353,32 @@ void main() {
       await _close(tester);
     });
 
+    testWidgets('brings the warning above the keyboard when Save keeps the field', (tester) async {
+      final server = _Server(
+        entries: [for (var i = 1; i <= 6; i++) _entry(i, text: 'Kargom hâlâ gelmedi, sipariş $i')],
+        state: _state(contact: {'state': 'none', 'required': true}),
+      );
+      // A phone, whose keyboard comes up under the field once it is tapped.
+      tester.view.physicalSize = const Size(402, 874) * tester.view.devicePixelRatio;
+      addTearDown(tester.view.resetPhysicalSize);
+      await _open(tester, server.support());
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.showKeyboard(find.byType(TextField).first);
+      tester.view.viewInsets = FakeViewPadding(bottom: 336 * tester.view.devicePixelRatio);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.enterText(find.byType(TextField).first, 'ahmet');
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      final warning = find.text('Check the address. It should look like you@example.com.');
+      final thread = tester.getRect(find.ancestor(of: warning, matching: find.byType(Scrollable)).first);
+      expect(tester.getRect(warning).bottom, lessThanOrEqualTo(thread.bottom));
+      expect(tester.getRect(find.byType(TextField).first).top, greaterThanOrEqualTo(thread.top));
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('says a line did not go, and sends it again under the same id', (tester) async {
       final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')])..messageStatus.add(500);
       await _open(tester, server.support());

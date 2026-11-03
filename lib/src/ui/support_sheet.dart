@@ -980,6 +980,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           textCapitalization: TextCapitalization.none,
           autofillHints: const [AutofillHints.email],
           textInputAction: TextInputAction.done,
+          // Save keeps the field and its keyboard: the room under it, where the warning comes, is kept above them too.
+          scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 88),
           style: theme.text.body,
           decoration: _bare(theme, strings.supportContactPlaceholder),
           onChanged: (_) {

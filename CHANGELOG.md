@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.76.1
+
+**Fixed**
+
+- On the page with the team, Save on a wrong address keeps the field and its
+  keyboard, and the warning under the field now stays above the keyboard
+  instead of under it (Web 0.52.1 does the same).
+
 ## 0.76.0
 
 **Changed**
