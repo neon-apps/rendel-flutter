@@ -22,6 +22,7 @@ export 'src/core/pairing.dart' show RendelPairResult, RendelPairFailure;
 export 'src/core/taps.dart' show RendelName, RendelMask, RendelIgnore;
 export 'src/core/events.dart' show RendelChange, RendelEvent, RendelWaiting;
 export 'src/core/followups.dart' show RendelApnsToken, RendelFollowup;
+export 'src/core/support.dart' show RendelSupportReply;
 export 'src/core/schema.dart' show RendelSchema;
 // Part of RendelDispatcher's signature, so a host registering a custom
 // builder has to be able to name it.

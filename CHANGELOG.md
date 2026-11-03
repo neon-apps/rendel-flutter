@@ -5,6 +5,27 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.77.0
+
+**Added**
+
+- Recent on Rendel's start: under the suggestions, the person's last three
+  sorted conversations with the app's team (the open one keeps its row at
+  the top), and See all, which opens every one by week with a search. A
+  sorted one opens as it was, under "Sorted on Oct 28", and its box says a
+  line opens it again; writing in it opens it again in place, under
+  "Opened again" (Web 0.53.0 draws the same).
+- The team's reply while the person is in the app: a banner across the top
+  while Rendel is closed (from `RendelLauncher`, which checks every half
+  minute while a conversation is open), a line at the top of an answer while
+  it is open; nothing jumps. The page opens at "New" above the lines they
+  had not read, from the banner, the row or a push.
+- The row back in Rendel says "Waiting for the team · back tomorrow at
+  09:00" with a clock while the team is away.
+- `Rendel.supportStatus` (`open`, `unread`) for a dot on your own Ask
+  button; `Rendel.openSupport(context, thread:)` opens one of the person's
+  conversations; a push from the team opens its own thread.
+
 ## 0.76.1
 
 **Fixed**

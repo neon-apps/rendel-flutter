@@ -56,6 +56,12 @@ class _RendelLauncherState extends State<RendelLauncher> {
   final _link = LayerLink();
   OverlayEntry? _popup;
   OverlayEntry? _banner;
+
+  /// The team's reply while Rendel is closed, across the top.
+  OverlayEntry? _reply;
+
+  /// Every half minute while this is on screen: a reply from the team comes in as a banner.
+  Timer? _supportBeat;
   StreamSubscription<RendelEvent>? _events;
 
   /// Whether the popup and the banner were placed for the dragged launcher.
@@ -73,7 +79,9 @@ class _RendelLauncherState extends State<RendelLauncher> {
     RendelFollowups.instance.current.addListener(_schedule);
     Rendel.minimised.addListener(_schedule);
     Rendel.configRevision.addListener(_schedule);
+    Rendel.supportReply.addListener(_schedule);
     _events = Rendel.events.listen((_) => _schedule());
+    _supportBeat = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(Rendel.supportTick()));
     _schedule();
   }
 
@@ -95,11 +103,15 @@ class _RendelLauncherState extends State<RendelLauncher> {
     RendelFollowups.instance.current.removeListener(_schedule);
     Rendel.minimised.removeListener(_schedule);
     Rendel.configRevision.removeListener(_schedule);
+    Rendel.supportReply.removeListener(_schedule);
     _events?.cancel();
+    _supportBeat?.cancel();
     _popup?.remove();
     _popup = null;
     _banner?.remove();
     _banner = null;
+    _reply?.remove();
+    _reply = null;
     _Floating.leave(this);
     super.dispose();
   }
@@ -120,7 +132,11 @@ class _RendelLauncherState extends State<RendelLauncher> {
       _floating = floating;
       _place(false, () => _popup, (entry) => _popup = entry, _buildPopup);
       _place(false, () => _banner, (entry) => _banner = entry, _buildBanner);
+      _place(false, () => _reply, (entry) => _reply = entry, _buildReply);
     }
+    // The team's reply takes the top first: it is the person's own conversation.
+    final reply = (!floating || _Floating.host == this) && Rendel.supportReply.value != null && Rendel.isInitialized && !Rendel.isOpen;
+    _place(reply, () => _reply, (entry) => _reply = entry, _buildReply);
     final waiting = RendelFollowups.instance.current.value;
     final show = (!floating || _Floating.host == this) &&
         waiting != null &&
@@ -128,7 +144,7 @@ class _RendelLauncherState extends State<RendelLauncher> {
         Rendel.isEnabled &&
         !Rendel.isOpen &&
         !Rendel.minimised.value;
-    final banner = show && waiting.isBanner;
+    final banner = show && waiting.isBanner && !reply;
     _place(show && !banner, () => _popup, (entry) => _popup = entry, _buildPopup);
     _place(banner, () => _banner, (entry) => _banner = entry, _buildBanner);
     if (show) RendelFollowups.instance.shown();
@@ -169,6 +185,77 @@ class _RendelLauncherState extends State<RendelLauncher> {
           closeLabel: Rendel.strings.closeDetail,
           onOpen: () => unawaited(Rendel.openFollowup(context)),
           onDismiss: Rendel.dismissFollowup,
+        ),
+      ),
+    );
+  }
+
+  /// The team wrote back while Rendel was closed: who, what, and Open, which goes to the line.
+  Widget _buildReply(BuildContext overlayContext) {
+    final reply = Rendel.supportReply.value;
+    if (reply == null || !mounted) return const SizedBox.shrink();
+    final theme = context.dependOnInheritedWidgetOfExactType<RendelThemeScope>()?.theme ?? Rendel.themeOf(context);
+    final strings = Rendel.strings;
+    final top = MediaQuery.paddingOf(overlayContext).top;
+    final initial = reply.name.trim().isEmpty ? '·' : reply.name.trim().characters.first.toUpperCase();
+    return Positioned(
+      top: top + theme.space.sm,
+      left: theme.space.lg,
+      right: theme.space.lg,
+      child: Material(
+        type: MaterialType.transparency,
+        child: Semantics(
+          liveRegion: true,
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            decoration: BoxDecoration(
+              color: theme.colors.surfaceRaised,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.06), spreadRadius: 1),
+                BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.3), offset: const Offset(0, 18), blurRadius: 44, spreadRadius: -12),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(shape: BoxShape.circle, color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.14), theme.colors.surfaceRaised)),
+                  child: Text(initial, style: theme.text.caption.copyWith(color: theme.accentText, fontWeight: FontWeight.w700, fontSize: 14, height: 1)),
+                ),
+                SizedBox(width: theme.space.sm + 2),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(strings.supportRepliedOf(reply.name), style: theme.text.labelEmphasis, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      if (reply.text.isNotEmpty) Text(reply.text, style: theme.text.labelSoft, maxLines: 2, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  tooltip: null,
+                  onPressed: () => Rendel.supportReply.value = null,
+                  icon: Icon(Icons.close_rounded, size: 18, color: theme.colors.onSurfaceSoft, semanticLabel: strings.closeDetail),
+                ),
+                RendelPressable(
+                  semanticLabel: strings.supportShow,
+                  onTap: () {
+                    Rendel.supportReply.value = null;
+                    unawaited(Rendel.openSupport(context));
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    decoration: BoxDecoration(color: theme.colors.accent, borderRadius: BorderRadius.circular(999)),
+                    child: Text(strings.supportShow, style: theme.text.caption.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: theme.colors.onAccent)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

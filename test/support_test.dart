@@ -21,6 +21,7 @@ import 'package:rendel/src/ui/support_sheet.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
 
 const _thread = '00000000-0000-4000-8000-000000000001';
+const _past = '00000000-0000-4000-8000-0000000000a1';
 const _invocation = '00000000-0000-4000-8000-0000000000aa';
 
 Map<String, dynamic> _entry(int seq, {String author = 'user', String? name, String? text, String kind = 'message', String? client, List<Object> blocks = const []}) => {
@@ -56,6 +57,15 @@ class _Server {
   /// How each message post is answered, in turn; 200 once they run out.
   final List<int> messageStatus = [];
 
+  /// The device's conversations with the team, for Recent.
+  List<Map<String, dynamic>> threads = const [];
+
+  /// Past threads by id, as they were.
+  final Map<String, ({Map<String, dynamic> state, List<Map<String, dynamic>> entries})> past = {};
+
+  /// A line in a sorted thread opens it again; with [otherOpen], another one is open and it cannot.
+  String? otherOpen;
+
   /// The stream is held open and says nothing, as a quiet thread's does, until a test [say]s something on it.
   final StreamController<List<int>> _quiet = StreamController<List<int>>();
 
@@ -71,8 +81,22 @@ class _Server {
         http.StreamedResponse(Stream.value(utf8.encode(jsonEncode(value))), status, headers: {'content-type': 'application/json'});
     if (path == '/v1/support/current') return json({'thread_id': _thread, 'conversation_id': 'c1', 'state': state, 'entries': entries});
     if (path == '/v1/support/unread') return json({'unread': 2, 'open': state['state'] != 'resolved'});
+    if (path == '/v1/support/threads') return json({'threads': threads});
+    if (request.method == 'GET' && path.startsWith('/v1/support/threads/') && path.split('/').length == 5) {
+      final id = path.split('/').last;
+      final known = past[id];
+      return json({'thread_id': known == null ? _thread : id, 'conversation_id': 'c2', 'state': known?.state ?? state, 'entries': known?.entries ?? entries});
+    }
     if (request.method == 'POST') posts.add((path: path.split('/threads/$_thread/').last, body: sent));
     if (path.endsWith('/messages')) {
+      final id = path.split('/')[4];
+      if (past[id] case final known? when known.state['state'] == 'resolved') {
+        if (otherOpen != null) return json({'error': {'code': 'another_open', 'thread_id': otherOpen}}, 409);
+        final reopened = {..._entry(known.entries.length + 1, kind: 'marker', author: 'system', text: 'Back with the Grove team.'), 'marker': 'reopened'};
+        final line = _entry(known.entries.length + 2, text: sent!['text'] as String, client: sent['client_msg_id'] as String);
+        past[id] = (state: {...known.state, 'state': 'open', 'mode': 'human'}, entries: [...known.entries, reopened, line]);
+        return json({'entry': line, 'reopened': reopened});
+      }
       final status = messageStatus.isEmpty ? 200 : messageStatus.removeAt(0);
       if (status != 200) return json({'error': {'code': 'internal'}}, status);
       final entry = _entry(entries.length + 1, text: sent!['text'] as String, client: sent['client_msg_id'] as String);
@@ -247,8 +271,8 @@ void main() {
       await _settle(tester);
       expect(find.text('You marked this sorted'), findsOneWidget);
       expect(find.text('Write any time and the Grove team picks it up again.'), findsOneWidget);
-      // The box to write in stays: a line within the week opens it again.
-      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
+      // The box to write in stays: a line opens it again.
+      expect(find.widgetWithText(TextField, 'Write to open it again'), findsOneWidget);
       expect(find.text("I'm sorted"), findsNothing);
       // Sorted, the header shows the tick where the close was: out by the way back.
       await tester.tap(find.byIcon(Icons.chevron_left_rounded));
@@ -266,6 +290,119 @@ void main() {
       final field = find.byType(TextField).last;
       expect(tester.getBottomLeft(field).dy, lessThanOrEqualTo(height - 300));
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('lists the sorted ones under the suggestions, and See all opens them by week with a search', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: {..._state(), 'state': 'resolved'});
+      final now = DateTime.now().toUtc();
+      server.threads = [
+        {'thread_id': _thread, 'state': 'resolved', 'title': 'Kargom gelmedi', 'unread': 0, 'last_message_at': now.toIso8601String()},
+        {'thread_id': _past, 'state': 'resolved', 'title': 'My order 1042 came with the box crushed', 'agent': 'Ayşe', 'unread': 0, 'last_message_at': '2026-10-12T10:00:00Z'},
+      ];
+      final support = server.support();
+      final controller = ConversationController(api: server.api(), actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true);
+      addTearDown(controller.dispose);
+      final opened = <String>[];
+      await tester.pumpWidget(_app(ThreadScreen(controller: controller, support: support, supportTeam: 'Grove', onSupportThread: opened.add)));
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.text('Recent'), findsOneWidget);
+      expect(find.text('Sorted with Ayşe'), findsOneWidget);
+      await tester.tap(find.text('My order 1042 came with the box crushed'));
+      expect(opened, [_past]);
+      await tester.tap(find.text('See all'));
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.text('With the Grove team'), findsOneWidget);
+      expect(find.text('This week'), findsOneWidget);
+      expect(find.text('Earlier'), findsOneWidget);
+      // Recent stays under the list; the list itself lets go of what does not match.
+      expect(find.text('Kargom gelmedi'), findsNWidgets(2));
+      await tester.enterText(find.byType(TextField).last, '1042');
+      await tester.pump();
+      expect(find.text('Kargom gelmedi'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).last, 'nothing like it');
+      await tester.pump();
+      expect(find.text('No conversation matches that.'), findsOneWidget);
+    });
+
+    testWidgets('opens a sorted one as it was, and writing in it opens it again in place', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')]);
+      server.past[_past] = (
+        state: {..._state(mode: 'closed'), 'thread_id': _past, 'state': 'resolved', 'user_read_seq': 3, 'last_seq': 3},
+        entries: [
+          _entry(1, text: 'My order 1042 came with the box crushed'),
+          _entry(2, author: 'agent', name: 'Ayşe', text: 'Done. Your new pair ships today.'),
+          {..._entry(3, kind: 'marker', author: 'system', text: 'Marked as sorted.'), 'marker': 'resolved'},
+        ],
+      );
+      final support = server.support();
+      await tester.runAsync(() => support.show(_past));
+      await _open(tester, support);
+      expect(find.textContaining('Sorted on '), findsOneWidget);
+      expect(find.textContaining('Sorted · '), findsOneWidget);
+      expect(find.text('You marked this sorted'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Write to open it again'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).last, 'The new pair is a bit small, can I get a 43?');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.textContaining('Opened again · '), findsOneWidget);
+      expect(find.text("I'm sorted"), findsOneWidget);
+      await _close(tester);
+    });
+
+    testWidgets('says when another conversation is open, and goes to it', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')])..otherOpen = _thread;
+      server.past[_past] = (
+        state: {..._state(mode: 'closed'), 'thread_id': _past, 'state': 'resolved'},
+        entries: [_entry(1, text: 'My order 1042 came with the box crushed'), {..._entry(2, kind: 'marker', author: 'system', text: 'Marked as sorted.'), 'marker': 'resolved'}],
+      );
+      final support = server.support();
+      await tester.runAsync(() => support.show(_past));
+      await _open(tester, support);
+      await tester.enterText(find.byType(TextField).last, 'One more thing');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      expect(find.text('Another conversation with the team is open.'), findsOneWidget);
+      await tester.tap(find.text('Go to it'));
+      await _settle(tester);
+      await _settle(tester);
+      expect(support.value.value.threadId, _thread);
+      expect(find.text('Another conversation with the team is open.'), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets("opens at New above the team's lines the person had not read", (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Can I swap the Aero Glide for a 44?'), _entry(2, author: 'agent', name: 'Dana', text: 'Morning, Dana here. The 44 is in stock.')],
+        state: {..._state(mode: 'human'), 'user_read_seq': 1, 'last_seq': 2},
+      );
+      await _open(tester, server.support());
+      expect(find.textContaining('New · '), findsOneWidget);
+      final mark = tester.getTopLeft(find.textContaining('New · ')).dy;
+      expect(mark, lessThan(tester.getTopLeft(find.text('Morning, Dana here. The 44 is in stock.')).dy));
+      expect(mark, greaterThan(tester.getTopLeft(find.text('Can I swap the Aero Glide for a 44?')).dy));
+      await _close(tester);
+    });
+
+    testWidgets('says the row is waiting while the team is away, with a clock, and the reply is a line at the top of an answer', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Can I swap the Aero Glide for a 44?')],
+        state: {..._state(), 'team_here': false, 'waiting': 'Waiting for the team · back tomorrow at 09:00'},
+      );
+      final support = server.support();
+      final controller = ConversationController(api: server.api(), actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true);
+      addTearDown(controller.dispose);
+      await tester.runAsync(() async {
+        await support.load();
+        // Nothing unread yet: the team has not answered.
+        support.value.value = support.value.value.copyWith(unread: 0);
+      });
+      await tester.pumpWidget(_app(ThreadScreen(controller: controller, support: support, supportTeam: 'Grove', onSupportOpen: () {})));
+      await tester.pump();
+      expect(find.text('Waiting for the team · back tomorrow at 09:00'), findsOneWidget);
+      expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
     });
 
     testWidgets('reads right to left in Arabic, with its words and nothing cut', (tester) async {

@@ -231,6 +231,38 @@ class Rendel {
   /// Whether this person has an open conversation with the team.
   static bool get supportOpen => _support?.open ?? false;
 
+  /// Whether this person has a conversation with your team open, and how many
+  /// of the team's lines wait unread: for your own Ask button, a dot while one
+  /// is open and the count while their reply waits.
+  static final ValueNotifier<({bool open, int unread})> supportStatus = ValueNotifier<({bool open, int unread})>((open: false, unread: 0));
+
+  /// The team's reply that came while Rendel was closed, for the banner
+  /// [RendelLauncher] puts across the top; null when there is none to show.
+  static final ValueNotifier<RendelSupportReply?> supportReply = ValueNotifier<RendelSupportReply?>(null);
+  static Timer? _replyGone;
+  static DateTime? _supportTicked;
+
+  /// Every half minute while [RendelLauncher] is on screen, a conversation
+  /// is open and the app is in front of the person: the team's reply is told
+  /// in the app, a banner while Rendel is closed, and the server holds its
+  /// push (`?here=1`).
+  static Future<void> supportTick() async {
+    final support = _support;
+    if (support == null || _supportTeam == null || !support.open) return;
+    if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
+    final at = _supportTicked;
+    if (at != null && DateTime.now().difference(at) < const Duration(seconds: 25)) return;
+    _supportTicked = DateTime.now();
+    final before = support.value.value.unread;
+    final unread = await support.refreshUnread(here: true);
+    final reply = support.lastReply;
+    if (unread > before && reply != null && !isOpen && supportOnScreen.value == null) {
+      supportReply.value = reply;
+      _replyGone?.cancel();
+      _replyGone = Timer(const Duration(seconds: 12), () => supportReply.value = null);
+    }
+  }
+
   /// The thread with the team on screen right now, or null. `rendel_push`
   /// reads it so a reply the person is already watching makes no banner.
   static final ValueNotifier<String?> supportOnScreen = ValueNotifier<String?>(null);
@@ -252,6 +284,7 @@ class Rendel {
     var open = false;
     support.value.addListener(() {
       supportUnread.value = support.value.value.unread;
+      supportStatus.value = (open: support.open, unread: support.value.value.unread);
       // The launcher shows for an open conversation even with the assistant paused.
       if (support.open != open) {
         open = support.open;
@@ -735,6 +768,7 @@ class Rendel {
           support: _supportTeam != null ? _supportOf(api) : null,
           supportTeam: _supportTeam,
           onSupportOpen: () => unawaited(openSupport(presentation.origin)),
+          onSupportThread: (id) => unawaited(openSupport(presentation.origin, thread: id)),
         ),
       ),
     );
@@ -833,7 +867,7 @@ class Rendel {
   /// for your app's own "Contact us": the thread they have, or a new one.
   /// Works while the assistant is paused too. False, with nothing shown,
   /// when Support is off for this app or the team could not be reached.
-  static Future<bool> openSupport(BuildContext context) async {
+  static Future<bool> openSupport(BuildContext context, {String? thread}) async {
     final api = await _whenClient();
     final team = _supportTeam;
     if (api == null || team == null) {
@@ -841,7 +875,11 @@ class Rendel {
       return false;
     }
     final support = _supportOf(api);
-    if (!await support.load()) {
+    supportReply.value = null;
+    // One of the person's conversations by its id (Recent, a push): a sorted one opens as it was.
+    if (thread != null) {
+      if (!await support.show(thread)) return false;
+    } else if (!await support.load()) {
       final done = await support.handoff('open_support');
       if (done != 'ok') {
         RendelLog.warn('support_handoff_failed', 'the team could not be reached ($done)');
@@ -866,6 +904,8 @@ class Rendel {
       theme: themeOf(context),
       strings: strings,
     );
+    // A thread opened by its id: the phone's current one is the session's again.
+    await support.restore();
     unawaited(support.refreshUnread());
     return true;
   }
@@ -957,7 +997,8 @@ class Rendel {
     if (data['rendel'] == '1' && thread is String && thread.isNotEmpty) {
       await _whenClient();
       if (!context.mounted) return false;
-      return openSupport(context);
+      // At the line itself: the page opens at "New", on the thread the push was for.
+      return openSupport(context, thread: thread);
     }
     final id = data['rendel_followup'];
     if (data['rendel'] != '1' || id is! String || id.isEmpty) return false;

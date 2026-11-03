@@ -122,6 +122,16 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   /// A line landed while the person had scrolled up to read: the pill brings them back.
   bool _newBelow = false;
 
+  /// What the person had read, and the newest line there was, when this page
+  /// opened: the team's first line between the two gets "New" above it, and
+  /// the page opens there, once. Unknown until the thread's state is.
+  ({int read, int last})? _newAfter;
+  final GlobalKey _newMark = GlobalKey();
+  bool _newShown = false;
+
+  /// The person sorted it on this page: the card says so, where a sorted one opened later keeps its "Sorted" line.
+  bool _sortedHere = false;
+
   /// Cards the team sent that this phone asked to open, so each is minted once.
   final Set<String> _opening = {};
 
@@ -169,6 +179,9 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   void _changed() {
     if (!mounted) return;
+    // What the person had read when the page opened, taken before this read moves it.
+    final state = widget.support.value.value.state;
+    if (_newAfter == null && state != null) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
     setState(() {});
     widget.support.read();
     final until = widget.support.value.value.typingUntil;
@@ -186,10 +199,21 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       setState(() => _newBelow = true);
       return;
     }
-    WidgetsBinding.instance.addPostFrameCallback((_) => _toNewest());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _toNewest();
+      // Opened on lines the person had not read: the page opens at "New", once.
+      if (!_newShown) WidgetsBinding.instance.addPostFrameCallback((_) => _toNew());
+    });
   }
 
   int _drawn = 0;
+
+  void _toNew() {
+    final mark = _newMark.currentContext;
+    if (mark == null || _newShown || !mounted) return;
+    _newShown = true;
+    Scrollable.ensureVisible(mark, alignment: 0.02);
+  }
 
   void _toNewest() {
     if (_scroll.hasClients) _scroll.jumpTo(_scroll.position.maxScrollExtent);
@@ -215,8 +239,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     if (text.isEmpty) return;
     _input.clear();
     final sent = await widget.support.send(text);
-    // The line waits for the address: it goes back in the field, the card asks.
-    if (sent == 'contact_required' && mounted) setState(() => _input.text = text);
+    // The line waits for the address, or for the other open conversation: it goes back in the field.
+    if ((sent == 'contact_required' || sent == 'another_open') && mounted) setState(() => _input.text = text);
   }
 
   /// Picks, uploads and sends a file as its own line (K11: a picture or a PDF).
@@ -287,18 +311,27 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final typing = v.typingUntil != null && v.typingUntil!.isAfter(DateTime.now());
     final agent = state?.agentName;
     final team = strings.supportTeamOf(widget.team);
+    if (_newAfter == null && state != null) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
+    final unseen = _newAfter;
 
     // A speaker's lines within five minutes are one run, as the web SDK groups them; a marker ends one.
     final items = <Object>[];
     _Run? run;
+    var newPlaced = false;
     final lastMarker = v.entries.where((e) => e.marker).lastOrNull;
     for (final entry in v.entries) {
       if (entry.marker) {
         run = null;
-        // Sorted: the card at the end says it, so the server's own line about it steps aside.
-        if (resolved && identical(entry, lastMarker) && (entry.markerKind?.endsWith('resolved') ?? false)) continue;
+        // Sorted on this page: the card at the end says it, so the server's own line about it steps aside.
+        if (resolved && _sortedHere && identical(entry, lastMarker) && (entry.markerKind?.endsWith('resolved') ?? false)) continue;
         items.add(entry);
         continue;
+      }
+      // "New" above the team's first line the person had not read when the page opened.
+      if (!newPlaced && unseen != null && entry.author == RendelSupportAuthorKind.agent && entry.seq > unseen.read && entry.seq <= unseen.last) {
+        newPlaced = true;
+        run = null;
+        items.add(_NewMark(entry.createdAt));
       }
       final mine = entry.author == RendelSupportAuthorKind.user;
       final who = mine ? strings.supportYou : (entry.authorName != null ? '${entry.authorName} · $team' : team);
@@ -316,7 +349,12 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final readRun = items.whereType<_Run>().where((r) => r.mine && readSeq >= r.entries.last.seq).lastOrNull;
     final column = _teamColumn(context, theme, strings, needsContact: needsContact, asked: asked);
     final lines = <Widget>[
-      for (final item in items) item is _Run ? _run(context, theme, strings, item, read: identical(item, readRun)) : _event(context, theme, item as RendelSupportEntry),
+      for (final item in items)
+        switch (item) {
+          _Run() => _run(context, theme, strings, item, read: identical(item, readRun)),
+          _NewMark() => _newLine(context, theme, strings, item.at),
+          _ => _event(context, theme, strings, item as RendelSupportEntry),
+        },
       if (column != null) column,
       if (v.pending.isNotEmpty) _pending(theme, strings, v.pending),
       // Newest of all: someone from the team is writing.
@@ -332,7 +370,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
             ],
           ),
         ),
-      if (resolved) _sorted(theme, strings),
+      if (resolved && _sortedHere) _sorted(theme, strings),
     ];
 
     return SafeArea(
@@ -394,12 +432,17 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                                     await widget.support.resolve();
                                     navigator.maybePop();
                                   }
-                                : () => widget.support.resolve(),
+                                : () {
+                                    setState(() => _sortedHere = true);
+                                    widget.support.resolve();
+                                  },
                           ),
                         ),
                       ),
-                    // Closed is not the end: a line within the week reopens the thread (plan §4.2).
-                    if (!needsContact) _composer(theme, strings),
+                    // Sorted, while another of theirs is open: that one is where they write.
+                    if (v.otherOpen case final other?) _otherOpen(theme, strings, other),
+                    // Closed is not the end: a line reopens the thread, in place (plan §4.2).
+                    if (!needsContact && v.otherOpen == null) _composer(theme, strings, resolved: resolved),
                   ],
                 ),
               ),
@@ -463,7 +506,12 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                         header: true,
                         child: Text(strings.supportTeamOf(widget.team), style: theme.text.body.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
-                      Text(state?.presence ?? (here ? strings.supportHere : strings.supportAway), style: theme.text.caption.copyWith(fontSize: 12.5, color: tone), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        resolved ? _sortedOn(context, strings) : (state?.presence ?? (here ? strings.supportHere : strings.supportAway)),
+                        style: theme.text.caption.copyWith(fontSize: 12.5, color: resolved ? theme.colors.onSurfaceSoft : tone),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ],
                   ),
                 ),
@@ -503,9 +551,81 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     );
   }
 
+  /// "Sorted on 28 Oct", from its last "sorted" line; "Sorted" when it has none.
+  String _sortedOn(BuildContext context, RendelStrings strings) {
+    final at = widget.support.value.value.entries.where((e) => e.markerKind?.endsWith('resolved') ?? false).lastOrNull?.createdAt;
+    return at == null ? strings.supportSortedMark : strings.supportSortedOnOf(_day(context, at));
+  }
+
+  /// "Oct 28", in the app's language.
+  String _day(BuildContext context, DateTime at) => MaterialLocalizations.of(context).formatShortMonthDay(at.toLocal());
+
+  /// "New · 09:41" across the page, above what the person had not read yet.
+  Widget _newLine(BuildContext context, RendelTheme theme, RendelStrings strings, DateTime at) {
+    final rule = Expanded(child: Container(height: 1, color: theme.colors.accent.withValues(alpha: 0.35)));
+    return Padding(
+      key: _newMark,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: Row(
+        children: [
+          rule,
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Text('${strings.supportNewMark} · ${_time(context, at)}', style: theme.text.caption.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600, color: theme.accentText)),
+          ),
+          rule,
+        ],
+      ),
+    );
+  }
+
+  /// Sorted, while another of the person's conversations is open: a way to it.
+  Widget _otherOpen(RendelTheme theme, RendelStrings strings, String other) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: _cardShell(theme),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Semantics(liveRegion: true, child: Text(strings.supportOtherOpen, style: _heading(theme))),
+              const SizedBox(height: 10),
+              _attached(theme, strings.supportGoTo, () {
+                _newAfter = null;
+                _newShown = false;
+                widget.support.show(other);
+              }),
+            ],
+          ),
+        ),
+      );
+
   /// What happened (who joined, who passed it on): small and quiet in the middle, with its time.
-  Widget _event(BuildContext context, RendelTheme theme, RendelSupportEntry entry) {
+  /// Sorted and opened again are a line across the page of their own.
+  Widget _event(BuildContext context, RendelTheme theme, RendelStrings strings, RendelSupportEntry entry) {
     final time = _time(context, entry.createdAt);
+    final kind = entry.markerKind;
+    if (kind == 'resolved' || kind == 'auto_resolved' || kind == 'reopened') {
+      final sorted = kind != 'reopened';
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+          decoration: BoxDecoration(color: Color.alphaBlend(theme.colors.onSurface.withValues(alpha: 0.05), theme.colors.surfaceRaised), borderRadius: BorderRadius.circular(999)),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (sorted) ...[Icon(Icons.check_rounded, size: 14, color: theme.accentText), const SizedBox(width: 6)],
+              Text(
+                sorted ? '${strings.supportSortedMark} · ${_day(context, entry.createdAt)}' : '${strings.supportOpenedAgain} · $time',
+                style: theme.text.caption.copyWith(fontSize: 12.5, fontWeight: FontWeight.w500, color: theme.colors.onSurfaceSoft),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     final text = entry.text;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -847,7 +967,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   TextStyle _heading(RendelTheme theme) => theme.text.labelStrong.copyWith(color: theme.colors.onSurface);
 
   /// One box like the assistant's own: the paperclip, the words, and send once there is something to send.
-  Widget _composer(RendelTheme theme, RendelStrings strings) {
+  Widget _composer(RendelTheme theme, RendelStrings strings, {bool resolved = false}) {
     final canAttach = widget.onPick != null && widget.onUpload != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -926,8 +1046,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     isDense: true,
                     border: InputBorder.none,
                     counterText: '',
-                    // Always the team, never the one person in it (Tuna, 2026-11-03).
-                    hintText: strings.supportWriteTeamOf(widget.team),
+                    // Always the team, never the one person in it (Tuna, 2026-11-03); a sorted one says a line opens it again.
+                    hintText: resolved ? strings.supportReopenHint : strings.supportWriteTeamOf(widget.team),
                     hintStyle: theme.text.body.copyWith(color: theme.colors.onSurfaceFaint),
                     contentPadding: EdgeInsets.symmetric(horizontal: canAttach ? 4 : 12, vertical: 8),
                   ),
@@ -1094,6 +1214,12 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
 /// How long one speaker's lines keep reading as one run (`GROUP_MS` in the web SDK).
 const _runGap = Duration(minutes: 5);
+
+/// Where the lines the person had not read begin.
+class _NewMark {
+  _NewMark(this.at);
+  final DateTime at;
+}
 
 class _Run {
   _Run({required this.key, required this.mine, required this.who, required this.avatar, required this.at, required this.entries});

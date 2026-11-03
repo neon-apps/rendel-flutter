@@ -117,6 +117,7 @@ class RendelSupportState {
     required this.teamHere,
     this.expectation,
     this.presence,
+    this.waiting,
     this.agentName,
     this.teamReadSeq = 0,
     required this.userReadSeq,
@@ -137,6 +138,9 @@ class RendelSupportState {
 
   /// A short line under the team's name: "Dana is here · replies in about 10 minutes", "Back tomorrow at 09:00".
   final String? presence;
+
+  /// While the team is away from an open thread, the row's line: "Waiting for the team · back tomorrow at 09:00".
+  final String? waiting;
   final String? agentName;
 
   /// Lines up to this one were read by the team: "Read" goes under the person's newest run among them.
@@ -157,6 +161,7 @@ class RendelSupportState {
         teamHere: teamHere,
         expectation: expectation,
         presence: presence,
+        waiting: waiting,
         agentName: agentName,
         teamReadSeq: teamReadSeq,
         userReadSeq: seq,
@@ -174,6 +179,7 @@ class RendelSupportState {
     final agent = raw['agent'];
     final expectation = raw['expectation'];
     final presence = raw['presence'];
+    final waiting = raw['waiting'];
     return RendelSupportState(
       threadId: thread,
       mode: mode,
@@ -181,6 +187,7 @@ class RendelSupportState {
       teamHere: raw['team_here'] == true,
       expectation: expectation is String ? expectation : null,
       presence: presence is String ? presence : null,
+      waiting: waiting is String ? waiting : null,
       agentName: agent is Map && agent['name'] is String ? agent['name'] as String : null,
       teamReadSeq: raw['team_read_seq'] is int ? raw['team_read_seq'] as int : 0,
       userReadSeq: raw['user_read_seq'] is int ? raw['user_read_seq'] as int : 0,
@@ -190,6 +197,61 @@ class RendelSupportState {
     );
   }
 }
+
+/// One of the person's conversations with the team, for Recent and the list
+/// behind it (`GET /v1/support/threads`), newest first.
+class RendelSupportThread {
+  const RendelSupportThread({
+    required this.threadId,
+    required this.resolved,
+    required this.title,
+    this.agent,
+    this.last,
+    this.unread = 0,
+    this.waiting,
+    required this.lastMessageAt,
+    this.resolvedAt,
+  });
+
+  final String threadId;
+  final bool resolved;
+
+  /// The person's own first line in it.
+  final String title;
+
+  /// Who last wrote for the team; null until the team wrote.
+  final String? agent;
+
+  /// The newest line, the person's (`mine`) or the team's.
+  final ({bool mine, String text})? last;
+  final int unread;
+  final String? waiting;
+  final DateTime lastMessageAt;
+  final DateTime? resolvedAt;
+
+  static RendelSupportThread? tryParse(Object? raw) {
+    if (raw is! Map) return null;
+    final id = raw['thread_id'];
+    final title = raw['title'];
+    final at = DateTime.tryParse('${raw['last_message_at']}');
+    if (id is! String || title is! String || at == null) return null;
+    final last = raw['last'];
+    return RendelSupportThread(
+      threadId: id,
+      resolved: raw['state'] == 'resolved',
+      title: title,
+      agent: raw['agent'] is String ? raw['agent'] as String : null,
+      last: last is Map && last['text'] is String ? (mine: last['kind'] == 'user', text: last['text'] as String) : null,
+      unread: raw['unread'] is int ? raw['unread'] as int : 0,
+      waiting: raw['waiting'] is String ? raw['waiting'] as String : null,
+      lastMessageAt: at.toLocal(),
+      resolvedAt: DateTime.tryParse('${raw['resolved_at']}')?.toLocal(),
+    );
+  }
+}
+
+/// The team's newest unread line, for the banner while Rendel is closed. Its text is empty when the customer hides it.
+typedef RendelSupportReply = ({int seq, String name, String text});
 
 /// A line sent from here that the server has not confirmed yet.
 class RendelSupportPending {
@@ -213,6 +275,7 @@ class RendelSupportSnapshot {
     this.pending = const [],
     this.unread = 0,
     this.asks = const [],
+    this.otherOpen,
   });
 
   final String? threadId;
@@ -227,6 +290,9 @@ class RendelSupportSnapshot {
   /// Reads the team asked to make that wait for the person's yes, in the server's words.
   final List<({String lookupId, String text})> asks;
 
+  /// A sorted thread could not open again: this other one of the person's is open.
+  final String? otherOpen;
+
   int get cursor => entries.isEmpty ? 0 : entries.last.seq;
 
   RendelSupportSnapshot copyWith({
@@ -238,6 +304,8 @@ class RendelSupportSnapshot {
     List<RendelSupportPending>? pending,
     int? unread,
     List<({String lookupId, String text})>? asks,
+    String? otherOpen,
+    bool clearOtherOpen = false,
   }) =>
       RendelSupportSnapshot(
         threadId: threadId ?? this.threadId,
@@ -247,6 +315,7 @@ class RendelSupportSnapshot {
         pending: pending ?? this.pending,
         unread: unread ?? this.unread,
         asks: asks ?? this.asks,
+        otherOpen: clearOtherOpen ? null : (otherOpen ?? this.otherOpen),
       );
 }
 
@@ -282,9 +351,22 @@ class RendelSupport {
   bool get open => _open;
   bool _open = false;
 
-  /// A thread read whole: its lines and its state in one change.
-  void _apply(String threadId, List<RendelSupportEntry> entries, RendelSupportState state) {
-    _open = !state.resolved;
+  /// A thread the page shows by its id (one from Recent), not the phone's current one.
+  String? _viewing;
+
+  /// The team's newest unread line, as the last count read it: for the banner while Rendel is closed.
+  RendelSupportReply? get lastReply => _reply;
+  RendelSupportReply? _reply;
+
+  /// A thread read whole: its lines and its state in one change. A sorted one
+  /// shown by its id says nothing about whether another is open; the phone's
+  /// current one does.
+  void _apply(String threadId, List<RendelSupportEntry> entries, RendelSupportState state, {bool current = true}) {
+    if (!state.resolved) {
+      _open = true;
+    } else if (current) {
+      _open = false;
+    }
     if (_watching) onScreen.value = threadId;
     final same = threadId == _now.threadId;
     final bySeq = {for (final e in same ? _now.entries : const <RendelSupportEntry>[]) e.seq: e};
@@ -297,6 +379,7 @@ class RendelSupport {
       entries: bySeq.values.toList()..sort((a, b) => a.seq.compareTo(b.seq)),
       pending: [for (final p in same ? _now.pending : const <RendelSupportPending>[]) if (!confirmed.contains(p.clientMsgId)) p],
       state: state,
+      clearOtherOpen: true,
     );
   }
 
@@ -313,7 +396,7 @@ class RendelSupport {
     );
   }
 
-  bool _applyThread(Map<String, dynamic>? json) {
+  bool _applyThread(Map<String, dynamic>? json, {bool current = true}) {
     final thread = json?['thread_id'];
     final state = RendelSupportState.tryParse(json?['state']);
     final entries = json?['entries'];
@@ -322,16 +405,47 @@ class RendelSupport {
       if (entries is List)
         for (final raw in entries)
           if (RendelSupportEntry.tryParse(raw) case final entry?) entry,
-    ], state);
+    ], state, current: current);
     return true;
   }
 
-  /// The thread this phone has, if any, brought up to date.
+  /// The thread this phone has, if any, brought up to date: the one on the page when it was opened by its id.
   Future<bool> load() async {
+    if (_viewing case final id?) return show(id);
     final known = _now.threadId;
     final answer = await api.support('GET', 'current?after=${known == null ? 0 : _now.cursor}', user: user());
     if (answer.status != 200) return known != null;
     return _applyThread(answer.json);
+  }
+
+  /// Recent and the list behind it: the person's conversations with the team, newest first; null when it could not be read.
+  Future<List<RendelSupportThread>?> threads() async {
+    final answer = await api.support('GET', 'threads', user: user());
+    final list = answer.json?['threads'];
+    if (answer.status != 200 || list is! List) return null;
+    return [
+      for (final raw in list)
+        if (RendelSupportThread.tryParse(raw) case final thread?) thread,
+    ];
+  }
+
+  /// One of the person's threads, by its id: a sorted one comes back as it was, ready to be written in.
+  Future<bool> show(String threadId) async {
+    final same = _now.threadId == threadId;
+    final answer = await api.support('GET', 'threads/${Uri.encodeComponent(threadId)}?after=${same ? _now.cursor : 0}', user: user());
+    if (answer.status != 200) return false;
+    _viewing = threadId;
+    return _applyThread(answer.json, current: false);
+  }
+
+  /// The page of a thread shown by its id closed: the session holds the phone's current one again, or none.
+  Future<void> restore() async {
+    if (_viewing == null) return;
+    _viewing = null;
+    final answer = await api.support('GET', 'current?after=0', user: user());
+    if (answer.status == 200 && _applyThread(answer.json)) return;
+    _open = false;
+    value.value = RendelSupportSnapshot(unread: _now.unread);
   }
 
   /// Opens the thread (or the one already open), with the person's first words when they wrote some.
@@ -354,7 +468,8 @@ class RendelSupport {
   String _path(String threadId, String rest) => 'threads/${Uri.encodeComponent(threadId)}/$rest';
 
   /// A line from the person: drawn at once as unsent and reconciled by its client id.
-  /// 'ok', 'contact_required' or 'failed'.
+  /// 'ok', 'contact_required', 'another_open' or 'failed'. A line in a sorted
+  /// thread opens it again, in place, with the server's "reopened" line first.
   Future<String> send(String text, {List<String> attachmentIds = const [], String? fileName}) async {
     final threadId = _now.threadId;
     final body = text.trim();
@@ -363,13 +478,20 @@ class RendelSupport {
     value.value = _now.copyWith(pending: [..._now.pending, RendelSupportPending(id, body.isEmpty ? fileName ?? '' : body, attachmentIds: attachmentIds)]);
     final answer = await api.support('POST', _path(threadId, 'messages'), user: user(), body: {'client_msg_id': id, if (body.isNotEmpty) 'text': body, if (attachmentIds.isNotEmpty) 'attachment_ids': attachmentIds});
     if (RendelSupportEntry.tryParse(answer.json?['entry']) case final entry? when answer.status == 200) {
-      _merge([entry]);
+      final reopened = RendelSupportEntry.tryParse(answer.json?['reopened']);
+      _merge([if (reopened != null) reopened, entry]);
+      // Written in a sorted thread: it is open again, with the team, and the state says so.
+      if (reopened != null) await load();
       return 'ok';
     }
     final error = answer.json?['error'];
     if (answer.status == 409 && error is Map && error['code'] == 'contact_required') {
       value.value = _now.copyWith(pending: [for (final p in _now.pending) if (p.clientMsgId != id) p]);
       return 'contact_required';
+    }
+    if (answer.status == 409 && error is Map && error['code'] == 'another_open' && error['thread_id'] is String) {
+      value.value = _now.copyWith(pending: [for (final p in _now.pending) if (p.clientMsgId != id) p], otherOpen: error['thread_id'] as String);
+      return 'another_open';
     }
     _markFailed(id, true);
     return 'failed';
@@ -493,12 +615,16 @@ class RendelSupport {
     await api.support('POST', _path(threadId, 'lookups/${Uri.encodeComponent(lookupId)}/run'), user: user(), body: {'allow': allow}, asPerson: true);
   }
 
-  /// The launcher's count: on init, on resume and on a push; never polled in the background.
-  Future<int> refreshUnread() async {
-    final answer = await api.support('GET', 'unread', user: user());
+  /// The launcher's count: on init, on resume, on a push, and every half
+  /// minute while a thread is open and the app is in front of the person
+  /// ([here]: the team's reply is then told in the app, not by a push).
+  Future<int> refreshUnread({bool here = false}) async {
+    final answer = await api.support('GET', here ? 'unread?here=1' : 'unread', user: user());
     final unread = answer.status == 200 && answer.json?['unread'] is int ? answer.json!['unread'] as int : 0;
     var open = _open;
     if (answer.status == 200) open = answer.json?['open'] == true;
+    final last = answer.json?['last'];
+    _reply = last is Map && last['seq'] is int && last['name'] is String ? (seq: last['seq'] as int, name: last['name'] as String, text: '${last['text'] ?? ''}') : null;
     if (unread != _now.unread || open != _open) {
       _open = open;
       value.value = _now.copyWith(unread: unread);
@@ -582,6 +708,8 @@ class RendelSupport {
   void reset() {
     watch(false);
     _open = false;
+    _viewing = null;
+    _reply = null;
     value.value = const RendelSupportSnapshot();
   }
 }

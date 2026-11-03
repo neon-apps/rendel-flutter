@@ -36,6 +36,7 @@ import '../core/followups.dart';
 import '../core/support.dart';
 import '../core/strings.dart';
 import 'followup_card.dart';
+import 'support_list.dart';
 import 'theme.dart';
 
 /// How long the thread takes no taps after Send (QA R4-2): longer than a
@@ -80,6 +81,7 @@ class ThreadScreen extends StatefulWidget {
     this.support,
     this.supportTeam,
     this.onSupportOpen,
+    this.onSupportThread,
   });
 
   final ConversationController controller;
@@ -186,6 +188,11 @@ class ThreadScreen extends StatefulWidget {
   final String? supportTeam;
   final VoidCallback? onSupportOpen;
 
+  /// One of the person's conversations with the team, from Recent under the
+  /// suggestions or the list behind it, opened by its id: a sorted one as it
+  /// was. Null draws no Recent.
+  final void Function(String threadId)? onSupportThread;
+
   @override
   State<ThreadScreen> createState() => _ThreadScreenState();
 }
@@ -212,6 +219,46 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// Not asked for twice while the row waits for the thread's lines; read again when the count moves.
   bool _rowLoading = false;
   int _rowUnread = 0;
+
+  /// The person's conversations with the team as last read, for Recent; read again when stale.
+  List<RendelSupportThread> _threads = const [];
+  DateTime? _threadsAt;
+  bool _wasOpen = false;
+
+  void _readThreads() {
+    final support = widget.support;
+    final at = _threadsAt;
+    if (support == null || widget.onSupportThread == null || (at != null && DateTime.now().difference(at) < const Duration(seconds: 30))) return;
+    _threadsAt = DateTime.now();
+    unawaited(support.threads().then((threads) {
+      if (threads != null && mounted) setState(() => _threads = threads);
+    }));
+  }
+
+  /// Recent under the suggestions, or nothing.
+  Widget? _recent() {
+    final support = widget.support;
+    final team = widget.supportTeam;
+    final open = widget.onSupportThread;
+    if (support == null || team == null || open == null) return null;
+    _readThreads();
+    if (!_threads.any((t) => t.resolved)) return null;
+    return RendelSupportRecent(
+      threads: _threads,
+      team: team,
+      onOpen: open,
+      onSeeAll: () => showRendelSupportList(
+        context,
+        threads: _threads,
+        reload: support.threads,
+        team: team,
+        assistant: widget.title,
+        theme: RendelThemeScope.of(context),
+        strings: _strings,
+        onOpen: open,
+      ),
+    );
+  }
 
   /// The conversation's language the screen is drawn in; see [_strings].
   String? _language;
@@ -1358,6 +1405,11 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   Widget? _supportRow(RendelTheme theme) {
     final support = widget.support;
     final team = widget.supportTeam;
+    // Opened or sorted since Recent was read: it is read again.
+    if (support != null && support.open != _wasOpen) {
+      _wasOpen = support.open;
+      _threadsAt = null;
+    }
     if (support == null || team == null || !support.open) return null;
     final strings = _strings;
     final v = support.value.value;
@@ -1378,6 +1430,60 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final title = strings.supportRowTitleOf(team);
     final unread = v.unread;
     final initial = (agent ?? team).trim();
+    // The person spoke last and the team is away: waiting, and until when.
+    final waiting = unread == 0 && (last == null || last.author == RendelSupportAuthorKind.user) ? v.state?.waiting : null;
+    final c = widget.controller;
+    // On one of Rendel's answers, the team's reply is a line at the top, never a jump to their page.
+    if (c.pages.isNotEmpty && unread > 0 && last != null && last.author == RendelSupportAuthorKind.agent) {
+      final text = (last.text?.isNotEmpty ?? false) ? last.text! : strings.photos;
+      return RendelPressable(
+        semanticLabel: '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}',
+        onTap: () => widget.onSupportOpen?.call(),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(7, 7, 8, 7),
+          decoration: BoxDecoration(
+            color: theme.colors.surfaceRaised,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [
+              BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.06), spreadRadius: 1),
+              BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.25), offset: const Offset(0, 16), blurRadius: 30, spreadRadius: -24),
+            ],
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.14), theme.colors.surfaceRaised)),
+                child: Text(
+                  (who ?? team).trim().isEmpty ? '·' : (who ?? team).trim().characters.first.toUpperCase(),
+                  style: theme.text.caption.copyWith(color: theme.accentText, fontWeight: FontWeight.w700, fontSize: 12, height: 1),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text.rich(
+                  TextSpan(children: [
+                    TextSpan(text: strings.supportRepliedOf(who ?? team), style: TextStyle(color: theme.colors.onSurface, fontWeight: FontWeight.w600)),
+                    TextSpan(text: ' · $text'),
+                  ]),
+                  style: theme.text.caption.copyWith(fontSize: 13.5),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 6),
+                decoration: BoxDecoration(color: theme.colors.accent, borderRadius: BorderRadius.circular(999)),
+                child: Text(strings.supportShow, style: theme.text.caption.copyWith(fontSize: 13, fontWeight: FontWeight.w600, color: theme.colors.onAccent)),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     // Read out in full; seen as the team's name, as the page's header says it.
     return RendelPressable(
       semanticLabel: unread > 0 ? '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}' : title,
@@ -1412,7 +1518,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                 children: [
                   Text(strings.supportTeamOf(team), style: theme.text.labelEmphasis.copyWith(fontSize: 15.5)),
                   const SizedBox(height: 1),
-                  Text(said, style: theme.text.labelSoft, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  Text(waiting ?? said, style: theme.text.labelSoft, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],
               ),
             ),
@@ -1428,6 +1534,14 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   unread > 9 ? '9+' : '$unread',
                   style: theme.text.caption.copyWith(color: theme.colors.onAccent, fontWeight: FontWeight.w700, height: 1),
                 ),
+              )
+            else if (waiting != null)
+              // The team away: waiting, in the amber of the page's own "Back tomorrow".
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(shape: BoxShape.circle, color: Color.alphaBlend(const Color(0xFFB7791F).withValues(alpha: 0.14), theme.colors.surfaceRaised)),
+                child: Icon(Icons.schedule_rounded, size: 16, color: Color.lerp(const Color(0xFFB7791F), theme.colors.onSurface, 0.12)),
               )
             else
               Container(
@@ -1509,6 +1623,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   suggestions: widget.suggestions,
                   onPick: _send,
                   onOpen: (url) => controller.tapAction(OpenUrlAction(url)),
+                  recent: _recent(),
                 )
               : _page(controller, [shown], bar: head),
           builder: (context, dock, page) => shown == null
@@ -2525,6 +2640,7 @@ class _EmptyState extends StatelessWidget {
     required this.suggestions,
     required this.onPick,
     required this.onOpen,
+    this.recent,
   });
 
   final String? headline;
@@ -2534,6 +2650,9 @@ class _EmptyState extends StatelessWidget {
 
   /// A link in the subtitle, tapped: the host opens it, as a card's link.
   final void Function(String url) onOpen;
+
+  /// The person's last conversations with the team, under the suggestions.
+  final Widget? recent;
 
   @override
   Widget build(BuildContext context) {
@@ -2608,6 +2727,10 @@ class _EmptyState extends StatelessWidget {
                   ),
                 ),
               ),
+            ],
+            if (recent case final recent?) ...[
+              SizedBox(height: theme.space.lg),
+              recent,
             ],
           ],
         ),

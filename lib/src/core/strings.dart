@@ -234,6 +234,23 @@ class RendelStrings {
     this.supportSortedTitle = 'You marked this sorted',
     this.supportSortedBody = 'Write any time and the {team} team picks it up again.',
     this.supportPreparedBy = 'Prepared by {name}',
+    this.supportRecent = 'Recent',
+    this.supportSeeAll = 'See all',
+    this.supportAll = 'With the {team} team',
+    this.supportSearch = 'Search your conversations',
+    this.supportSearchNone = 'No conversation matches that.',
+    this.supportThisWeek = 'This week',
+    this.supportEarlier = 'Earlier',
+    this.supportSortedWith = 'Sorted with {name}',
+    this.supportSortedOn = 'Sorted on {date}',
+    this.supportSortedMark = 'Sorted',
+    this.supportOpenedAgain = 'Opened again',
+    this.supportNewMark = 'New',
+    this.supportReplied = '{name} replied',
+    this.supportShow = 'Open',
+    this.supportReopenHint = 'Write to open it again',
+    this.supportOtherOpen = 'Another conversation with the team is open.',
+    this.supportGoTo = 'Go to it',
     this.memoryEmpty = 'Tell me a preference once, like “always lactose-free”, and I\'ll keep it in mind.',
     this.memoryForget = 'Forget',
     this.memoryForgetAll = 'Forget all',
@@ -682,6 +699,25 @@ class RendelStrings {
 
   /// Above a card someone on the team prepared for the person to confirm.
   final String supportPreparedBy;
+
+  /// Recent, the list behind it, and the lines across a conversation: where it was sorted, opened again, and what is new.
+  final String supportRecent;
+  final String supportSeeAll;
+  final String supportAll;
+  final String supportSearch;
+  final String supportSearchNone;
+  final String supportThisWeek;
+  final String supportEarlier;
+  final String supportSortedWith;
+  final String supportSortedOn;
+  final String supportSortedMark;
+  final String supportOpenedAgain;
+  final String supportNewMark;
+  final String supportReplied;
+  final String supportShow;
+  final String supportReopenHint;
+  final String supportOtherOpen;
+  final String supportGoTo;
   final String memoryEmpty;
   final String memoryForget;
   final String memoryForgetAll;
@@ -730,6 +766,10 @@ class RendelStrings {
   String supportRowTitleOf(String team) => supportRowTitle.replaceAll('{team}', team);
   String supportSortedBodyOf(String team) => supportSortedBody.replaceAll('{team}', team);
   String supportPreparedByOf(String name) => supportPreparedBy.replaceAll('{name}', name);
+  String supportAllOf(String team) => supportAll.replaceAll('{team}', team);
+  String supportSortedWithOf(String name) => supportSortedWith.replaceAll('{name}', name);
+  String supportSortedOnOf(String date) => supportSortedOn.replaceAll('{date}', date);
+  String supportRepliedOf(String name) => supportReplied.replaceAll('{name}', name);
   String supportTypingOf(String name) => supportTyping.replaceAll('{name}', name);
   String supportUnreadOf(int count) => supportUnread.replaceAll('{count}', '$count');
   String stepOfCount(int step, int count) =>
@@ -1002,6 +1042,23 @@ class RendelStrings {
     String? supportSortedTitle,
     String? supportSortedBody,
     String? supportPreparedBy,
+    String? supportRecent,
+    String? supportSeeAll,
+    String? supportAll,
+    String? supportSearch,
+    String? supportSearchNone,
+    String? supportThisWeek,
+    String? supportEarlier,
+    String? supportSortedWith,
+    String? supportSortedOn,
+    String? supportSortedMark,
+    String? supportOpenedAgain,
+    String? supportNewMark,
+    String? supportReplied,
+    String? supportShow,
+    String? supportReopenHint,
+    String? supportOtherOpen,
+    String? supportGoTo,
     String? memoryEmpty,
     String? memoryForget,
     String? memoryForgetAll,
@@ -1214,6 +1271,23 @@ class RendelStrings {
       supportSortedTitle: supportSortedTitle ?? this.supportSortedTitle,
       supportSortedBody: supportSortedBody ?? this.supportSortedBody,
       supportPreparedBy: supportPreparedBy ?? this.supportPreparedBy,
+      supportRecent: supportRecent ?? this.supportRecent,
+      supportSeeAll: supportSeeAll ?? this.supportSeeAll,
+      supportAll: supportAll ?? this.supportAll,
+      supportSearch: supportSearch ?? this.supportSearch,
+      supportSearchNone: supportSearchNone ?? this.supportSearchNone,
+      supportThisWeek: supportThisWeek ?? this.supportThisWeek,
+      supportEarlier: supportEarlier ?? this.supportEarlier,
+      supportSortedWith: supportSortedWith ?? this.supportSortedWith,
+      supportSortedOn: supportSortedOn ?? this.supportSortedOn,
+      supportSortedMark: supportSortedMark ?? this.supportSortedMark,
+      supportOpenedAgain: supportOpenedAgain ?? this.supportOpenedAgain,
+      supportNewMark: supportNewMark ?? this.supportNewMark,
+      supportReplied: supportReplied ?? this.supportReplied,
+      supportShow: supportShow ?? this.supportShow,
+      supportReopenHint: supportReopenHint ?? this.supportReopenHint,
+      supportOtherOpen: supportOtherOpen ?? this.supportOtherOpen,
+      supportGoTo: supportGoTo ?? this.supportGoTo,
       memoryEmpty: memoryEmpty ?? this.memoryEmpty,
       memoryForget: memoryForget ?? this.memoryForget,
       memoryForgetAll: memoryForgetAll ?? this.memoryForgetAll,
@@ -1443,6 +1517,23 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedTitle: 'Çözüldü olarak işaretlediniz',
     supportSortedBody: 'Dilediğiniz an yazabilirsiniz; {team} ekibi hemen devralır.',
     supportPreparedBy: '{name} sizin için hazırladı',
+    supportRecent: 'Son yazışmalar',
+    supportSeeAll: 'Tümünü gör',
+    supportAll: '{team} ekibiyle yazışmalar',
+    supportSearch: 'Yazışmalarınızda arayın…',
+    supportSearchNone: 'Aramanızla eşleşen yazışma yok.',
+    supportThisWeek: 'Bu hafta',
+    supportEarlier: 'Daha önce',
+    supportSortedWith: '{name} ile çözüldü',
+    supportSortedOn: '{date} tarihinde çözüldü',
+    supportSortedMark: 'Çözüldü',
+    supportOpenedAgain: 'Tekrar açıldı',
+    supportNewMark: 'Yeni',
+    supportReplied: '{name} yanıtladı',
+    supportShow: 'Aç',
+    supportReopenHint: 'Yeniden açmak için yazın…',
+    supportOtherOpen: 'Ekiple açık bir yazışmanız zaten var.',
+    supportGoTo: 'Yazışmaya git',
     memoryEmpty: 'Bana \'hep laktozsuz\' gibi bir tercihinizi söyleyin, sonraki seferler için aklımda tutayım.',
     memoryForget: 'Unut',
     memoryForgetAll: 'Tümünü unut',
@@ -1661,6 +1752,23 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedTitle: 'Als erledigt markiert',
     supportSortedBody: 'Schreiben Sie jederzeit, das Team von {team} übernimmt wieder.',
     supportPreparedBy: 'Für Sie vorbereitet von {name}',
+    supportRecent: 'Zuletzt',
+    supportSeeAll: 'Alle ansehen',
+    supportAll: 'Mit dem Team von {team}',
+    supportSearch: 'Unterhaltungen durchsuchen',
+    supportSearchNone: 'Keine Unterhaltung passt dazu.',
+    supportThisWeek: 'Diese Woche',
+    supportEarlier: 'Früher',
+    supportSortedWith: 'Geklärt mit {name}',
+    supportSortedOn: 'Geklärt am {date}',
+    supportSortedMark: 'Geklärt',
+    supportOpenedAgain: 'Wieder geöffnet',
+    supportNewMark: 'Neu',
+    supportReplied: '{name} hat geantwortet',
+    supportShow: 'Öffnen',
+    supportReopenHint: 'Schreiben Sie, um sie wieder zu öffnen',
+    supportOtherOpen: 'Eine andere Unterhaltung mit dem Team ist offen.',
+    supportGoTo: 'Dorthin',
     memoryEmpty: 'Sagen Sie mir einmal eine Vorliebe, etwa „immer laktosefrei“, und ich behalte sie im Kopf.',
     memoryForget: 'Vergessen',
     memoryForgetAll: 'Alles vergessen',
@@ -1878,6 +1986,23 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedTitle: 'Vous l’avez marqué comme réglé',
     supportSortedBody: 'Écrivez quand vous voulez, l’équipe {team} reprend la conversation.',
     supportPreparedBy: 'Préparé par {name}',
+    supportRecent: 'Récents',
+    supportSeeAll: 'Tout voir',
+    supportAll: 'Avec l’équipe {team}',
+    supportSearch: 'Rechercher dans vos conversations',
+    supportSearchNone: 'Aucune conversation ne correspond.',
+    supportThisWeek: 'Cette semaine',
+    supportEarlier: 'Plus tôt',
+    supportSortedWith: 'Réglé avec {name}',
+    supportSortedOn: 'Réglé le {date}',
+    supportSortedMark: 'Réglé',
+    supportOpenedAgain: 'Rouverte',
+    supportNewMark: 'Nouveau',
+    supportReplied: '{name} a répondu',
+    supportShow: 'Ouvrir',
+    supportReopenHint: 'Écrivez pour la rouvrir',
+    supportOtherOpen: 'Une autre conversation avec l’équipe est ouverte.',
+    supportGoTo: 'Y aller',
     memoryEmpty: 'Dites-moi une préférence une fois, comme « toujours sans lactose », et je la garderai en tête.',
     memoryForget: 'Oublier',
     memoryForgetAll: 'Tout oublier',
@@ -2094,6 +2219,23 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedTitle: 'Lo marcaste como resuelto',
     supportSortedBody: 'Escribe cuando quieras y el equipo de {team} lo retoma.',
     supportPreparedBy: 'Preparado por {name}',
+    supportRecent: 'Recientes',
+    supportSeeAll: 'Ver todo',
+    supportAll: 'Con el equipo de {team}',
+    supportSearch: 'Busca en tus conversaciones',
+    supportSearchNone: 'Ninguna conversación coincide.',
+    supportThisWeek: 'Esta semana',
+    supportEarlier: 'Antes',
+    supportSortedWith: 'Resuelto con {name}',
+    supportSortedOn: 'Resuelto el {date}',
+    supportSortedMark: 'Resuelto',
+    supportOpenedAgain: 'Abierta de nuevo',
+    supportNewMark: 'Nuevo',
+    supportReplied: '{name} respondió',
+    supportShow: 'Abrir',
+    supportReopenHint: 'Escribe para abrirla de nuevo',
+    supportOtherOpen: 'Hay otra conversación abierta con el equipo.',
+    supportGoTo: 'Ir a ella',
     memoryEmpty: 'Dime una preferencia una vez, como «siempre sin lactosa», y la tendré en cuenta.',
     memoryForget: 'Olvidar',
     memoryForgetAll: 'Olvidar todo',
@@ -2309,6 +2451,23 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedTitle: 'حدّدتها كمحلولة',
     supportSortedBody: 'اكتب في أي وقت وسيتابع فريق {team} من جديد.',
     supportPreparedBy: 'أعدّه لك {name}',
+    supportRecent: 'الأحدث',
+    supportSeeAll: 'عرض الكل',
+    supportAll: 'مع فريق {team}',
+    supportSearch: 'ابحث في محادثاتك',
+    supportSearchNone: 'لا توجد محادثة مطابقة.',
+    supportThisWeek: 'هذا الأسبوع',
+    supportEarlier: 'سابقًا',
+    supportSortedWith: 'تم الحل مع {name}',
+    supportSortedOn: 'تم الحل في {date}',
+    supportSortedMark: 'تم الحل',
+    supportOpenedAgain: 'أُعيد فتحها',
+    supportNewMark: 'جديد',
+    supportReplied: 'ردّ {name}',
+    supportShow: 'فتح',
+    supportReopenHint: 'اكتب لإعادة فتحها',
+    supportOtherOpen: 'هناك محادثة أخرى مفتوحة مع الفريق.',
+    supportGoTo: 'الانتقال إليها',
     memoryEmpty: 'أخبرني بتفضيل مرة واحدة، مثل «دائمًا خالٍ من اللاكتوز»، وسأتذكره.',
     memoryForget: 'انسَ',
     memoryForgetAll: 'انسَ الكل',
