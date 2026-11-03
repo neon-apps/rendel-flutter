@@ -177,7 +177,7 @@ Future<void> _close(WidgetTester tester) async {
 
 void main() {
   group('the support page', () {
-    testWidgets("groups a speaker's lines, names who answered, and never says Seen or Read (K9)", (tester) async {
+    testWidgets("groups a speaker's lines, names who answered for which team, and says what happened with its time (design A)", (tester) async {
       final server = _Server(
         entries: [
           _entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'),
@@ -189,21 +189,20 @@ void main() {
       );
       await _open(tester, server.support());
       expect(find.text('Grove team'), findsOneWidget);
-      expect(find.text('Your message is with the Grove team.'), findsOneWidget);
-      // The person's two lines are one run; the team's is under who wrote it, once.
-      expect(find.text('Ayşe'), findsOneWidget);
+      expect(find.textContaining('Your message is with the Grove team. · '), findsOneWidget);
+      // The person's two lines are one run; the team's is under who wrote it, for which team, once.
+      expect(find.text('Ayşe · Grove team'), findsOneWidget);
       expect(find.text('You'), findsNothing);
       expect(find.textContaining('Seen'), findsNothing);
-      expect(find.textContaining('Read'), findsNothing);
       // The person's lines on the end, the team's on the start.
       final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
       expect(tester.getTopRight(find.text('Kargom gelmedi')).dx, greaterThan(width * 0.8));
       expect(tester.getTopLeft(find.text('Hemen bakıyorum.')).dx, lessThan(width * 0.3));
-      // The team has answered: "I'm sorted" in the header, no "Back to the assistant".
+      // The team has answered: "I'm sorted" as the chip above the box, not "By mistake?".
       expect(find.text("I'm sorted"), findsOneWidget);
-      expect(find.text('Back to the assistant'), findsNothing);
+      expect(find.textContaining('By mistake'), findsNothing);
       // The box names the team, never the person in it.
-      expect(find.widgetWithText(TextField, 'Write to the Grove team…'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
       await _close(tester);
     });
 
@@ -221,16 +220,39 @@ void main() {
       await tester.pumpWidget(_app(ThreadScreen(controller: controller, support: support, supportTeam: 'Grove', onSupportOpen: () => opened++)));
       await _settle(tester);
       await _settle(tester);
-      expect(find.text('Your conversation with the Grove team'), findsOneWidget);
+      expect(find.bySemanticsLabel(RegExp('Your conversation with the Grove team')), findsOneWidget);
+      expect(find.text('Grove team'), findsOneWidget);
       expect(find.text('Ayşe: Hemen bakıyorum.'), findsOneWidget);
       expect(find.bySemanticsLabel(RegExp('New messages from the team: 2')), findsOneWidget);
-      await tester.tap(find.text('Your conversation with the Grove team'));
+      await tester.tap(find.text('Grove team'));
       expect(opened, 1);
       // Sorted: the row goes.
       server.state = {..._state(mode: 'human'), 'state': 'resolved'};
       await tester.runAsync(support.load);
       await tester.pump();
-      expect(find.text('Your conversation with the Grove team'), findsNothing);
+      expect(find.bySemanticsLabel(RegExp('Your conversation with the Grove team')), findsNothing);
+    });
+
+    testWidgets('says who is helping and when, Read under the run the team read, and sorted as a card (design A)', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Hemen bakıyorum.')],
+        state: {..._state(mode: 'human'), 'presence': 'Ayşe is here · replies in about 10 minutes', 'team_read_seq': 1},
+      );
+      await _open(tester, server.support());
+      expect(find.text('Ayşe is here · replies in about 10 minutes'), findsOneWidget);
+      expect(find.textContaining(' · Read'), findsOneWidget);
+      expect(find.text("I'm sorted"), findsOneWidget);
+      await tester.tap(find.text("I'm sorted"));
+      server.state = {...server.state, 'state': 'resolved'};
+      await _settle(tester);
+      expect(find.text('You marked this sorted'), findsOneWidget);
+      expect(find.text('Write any time and the Grove team picks it up again.'), findsOneWidget);
+      // The box to write in stays: a line within the week opens it again.
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
+      expect(find.text("I'm sorted"), findsNothing);
+      // Sorted, the header shows the tick where the close was: out by the way back.
+      await tester.tap(find.byIcon(Icons.chevron_left_rounded));
+      await _settle(tester);
     });
 
     testWidgets('keeps the place to write above the keyboard', (tester) async {
@@ -259,11 +281,12 @@ void main() {
       expect(tester.takeException(), isNull);
       final ar = RendelStrings.forLocale('ar');
       expect(find.text(ar.supportSorted), findsOneWidget);
-      // The page's start is on the right: the team's line and the close are there, the person's own line on the other side.
+      // The page's start is on the right: the team's line and the way back are there; the person's own line and the close on the other side.
       final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
       expect(tester.getTopLeft(find.text('لم تصل شحنتي بعد، والطلب رقم M-2021')).dx, lessThan(width * 0.2));
       expect(tester.getTopRight(find.text('سأتحقق من ذلك الآن.')).dx, greaterThan(width * 0.7));
-      expect(tester.getCenter(find.byIcon(Icons.close_rounded)).dx, greaterThan(width / 2));
+      expect(tester.getCenter(find.byIcon(Icons.chevron_left_rounded)).dx, greaterThan(width / 2));
+      expect(tester.getCenter(find.byIcon(Icons.close_rounded)).dx, lessThan(width / 2));
       await _close(tester);
     });
 
@@ -273,7 +296,7 @@ void main() {
         state: _state(contact: {'state': 'none', 'required': true}),
       );
       await _open(tester, server.support());
-      expect(find.widgetWithText(TextField, 'Write to the Grove team…'), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
       expect(find.text('Where should we send the reply? Add your email to keep going.'), findsNothing);
       await _close(tester);
     });
@@ -286,7 +309,7 @@ void main() {
       await _open(tester, server.support());
       expect(find.text('Where should we send the reply? Add your email to keep going.'), findsOneWidget);
       // No field to write in until the address is given.
-      expect(find.widgetWithText(TextField, 'Write to the Grove team…'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsNothing);
       await tester.enterText(find.byType(TextField).first, 'zeynep@example.com');
       await tester.tap(find.text('Save'));
       await _settle(tester);

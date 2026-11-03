@@ -854,6 +854,7 @@ class Rendel {
       context,
       support: support,
       team: team,
+      assistant: _config.assistantName,
       onAction: controller.tapAction,
       canHandle: controller.handles,
       routeTitle: (route) => controller.routes[route]?.title,

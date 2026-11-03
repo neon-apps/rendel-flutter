@@ -210,7 +210,7 @@ class RendelStrings {
     this.supportSorted = 'I\'m sorted',
     this.supportYou = 'You',
     this.supportWriteTo = 'Write to {name}…',
-    this.supportWriteTeam = 'Write to the {team} team…',
+    this.supportWriteTeam = 'Message the {team} team',
     this.supportTyping = '{name} is typing…',
     this.supportUnsent = 'Not sent. Tap to try again.',
     this.supportContactAsk = 'Where should we send the reply? Add your email to keep going.',
@@ -230,6 +230,10 @@ class RendelStrings {
     this.supportOpen = 'Talk to the team',
     this.supportRowTitle = 'Your conversation with the {team} team',
     this.supportSending = 'Sending…',
+    this.supportRead = 'Read',
+    this.supportSortedTitle = 'You marked this sorted',
+    this.supportSortedBody = 'Write any time and the {team} team picks it up again.',
+    this.supportPreparedBy = 'Prepared by {name}',
     this.memoryEmpty = 'Tell me a preference once, like “always lactose-free”, and I\'ll keep it in mind.',
     this.memoryForget = 'Forget',
     this.memoryForgetAll = 'Forget all',
@@ -668,6 +672,16 @@ class RendelStrings {
 
   /// Under the person's line while it is on its way to the team.
   final String supportSending;
+
+  /// Under the person's lines once the team has read them.
+  final String supportRead;
+
+  /// The card at the end of a conversation the person marked sorted.
+  final String supportSortedTitle;
+  final String supportSortedBody;
+
+  /// Above a card someone on the team prepared for the person to confirm.
+  final String supportPreparedBy;
   final String memoryEmpty;
   final String memoryForget;
   final String memoryForgetAll;
@@ -714,6 +728,8 @@ class RendelStrings {
   String supportWriteToOf(String name) => supportWriteTo.replaceAll('{name}', name);
   String supportWriteTeamOf(String team) => supportWriteTeam.replaceAll('{team}', team);
   String supportRowTitleOf(String team) => supportRowTitle.replaceAll('{team}', team);
+  String supportSortedBodyOf(String team) => supportSortedBody.replaceAll('{team}', team);
+  String supportPreparedByOf(String name) => supportPreparedBy.replaceAll('{name}', name);
   String supportTypingOf(String name) => supportTyping.replaceAll('{name}', name);
   String supportUnreadOf(int count) => supportUnread.replaceAll('{count}', '$count');
   String stepOfCount(int step, int count) =>
@@ -982,6 +998,10 @@ class RendelStrings {
     String? supportOpen,
     String? supportRowTitle,
     String? supportSending,
+    String? supportRead,
+    String? supportSortedTitle,
+    String? supportSortedBody,
+    String? supportPreparedBy,
     String? memoryEmpty,
     String? memoryForget,
     String? memoryForgetAll,
@@ -1190,6 +1210,10 @@ class RendelStrings {
       supportOpen: supportOpen ?? this.supportOpen,
       supportRowTitle: supportRowTitle ?? this.supportRowTitle,
       supportSending: supportSending ?? this.supportSending,
+      supportRead: supportRead ?? this.supportRead,
+      supportSortedTitle: supportSortedTitle ?? this.supportSortedTitle,
+      supportSortedBody: supportSortedBody ?? this.supportSortedBody,
+      supportPreparedBy: supportPreparedBy ?? this.supportPreparedBy,
       memoryEmpty: memoryEmpty ?? this.memoryEmpty,
       memoryForget: memoryForget ?? this.memoryForget,
       memoryForgetAll: memoryForgetAll ?? this.memoryForgetAll,
@@ -1415,6 +1439,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportOpen: 'Ekiple konuşun',
     supportRowTitle: '{team} ekibiyle görüşmeniz',
     supportSending: 'Gönderiliyor…',
+    supportRead: 'Okundu',
+    supportSortedTitle: 'Çözüldü olarak işaretlediniz',
+    supportSortedBody: 'Dilediğiniz an yazabilirsiniz; {team} ekibi hemen devralır.',
+    supportPreparedBy: '{name} sizin için hazırladı',
     memoryEmpty: 'Bana \'hep laktozsuz\' gibi bir tercihinizi söyleyin, sonraki seferler için aklımda tutayım.',
     memoryForget: 'Unut',
     memoryForgetAll: 'Tümünü unut',
@@ -1629,6 +1657,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportOpen: 'Mit dem Team sprechen',
     supportRowTitle: 'Ihr Gespräch mit dem Team von {team}',
     supportSending: 'Wird gesendet…',
+    supportRead: 'Gelesen',
+    supportSortedTitle: 'Als erledigt markiert',
+    supportSortedBody: 'Schreiben Sie jederzeit, das Team von {team} übernimmt wieder.',
+    supportPreparedBy: 'Für Sie vorbereitet von {name}',
     memoryEmpty: 'Sagen Sie mir einmal eine Vorliebe, etwa „immer laktosefrei“, und ich behalte sie im Kopf.',
     memoryForget: 'Vergessen',
     memoryForgetAll: 'Alles vergessen',
@@ -1842,6 +1874,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportOpen: 'Parler à l’équipe',
     supportRowTitle: 'Votre conversation avec l’équipe {team}',
     supportSending: 'Envoi…',
+    supportRead: 'Lu',
+    supportSortedTitle: 'Vous l’avez marqué comme réglé',
+    supportSortedBody: 'Écrivez quand vous voulez, l’équipe {team} reprend la conversation.',
+    supportPreparedBy: 'Préparé par {name}',
     memoryEmpty: 'Dites-moi une préférence une fois, comme « toujours sans lactose », et je la garderai en tête.',
     memoryForget: 'Oublier',
     memoryForgetAll: 'Tout oublier',
@@ -2054,6 +2090,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportOpen: 'Hablar con el equipo',
     supportRowTitle: 'Tu conversación con el equipo de {team}',
     supportSending: 'Enviando…',
+    supportRead: 'Leído',
+    supportSortedTitle: 'Lo marcaste como resuelto',
+    supportSortedBody: 'Escribe cuando quieras y el equipo de {team} lo retoma.',
+    supportPreparedBy: 'Preparado por {name}',
     memoryEmpty: 'Dime una preferencia una vez, como «siempre sin lactosa», y la tendré en cuenta.',
     memoryForget: 'Olvidar',
     memoryForgetAll: 'Olvidar todo',
@@ -2265,6 +2305,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportOpen: 'تحدث إلى الفريق',
     supportRowTitle: 'محادثتك مع فريق {team}',
     supportSending: 'جارٍ الإرسال…',
+    supportRead: 'تمت القراءة',
+    supportSortedTitle: 'حدّدتها كمحلولة',
+    supportSortedBody: 'اكتب في أي وقت وسيتابع فريق {team} من جديد.',
+    supportPreparedBy: 'أعدّه لك {name}',
     memoryEmpty: 'أخبرني بتفضيل مرة واحدة، مثل «دائمًا خالٍ من اللاكتوز»، وسأتذكره.',
     memoryForget: 'انسَ',
     memoryForgetAll: 'انسَ الكل',

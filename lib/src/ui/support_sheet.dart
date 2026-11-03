@@ -12,13 +12,13 @@ import 'renderer/registry.dart';
 import 'theme.dart';
 
 /// Opens the person's thread with the app's own team (human support, design/
-/// plans/human-support.md §3.3) as a sheet over what is on screen, drawn as a
-/// messaging app is and as the web SDK draws it: the team's name and whether
-/// they are here, the person's lines on one side in the app's colour and the
-/// team's on the other under who wrote them, a speaker's lines within five
-/// minutes as one run with its time (never "Seen" or "Read": K9), the email
-/// the reply goes to when nobody could reach the person otherwise (K14), and
-/// one box to write in.
+/// plans/human-support.md §3.3) as a sheet over what is on screen, drawn as
+/// design A (Tuna, 2026-11-03) and as the web SDK draws it: back to the
+/// assistant, the team with who is helping and when they answer, the
+/// person's bubbles on one side in the app's colour with "Read" once the team
+/// read them, the team's white ones on the other under "Dana · Halden team",
+/// what happened small in the middle, the team's auto-reply and what they ask
+/// (the email the reply goes to, K14) in their column, and a pill to write in.
 ///
 /// [onAction] carries out a tap on a card the team sent: a screen, a link, a
 /// call. The sheet closes first when it opens a screen of the app.
@@ -26,6 +26,7 @@ Future<void> showRendelSupport(
   BuildContext context, {
   required RendelSupport support,
   required String team,
+  String? assistant,
   required Future<bool> Function(UIAction action) onAction,
   required bool Function(UIAction action) canHandle,
   String? Function(String route)? routeTitle,
@@ -55,6 +56,7 @@ Future<void> showRendelSupport(
           child: RendelSupportSheet(
             support: support,
             team: team,
+            assistant: assistant,
             onAction: onAction,
             canHandle: canHandle,
             routeTitle: routeTitle,
@@ -72,6 +74,7 @@ class RendelSupportSheet extends StatefulWidget {
     super.key,
     required this.support,
     required this.team,
+    this.assistant,
     required this.onAction,
     required this.canHandle,
     this.routeTitle,
@@ -81,6 +84,9 @@ class RendelSupportSheet extends StatefulWidget {
 
   final RendelSupport support;
   final String team;
+
+  /// What the assistant is called: the way back says it.
+  final String? assistant;
   final Future<bool> Function(UIAction action) onAction;
   final bool Function(UIAction action) canHandle;
   final String? Function(String route)? routeTitle;
@@ -274,42 +280,45 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final v = widget.support.value.value;
     final state = v.state;
     final resolved = state?.resolved ?? false;
-    final contact = state?.contactState ?? 'not_needed';
+    final asked = v.entries.any((e) => e.author == RendelSupportAuthorKind.user);
     // The first line always goes (the server takes it); the one after it waits for an email.
-    final needsContact = (state?.contactRequired ?? false) && v.entries.any((e) => e.author == RendelSupportAuthorKind.user);
-    // The optional box is for the wait: once the team is talking, it gives the page back.
-    final offersContact = !needsContact &&
-        contact == 'none' &&
-        v.entries.any((e) => e.author == RendelSupportAuthorKind.user) &&
-        !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent);
+    final needsContact = (state?.contactRequired ?? false) && asked;
     final justHanded = !resolved && !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent);
     final typing = v.typingUntil != null && v.typingUntil!.isAfter(DateTime.now());
     final agent = state?.agentName;
+    final team = strings.supportTeamOf(widget.team);
 
     // A speaker's lines within five minutes are one run, as the web SDK groups them; a marker ends one.
     final items = <Object>[];
     _Run? run;
+    final lastMarker = v.entries.where((e) => e.marker).lastOrNull;
     for (final entry in v.entries) {
       if (entry.marker) {
         run = null;
-        items.add(entry.text ?? '');
+        // Sorted: the card at the end says it, so the server's own line about it steps aside.
+        if (resolved && identical(entry, lastMarker) && (entry.markerKind?.endsWith('resolved') ?? false)) continue;
+        items.add(entry);
         continue;
       }
       final mine = entry.author == RendelSupportAuthorKind.user;
-      final who = mine ? strings.supportYou : (entry.authorName ?? widget.team);
+      final who = mine ? strings.supportYou : (entry.authorName != null ? '${entry.authorName} · $team' : team);
       final key = '${mine ? 'me' : 'team'}:$who';
       if (run != null && run.key == key && entry.createdAt.difference(run.at) <= _runGap) {
         run.entries.add(entry);
         run.at = entry.createdAt;
       } else {
-        run = _Run(key: key, mine: mine, who: who, at: entry.createdAt, entries: [entry]);
+        run = _Run(key: key, mine: mine, who: who, avatar: entry.authorName ?? widget.team, at: entry.createdAt, entries: [entry]);
         items.add(run);
       }
     }
+    // "Read ✓" under the person's newest run the team has read (design A).
+    final readSeq = state?.teamReadSeq ?? 0;
+    final readRun = items.whereType<_Run>().where((r) => r.mine && readSeq >= r.entries.last.seq).lastOrNull;
+    final column = _teamColumn(context, theme, strings, needsContact: needsContact, asked: asked);
     final lines = <Widget>[
-      for (final item in items) item is _Run ? _run(context, theme, strings, item) : _marker(theme, item as String),
+      for (final item in items) item is _Run ? _run(context, theme, strings, item, read: identical(item, readRun)) : _event(context, theme, item as RendelSupportEntry),
+      if (column != null) column,
       if (v.pending.isNotEmpty) _pending(theme, strings, v.pending),
-      if (state?.expectation case final expectation? when state!.mode != 'human') _wait(context, theme, expectation),
       // Newest of all: someone from the team is writing.
       if (typing)
         Semantics(
@@ -319,217 +328,286 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
             children: [
               _avatar(theme, agent ?? widget.team),
               const SizedBox(width: 8),
-              _bubble(theme, _TypingDots(color: theme.colors.onSurfaceSoft), mine: false, first: true),
+              _bubble(theme, _TypingDots(color: theme.colors.onSurfaceFaint), mine: false, last: true),
             ],
           ),
         ),
-      // The server's own line says it closed when the last thing that happened was closing it.
-      if (resolved && !(v.entries.lastOrNull?.marker ?? false)) _marker(theme, strings.supportClosed),
+      if (resolved) _sorted(theme, strings),
     ];
 
     return SafeArea(
       top: false,
       child: SizedBox(
         height: math.max(MediaQuery.sizeOf(context).height * 0.88 - MediaQuery.viewInsetsOf(context).bottom, 200),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: EdgeInsetsDirectional.fromSTEB(theme.space.sm, theme.space.md, theme.space.md, theme.space.sm),
-              child: Row(
-                children: [
-                  IconButton(
-                    tooltip: null,
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    style: IconButton.styleFrom(
-                      backgroundColor: theme.colors.surfaceRaised,
-                      side: BorderSide(color: theme.hairline),
-                    ),
-                    icon: Icon(Icons.close_rounded, size: 18, color: theme.colors.onSurface, semanticLabel: strings.supportBack),
-                  ),
-                  SizedBox(width: theme.space.xs),
-                  _avatar(theme, agent ?? widget.team, size: 36),
-                  SizedBox(width: theme.space.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Semantics(
-                          header: true,
-                          child: Text(strings.supportTeamOf(widget.team), style: theme.text.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                        ),
-                        const SizedBox(height: 2),
-                        Row(
-                          children: [
-                            Container(
-                              width: 7,
-                              height: 7,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                // No status green in the theme (`danger`'s note): here is the app's own colour.
-                                color: (state?.teamHere ?? false) ? theme.colors.accent : theme.colors.onSurfaceFaint,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text((state?.teamHere ?? false) ? strings.supportHere : strings.supportAway, style: theme.text.caption),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // The one thing the person can do about the conversation itself.
-                  if (justHanded)
-                    _action(theme, label: strings.supportBack, onTap: () async {
-                      final navigator = Navigator.of(context);
-                      await widget.support.resolve();
-                      navigator.maybePop();
-                    })
-                  else if (!resolved)
-                    _action(theme, label: strings.supportSorted, icon: Icons.check_rounded, onTap: () => widget.support.resolve()),
-                ],
-              ),
-            ),
-            Container(height: 1, color: theme.hairline),
-            Expanded(
-              child: Stack(
-                alignment: Alignment.bottomCenter,
-                children: [
-                  // The conversation sits on the panel's own ground with a breath of the app's colour; the team's lines and the cards are raised on it.
-                  Positioned.fill(child: ColoredBox(color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.03), theme.colors.surface))),
-                  Semantics(
-                    liveRegion: true,
-                    child: ListView.separated(
-                      controller: _scroll,
-                      padding: EdgeInsets.fromLTRB(14, theme.space.md, 14, theme.space.md),
-                      itemCount: lines.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 14),
-                      itemBuilder: (_, i) => lines[i],
-                    ),
-                  ),
-                  if (_newBelow)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: theme.space.xs),
-                      child: RendelActionButton(label: strings.supportNewLine, onTap: _toNewest),
-                    ),
-                ],
-              ),
-            ),
-            Container(height: 1, color: theme.hairline),
-            Padding(
-              padding: EdgeInsets.fromLTRB(12, 10, 12, theme.space.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (needsContact || offersContact) _contactCard(theme, strings, required: needsContact),
-                  if (contact == 'stated' && !resolved) _codeCard(theme, strings),
-                  // A read the team asked for that waits for the person's yes, in the server's words.
-                  for (final ask in v.asks)
-                    _plate(theme, [
-                      Text(ask.text, style: _heading(theme)),
-                      SizedBox(height: theme.space.sm),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: RendelActionButton(
-                              label: strings.goBack,
-                              quiet: true,
-                              expand: true,
-                              onTap: () => widget.support.answerLookup(ask.lookupId, allow: false),
-                            ),
-                          ),
-                          SizedBox(width: theme.space.sm),
-                          Expanded(
-                            child: RendelActionButton(
-                              label: strings.confirm,
-                              expand: true,
-                              onTap: () => widget.support.answerLookup(ask.lookupId, allow: true),
-                            ),
-                          ),
-                        ],
+        child: ColoredBox(
+          color: Color.alphaBlend(theme.colors.onSurface.withValues(alpha: 0.015), theme.colors.surfaceRaised),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _head(context, theme, strings, resolved: resolved),
+              Container(height: 1, color: theme.colors.onSurface.withValues(alpha: 0.06)),
+              Expanded(
+                child: Stack(
+                  alignment: Alignment.bottomCenter,
+                  children: [
+                    Semantics(
+                      liveRegion: true,
+                      child: ListView.separated(
+                        controller: _scroll,
+                        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+                        itemCount: lines.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 8),
+                        itemBuilder: (_, i) => lines[i],
                       ),
-                    ]),
-                  if (_note case final note?)
-                    Padding(
-                      padding: EdgeInsets.only(bottom: theme.space.xs),
-                      child: Semantics(liveRegion: true, child: Text(note, style: theme.text.caption)),
                     ),
-                  // Closed is not the end: a line within the week reopens the thread (plan §4.2).
-                  if (!needsContact) _composer(theme, strings),
-                ],
+                    if (_newBelow)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: theme.space.xs),
+                        child: RendelActionButton(label: strings.supportNewLine, onTap: _toNewest),
+                      ),
+                  ],
+                ),
               ),
-            ),
-          ],
+              Padding(
+                padding: EdgeInsets.fromLTRB(12, 8, 12, theme.space.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_note case final note?)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: theme.space.xs),
+                        child: Semantics(liveRegion: true, child: Text(note, style: theme.text.caption)),
+                      ),
+                    // "I'm sorted" while the conversation is open; before the team has written, the way back (K4).
+                    if (!resolved)
+                      Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: _chip(
+                            theme,
+                            label: justHanded ? strings.supportMistake : strings.supportSorted,
+                            onTap: justHanded
+                                ? () async {
+                                    final navigator = Navigator.of(context);
+                                    await widget.support.resolve();
+                                    navigator.maybePop();
+                                  }
+                                : () => widget.support.resolve(),
+                          ),
+                        ),
+                      ),
+                    // Closed is not the end: a line within the week reopens the thread (plan §4.2).
+                    if (!needsContact) _composer(theme, strings),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  /// One speaker's run: who wrote it (the team's), its lines, and its time.
-  Widget _run(BuildContext context, RendelTheme theme, RendelStrings strings, _Run run) {
+  /// Back to the assistant, the team with who is helping and when they answer, and a way out: close, or the tick of a sorted conversation.
+  Widget _head(BuildContext context, RendelTheme theme, RendelStrings strings, {required bool resolved}) {
+    final state = widget.support.value.value.state;
+    final here = state?.teamHere ?? false;
+    // Green while the team is here, amber while it is away: there is no status palette, so these are drawn for legibility on the page.
+    final tone = Color.lerp(here ? const Color(0xFF2E7D4F) : const Color(0xFFB7791F), theme.colors.onSurface, 0.12)!;
+    return Container(
+      color: theme.colors.surfaceRaised.withValues(alpha: 0.92),
+      padding: const EdgeInsets.fromLTRB(6, 10, 12, 10),
+      child: Row(
+        children: [
+          // The way back keeps to its own size; the team and their presence line take the room between.
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 110),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Semantics(
+                button: true,
+                label: strings.supportBack,
+                excludeSemantics: true,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => Navigator.of(context).maybePop(),
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 44),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.chevron_left_rounded, size: 24, color: theme.accentText),
+                        Flexible(child: Text(widget.assistant ?? 'Rendel', style: theme.text.body.copyWith(color: theme.accentText, fontSize: 15), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _avatar(theme, state?.agentName ?? widget.team, size: 36),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Semantics(
+                        header: true,
+                        child: Text(strings.supportTeamOf(widget.team), style: theme.text.body.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                      Text(state?.presence ?? (here ? strings.supportHere : strings.supportAway), style: theme.text.caption.copyWith(fontSize: 12.5, color: tone), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 32,
+            child: Align(
+              alignment: AlignmentDirectional.centerEnd,
+              child: resolved
+                  ? Semantics(
+                      label: strings.supportSortedTitle,
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(color: theme.colors.accent, shape: BoxShape.circle),
+                        child: Icon(Icons.check_rounded, size: 18, color: theme.colors.onAccent),
+                      ),
+                    )
+                  : IconButton(
+                      tooltip: null,
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      style: IconButton.styleFrom(
+                        backgroundColor: theme.colors.onSurface.withValues(alpha: 0.07),
+                        minimumSize: const Size(32, 32),
+                        fixedSize: const Size(32, 32),
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: Icon(Icons.close_rounded, size: 17, color: theme.colors.onSurfaceSoft, semanticLabel: strings.closeDetail),
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// What happened (who joined, who passed it on): small and quiet in the middle, with its time.
+  Widget _event(BuildContext context, RendelTheme theme, RendelSupportEntry entry) {
+    final time = _time(context, entry.createdAt);
+    final text = entry.text;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Text(text == null || text.isEmpty ? time : '$text · $time', style: theme.text.caption.copyWith(fontSize: 12.5, color: theme.colors.onSurfaceFaint), textAlign: TextAlign.center),
+    );
+  }
+
+  /// One speaker's run: the team's under who wrote it with their avatar at its foot; the person's with its time, and "Read" once the team read it.
+  Widget _run(BuildContext context, RendelTheme theme, RendelStrings strings, _Run run, {required bool read}) {
     final column = Column(
       crossAxisAlignment: run.mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
         if (!run.mine)
           Padding(
-            padding: const EdgeInsetsDirectional.only(start: 4, bottom: 3),
-            child: ExcludeSemantics(child: Text(run.who, style: _who(theme))),
+            padding: const EdgeInsetsDirectional.only(start: 4, bottom: 2),
+            child: ExcludeSemantics(child: Text(run.who, style: _meta(theme).copyWith(fontSize: 12))),
           ),
-        for (final (i, entry) in run.entries.indexed) _entry(context, theme, strings, entry, mine: run.mine, first: i == 0),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(6, 3, 6, 0),
-          child: Text(_time(context, run.entries.last.createdAt), style: _meta(theme)),
-        ),
+        for (final (i, entry) in run.entries.indexed) _entry(context, theme, strings, entry, mine: run.mine, first: i == 0, last: i == run.entries.length - 1),
+        if (run.mine)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 0),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(child: Text(read ? '${_time(context, run.entries.last.createdAt)} · ${strings.supportRead}' : _time(context, run.entries.last.createdAt), style: _meta(theme))),
+                if (read) ...[const SizedBox(width: 3), Icon(Icons.check_rounded, size: 12, color: theme.colors.onSurfaceFaint)],
+              ],
+            ),
+          ),
       ],
     );
-    return _side(theme, mine: run.mine, who: run.who, child: column);
+    return _side(theme, mine: run.mine, avatar: run.avatar, child: column);
   }
 
   /// A run on its side: the person's on the end, the team's on the start beside who wrote it.
-  Widget _side(RendelTheme theme, {required bool mine, required String who, required Widget child, bool meta = true}) {
-    final width = MediaQuery.sizeOf(context).width * 0.8;
+  Widget _side(RendelTheme theme, {required bool mine, required String avatar, required Widget child}) {
+    final width = math.min(MediaQuery.sizeOf(context).width * 0.82, 300.0);
     return Row(
       mainAxisAlignment: mine ? MainAxisAlignment.end : MainAxisAlignment.start,
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        if (!mine) ...[
-          // Beside the run's last line, not its time.
-          Padding(padding: EdgeInsets.only(bottom: meta ? 19 : 0), child: _avatar(theme, who)),
-          const SizedBox(width: 8),
-        ],
+        if (!mine) ...[_avatar(theme, avatar), const SizedBox(width: 8)],
         Flexible(child: ConstrainedBox(constraints: BoxConstraints(maxWidth: width), child: child)),
       ],
     );
   }
 
-  Widget _entry(BuildContext context, RendelTheme theme, RendelStrings strings, RendelSupportEntry entry, {required bool mine, required bool first}) {
+  Widget _entry(BuildContext context, RendelTheme theme, RendelStrings strings, RendelSupportEntry entry, {required bool mine, required bool first, required bool last}) {
     final who = mine ? strings.supportYou : (entry.authorName ?? widget.team);
     final ink = mine ? theme.colors.onAccent : theme.colors.onSurface;
     final hasText = entry.text?.isNotEmpty ?? false;
-    final parts = <Widget>[
-      if (hasText) _bubble(theme, Text(entry.text!), mine: mine, first: first),
-      for (final (i, file) in entry.files.indexed)
-        _bubble(
-          theme,
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.insert_drive_file_outlined, size: 16, color: ink),
-              const SizedBox(width: 8),
-              Flexible(child: Text(file, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
-            ],
-          ),
-          mine: mine,
-          first: first && !hasText && i == 0,
+    final bubbles = <Widget>[
+      if (hasText) Text(entry.text!),
+      for (final url in entry.pictures)
+        ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.network(url, width: 132, height: 99, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.image_outlined, color: ink)),
         ),
+      for (final file in entry.files)
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.insert_drive_file_outlined, size: 16, color: ink),
+            const SizedBox(width: 8),
+            Flexible(child: Text(file, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
+          ],
+        ),
+    ];
+    final parts = <Widget>[
+      for (final (i, b) in bubbles.indexed)
+        _bubble(theme, b, mine: mine, last: last && i == bubbles.length - 1 && entry.blocks.isEmpty, picture: b is ClipRRect),
       for (final raw in entry.blocks)
         if (_unopened(raw))
           Text(strings.loading, style: theme.text.caption)
         else if (WireBlock.tryParse(raw) case final block?)
-          // A line's cards arrive whole, drawn ready and as wide as the run.
-          SizedBox(width: double.infinity, child: ComponentRegistry.build(context, block..ready = true, _dispatch)),
+          // A card the team sent, in their column: who prepared it, then the card to act on.
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(top: 4),
+            padding: const EdgeInsets.all(14),
+            decoration: _cardShell(theme),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (raw['type'] == 'confirm_card' && !mine)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        Icon(Icons.inventory_2_outlined, size: 16, color: theme.accentText),
+                        const SizedBox(width: 6),
+                        Flexible(child: Text(strings.supportPreparedByOf(who), style: theme.text.caption.copyWith(color: theme.accentText, fontWeight: FontWeight.w600))),
+                      ],
+                    ),
+                  ),
+                // A line's cards arrive whole, drawn ready.
+                ComponentRegistry.build(context, block..ready = true, _dispatch),
+              ],
+            ),
+          ),
     ];
     return Semantics(
       container: true,
@@ -547,12 +625,12 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     );
   }
 
-  /// What is still on its way: faded while it goes, outlined with a way to send it again when it did not.
+  /// What is still on its way: faded while it goes; dimmed, with how to send it again in red, when it did not.
   Widget _pending(RendelTheme theme, RendelStrings strings, List<RendelSupportPending> pending) {
     return _side(
       theme,
       mine: true,
-      who: strings.supportYou,
+      avatar: strings.supportYou,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.end,
         mainAxisSize: MainAxisSize.min,
@@ -561,8 +639,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
             Padding(
               padding: EdgeInsets.only(top: i == 0 ? 0 : 3),
               child: Opacity(
-                opacity: line.failed ? 1 : 0.62,
-                child: _bubble(theme, Text(line.text), mine: true, first: i == 0, failed: line.failed),
+                opacity: line.failed ? 0.55 : 0.62,
+                child: _bubble(theme, Text(line.text), mine: true, last: i == pending.length - 1),
               ),
             ),
             if (line.failed)
@@ -572,13 +650,13 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                   onTap: () => widget.support.retry(line.clientMsgId),
                   borderRadius: BorderRadius.circular(8),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.refresh_rounded, size: 15, color: theme.danger),
-                        const SizedBox(width: 5),
-                        Text(strings.supportUnsent, style: theme.text.caption.copyWith(color: theme.danger, fontWeight: FontWeight.w600)),
+                        Icon(Icons.refresh_rounded, size: 13, color: theme.danger),
+                        const SizedBox(width: 4),
+                        Flexible(child: Text(strings.supportUnsent, style: _meta(theme).copyWith(color: theme.danger, fontWeight: FontWeight.w500))),
                       ],
                     ),
                   ),
@@ -586,126 +664,172 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
               ),
           ],
           if (pending.any((line) => !line.failed))
-            Padding(padding: const EdgeInsets.fromLTRB(6, 3, 6, 0), child: Text(strings.supportSending, style: _meta(theme))),
+            Padding(padding: const EdgeInsets.fromLTRB(4, 2, 4, 0), child: Text(strings.supportSending, style: _meta(theme))),
         ],
       ),
     );
   }
 
-  /// When the team will answer, while nobody has: a quiet note on the team's side, not a box.
-  Widget _wait(BuildContext context, RendelTheme theme, String expectation) => Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ExcludeSemantics(child: _mark(theme, Icons.schedule_rounded, size: 28, circle: true)),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Padding(
-              padding: EdgeInsets.only(top: 5, right: MediaQuery.sizeOf(context).width * 0.1),
-              child: Text(expectation, style: theme.text.caption),
-            ),
-          ),
-        ],
-      );
-
-  /// The app's colour, lightly, behind a glyph: the wait note's, a card's.
-  Widget _mark(RendelTheme theme, IconData glyph, {double size = 34, bool circle = false}) => Container(
-        width: size,
-        height: size,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.12), theme.colors.surfaceRaised),
-          borderRadius: circle ? null : BorderRadius.circular(12),
-          shape: circle ? BoxShape.circle : BoxShape.rectangle,
-          border: Border.all(color: theme.colors.accent.withValues(alpha: 0.18)),
-        ),
-        child: Icon(glyph, size: size * 0.52, color: theme.accentText),
-      );
-
-  /// What happened to the conversation itself, across the page between hairlines.
-  Widget _marker(RendelTheme theme, String text) => Row(
-        children: [
-          Expanded(child: Container(height: 1, color: theme.hairline)),
-          Flexible(
-            flex: 4,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(text, style: theme.text.caption, textAlign: TextAlign.center),
-            ),
-          ),
-          Expanded(child: Container(height: 1, color: theme.hairline)),
-        ],
-      );
-
-  /// One bubble: the person's in the app's colour, the team's on the page's own; a run's lines meet at their side's corners.
-  Widget _bubble(RendelTheme theme, Widget child, {required bool mine, required bool first, bool failed = false}) {
-    const round = Radius.circular(20);
-    const joined = Radius.circular(6);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
-      decoration: BoxDecoration(
-        color: failed ? theme.colors.surfaceRaised : (mine ? theme.colors.accent : theme.colors.surfaceRaised),
-        boxShadow: failed
-            ? null
-            : [
-                mine
-                    ? BoxShadow(color: theme.colors.accent.withValues(alpha: 0.35), offset: const Offset(0, 6), blurRadius: 14, spreadRadius: -10)
-                    : BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.06), offset: const Offset(0, 1), blurRadius: 2),
-              ],
-        borderRadius: mine
-            ? BorderRadiusDirectional.only(topStart: round, bottomStart: round, topEnd: first ? round : joined, bottomEnd: joined)
-            : BorderRadiusDirectional.only(topEnd: round, bottomEnd: round, topStart: first ? round : joined, bottomStart: joined),
-        border: failed ? Border.all(color: theme.danger, width: 1.5) : (mine ? null : Border.all(color: theme.hairline)),
-      ),
-      child: DefaultTextStyle.merge(
-        style: theme.text.body.copyWith(color: mine && !failed ? theme.colors.onAccent : theme.colors.onSurface, height: 1.42),
-        child: child,
-      ),
-    );
-  }
-
-  /// A speaker's initial in a circle.
-  Widget _avatar(RendelTheme theme, String name, {double size = 28}) => ExcludeSemantics(
-        child: Container(
-          width: size,
-          height: size,
-          alignment: Alignment.center,
-          // The team's circles carry the app's colour, lightly: who answers is the app.
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.12), theme.colors.surfaceRaised),
-            border: Border.all(color: theme.colors.accent.withValues(alpha: 0.18)),
-          ),
-          child: Text(
-            name.trim().isEmpty ? '·' : name.trim().characters.first.toUpperCase(),
-            style: theme.text.caption.copyWith(color: theme.accentText, fontWeight: FontWeight.w600, fontSize: size * 0.42, height: 1),
-          ),
-        ),
-      );
-
-  /// "I'm sorted", or "Back to the assistant" before anyone from the team has written: a button, in the header.
-  Widget _action(RendelTheme theme, {required String label, IconData? icon, required VoidCallback onTap}) => RendelPressable(
-        semanticLabel: label,
-        onTap: onTap,
-        child: Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: theme.colors.surfaceRaised,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: theme.hairline),
-          ),
-          child: Row(
+  /// The team's side at the end of the page while it waits: their auto-reply about when they answer, and what they
+  /// ask of the person (where to send the reply, the code it got, a read of their account).
+  Widget? _teamColumn(BuildContext context, RendelTheme theme, RendelStrings strings, {required bool needsContact, required bool asked}) {
+    final v = widget.support.value.value;
+    final state = v.state;
+    final resolved = state?.resolved ?? false;
+    final contact = state?.contactState ?? 'not_needed';
+    // The optional box is for the wait: once the team is talking, it gives the page back.
+    final offersContact = !needsContact && contact == 'none' && asked && !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent);
+    final items = <Widget>[
+      if (state?.expectation case final expectation? when state!.mode != 'human')
+        _bubble(
+          theme,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (icon != null) ...[Icon(icon, size: 16, color: theme.colors.onSurface), const SizedBox(width: 6)],
-              Text(label, style: theme.text.caption.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w600)),
+              Padding(padding: const EdgeInsets.only(top: 2), child: Icon(Icons.schedule_rounded, size: 16, color: theme.accentText)),
+              const SizedBox(width: 8),
+              Flexible(child: Text(expectation, style: const TextStyle(fontSize: 15))),
+            ],
+          ),
+          mine: false,
+          last: false,
+          auto: true,
+        ),
+      if (needsContact || offersContact) _contactCard(theme, strings, required: needsContact),
+      if (contact == 'stated' && !resolved) _codeCard(theme, strings),
+      // A read the team asked for that waits for the person's yes, in the server's words.
+      for (final ask in v.asks)
+        _plate(theme, [
+          Text(ask.text, style: _heading(theme)),
+          SizedBox(height: theme.space.sm),
+          Row(
+            children: [
+              Expanded(child: RendelActionButton(label: strings.confirm, expand: true, onTap: () => widget.support.answerLookup(ask.lookupId, allow: true))),
+              SizedBox(width: theme.space.sm),
+              RendelActionButton(label: strings.goBack, quiet: true, onTap: () => widget.support.answerLookup(ask.lookupId, allow: false)),
+            ],
+          ),
+        ]),
+    ];
+    if (items.isEmpty) return null;
+    final team = strings.supportTeamOf(widget.team);
+    return _side(
+      theme,
+      mine: false,
+      avatar: widget.team,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Padding(padding: const EdgeInsetsDirectional.only(start: 4, bottom: 2), child: ExcludeSemantics(child: Text(team, style: _meta(theme).copyWith(fontSize: 12)))),
+          for (final (i, item) in items.indexed) Padding(padding: EdgeInsets.only(top: i == 0 ? 0 : 4), child: item),
+        ],
+      ),
+    );
+  }
+
+  /// Sorted: a quiet card at the end, and the box to write in stays.
+  Widget _sorted(RendelTheme theme, RendelStrings strings) => Semantics(
+        liveRegion: true,
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(10, 16, 10, 0),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.09), theme.colors.surfaceRaised),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(color: theme.colors.accent, shape: BoxShape.circle),
+                child: Icon(Icons.check_rounded, size: 16, color: theme.colors.onAccent),
+              ),
+              const SizedBox(height: 6),
+              Text(strings.supportSortedTitle, style: theme.text.body.copyWith(fontSize: 15.5, fontWeight: FontWeight.w600, color: theme.colors.onSurface), textAlign: TextAlign.center),
+              const SizedBox(height: 2),
+              Text(strings.supportSortedBodyOf(widget.team), style: theme.text.caption.copyWith(fontSize: 13.5), textAlign: TextAlign.center),
             ],
           ),
         ),
       );
 
+  /// One bubble: the person's in the app's colour, the team's white with a faint ring; the run's last carries the tail on its own side.
+  Widget _bubble(RendelTheme theme, Widget child, {required bool mine, required bool last, bool auto = false, bool picture = false}) {
+    const round = Radius.circular(20);
+    const tail = Radius.circular(6);
+    return Container(
+      padding: picture ? const EdgeInsets.all(4) : const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+      decoration: BoxDecoration(
+        color: mine
+            ? theme.colors.accent
+            : auto
+                ? Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.09), theme.colors.surfaceRaised)
+                : theme.colors.surfaceRaised,
+        borderRadius: mine
+            ? BorderRadiusDirectional.only(topStart: round, topEnd: round, bottomStart: round, bottomEnd: last ? tail : round)
+            : BorderRadiusDirectional.only(topStart: round, topEnd: round, bottomEnd: round, bottomStart: last ? tail : round),
+        boxShadow: mine || auto
+            ? null
+            : [
+                BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.05), offset: const Offset(0, 1), blurRadius: 1),
+                BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.05), spreadRadius: 1),
+              ],
+      ),
+      child: DefaultTextStyle.merge(
+        style: theme.text.body.copyWith(color: mine ? theme.colors.onAccent : theme.colors.onSurface, fontSize: 16, height: 1.32),
+        child: child,
+      ),
+    );
+  }
+
+  /// A speaker's initial in a circle, in the app's colour, lightly.
+  Widget _avatar(RendelTheme theme, String name, {double size = 26}) => ExcludeSemantics(
+        child: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.14), theme.colors.surfaceRaised),
+            border: Border.all(color: theme.colors.surfaceRaised, width: 2),
+          ),
+          child: Text(
+            name.trim().isEmpty ? '·' : name.trim().characters.first.toUpperCase(),
+            style: theme.text.caption.copyWith(color: theme.accentText, fontWeight: FontWeight.w700, fontSize: size * 0.42, height: 1),
+          ),
+        ),
+      );
+
+  /// A small chip above the box: "I'm sorted", or the way back to the assistant before the team has written.
+  Widget _chip(RendelTheme theme, {required String label, required VoidCallback onTap}) => RendelPressable(
+        semanticLabel: label,
+        onTap: onTap,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 32),
+          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+          decoration: BoxDecoration(
+            color: theme.colors.surfaceRaised,
+            borderRadius: BorderRadius.circular(999),
+            boxShadow: [BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.08), spreadRadius: 1)],
+          ),
+          child: Text(label, style: theme.text.caption.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: theme.accentText)),
+        ),
+      );
+
+  /// A card in the team's column: white, with a faint ring and a soft shadow.
+  BoxDecoration _cardShell(RendelTheme theme) => BoxDecoration(
+        color: theme.colors.surfaceRaised,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.06), spreadRadius: 1),
+          BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.2), offset: const Offset(0, 14), blurRadius: 30, spreadRadius: -22),
+        ],
+      );
+
   String _time(BuildContext context, DateTime at) => MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at.toLocal()));
-  TextStyle _who(RendelTheme theme) => theme.text.caption.copyWith(fontWeight: FontWeight.w600);
   TextStyle _meta(RendelTheme theme) => theme.text.caption.copyWith(fontSize: 11.5, color: theme.colors.onSurfaceFaint, fontFeatures: const [FontFeature.tabularFigures()]);
 
   /// A confirm card the team sent that has no confirmation yet: this phone mints it, once, when it is first drawn.
@@ -765,13 +889,13 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
               ],
             ),
           ),
+        // A white pill: a round + to attach, the words, and a round send in the app's colour.
         Container(
-          padding: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: theme.colors.composer,
+            color: theme.colors.surfaceRaised,
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: theme.composerEdge),
-            boxShadow: [BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.18), offset: const Offset(0, 10), blurRadius: 24, spreadRadius: -18)],
+            boxShadow: [BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.08), spreadRadius: 1)],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -780,7 +904,13 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                 IconButton(
                   tooltip: null,
                   onPressed: _attaching ? null : () => setState(() => _menu = !_menu),
-                  icon: Icon(Icons.attach_file_rounded, color: theme.colors.onComposer, semanticLabel: strings.attachFile),
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.colors.onSurface.withValues(alpha: 0.07),
+                    minimumSize: const Size(36, 36),
+                    fixedSize: const Size(36, 36),
+                    padding: EdgeInsets.zero,
+                  ),
+                  icon: Icon(Icons.add_rounded, size: 20, color: theme.colors.onSurfaceSoft, semanticLabel: strings.attachFile),
                 ),
               Expanded(
                 child: TextField(
@@ -791,7 +921,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                   textInputAction: TextInputAction.send,
                   onChanged: (_) => widget.support.typing(),
                   onSubmitted: (_) => _send(),
-                  style: theme.text.body.copyWith(color: theme.colors.onComposer),
+                  style: theme.text.body.copyWith(color: theme.colors.onSurface, fontSize: 16),
                   decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
@@ -799,7 +929,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     // Always the team, never the one person in it (Tuna, 2026-11-03).
                     hintText: strings.supportWriteTeamOf(widget.team),
                     hintStyle: theme.text.body.copyWith(color: theme.colors.onSurfaceFaint),
-                    contentPadding: EdgeInsets.symmetric(horizontal: canAttach ? 2 : 12, vertical: 10),
+                    contentPadding: EdgeInsets.symmetric(horizontal: canAttach ? 4 : 12, vertical: 8),
                   ),
                 ),
               ),
@@ -812,9 +942,12 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     onPressed: ready ? _send : null,
                     style: IconButton.styleFrom(
                       backgroundColor: theme.colors.accent,
-                      disabledBackgroundColor: theme.colors.accent.withValues(alpha: 0.35),
+                      disabledBackgroundColor: theme.colors.accent.withValues(alpha: 0.4),
+                      minimumSize: const Size(36, 36),
+                      fixedSize: const Size(36, 36),
+                      padding: EdgeInsets.zero,
                     ),
-                    icon: Icon(Icons.arrow_upward_rounded, size: 20, color: theme.colors.onAccent, semanticLabel: strings.sendMessage),
+                    icon: Icon(Icons.arrow_upward_rounded, size: 18, color: theme.colors.onAccent, semanticLabel: strings.sendMessage),
                   );
                 },
               ),
@@ -825,17 +958,18 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     );
   }
 
-  /// Where the reply can reach the person (K14): checked by the API's own rule, said under the field once they
-  /// leave it or tap Save, and from then on with each change.
+  /// Where the reply can reach the person (K14), as a card in the team's column: checked by the API's own rule,
+  /// said under the field once they leave it or tap Save, and from then on with each change.
   Widget _contactCard(RendelTheme theme, RendelStrings strings, {required bool required}) {
     final problem = supportEmailProblem(_email.text);
     final warning = _emailRefused ??
         (_emailWarned && problem != null ? (problem == 'empty' ? strings.supportContactEmpty : strings.supportContactInvalid) : null);
     return _plate(theme, [
-      _cardHead(theme, Icons.mail_outline_rounded, required ? strings.supportContactAsk : strings.supportContactOptional, strings.supportContactWhy),
-      SizedBox(height: theme.space.sm + 4),
+      Text(required ? strings.supportContactAsk : strings.supportContactOptional, style: _heading(theme)),
+      const SizedBox(height: 10),
       _group(
         theme,
+        glyph: Icons.mail_outline_rounded,
         invalid: warning != null,
         field: TextField(
           controller: _email,
@@ -853,9 +987,10 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           },
           onSubmitted: (_) => _saveEmail(strings),
         ),
-        button: RendelActionButton(label: strings.supportContactSend, onTap: () => _saveEmail(strings)),
+        button: _attached(theme, strings.supportContactSend, () => _saveEmail(strings)),
       ),
       if (warning != null) _warning(theme, warning),
+      Padding(padding: const EdgeInsets.fromLTRB(2, 6, 2, 0), child: Text(strings.supportContactWhy, style: _meta(theme).copyWith(fontSize: 12))),
     ]);
   }
 
@@ -874,12 +1009,13 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
             ],
           ),
         ),
-        SizedBox(height: theme.space.sm + 4),
+        const SizedBox(height: 8),
       ],
-      _cardHead(theme, Icons.lock_outline_rounded, strings.supportCodeLabel, null),
-      SizedBox(height: theme.space.sm + 4),
+      Text(strings.supportCodeLabel, style: _heading(theme)),
+      const SizedBox(height: 10),
       _group(
         theme,
+        glyph: Icons.lock_outline_rounded,
         invalid: _codeWrong,
         field: TextField(
           controller: _code,
@@ -890,40 +1026,35 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           decoration: _bare(theme, null).copyWith(counterText: ''),
           onSubmitted: (_) => _verify(strings),
         ),
-        button: RendelActionButton(label: strings.confirm, onTap: () => _verify(strings)),
+        button: _attached(theme, strings.confirm, () => _verify(strings)),
       ),
       if (_codeWrong) _warning(theme, strings.supportCodeWrong),
     ]);
   }
 
-  /// A card's mark, title and why.
-  Widget _cardHead(RendelTheme theme, IconData glyph, String title, String? why) => Row(
-        crossAxisAlignment: why == null ? CrossAxisAlignment.center : CrossAxisAlignment.start,
-        children: [
-          ExcludeSemantics(child: _mark(theme, glyph)),
-          SizedBox(width: theme.space.sm + 4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(title, style: _heading(theme)),
-                if (why != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text(why, style: theme.text.caption)),
-              ],
-            ),
-          ),
-        ],
+  /// The field with its mark and its button attached, as one control; red, with the warning under it, while wrong.
+  Widget _group(RendelTheme theme, {required IconData glyph, required Widget field, required Widget button, required bool invalid}) => Container(
+        height: 46,
+        padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: invalid ? Color.alphaBlend(theme.danger.withValues(alpha: 0.08), theme.colors.surfaceRaised) : theme.colors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: invalid ? theme.danger : theme.colors.onSurface.withValues(alpha: 0.1), width: 1.5),
+        ),
+        child: Row(children: [Icon(glyph, size: 18, color: theme.colors.onSurfaceSoft), const SizedBox(width: 8), Expanded(child: field), const SizedBox(width: 6), button]),
       );
 
-  /// The field and its button as one control, as the box to write in is; outlined in the warning's colour while wrong.
-  Widget _group(RendelTheme theme, {required Widget field, required Widget button, required bool invalid}) => Container(
-        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
-        decoration: BoxDecoration(
-          color: theme.colors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: invalid ? theme.danger : theme.colors.lineStrong, width: invalid ? 1.5 : 1),
+  /// The button inside a field: small, in the app's colour.
+  Widget _attached(RendelTheme theme, String label, VoidCallback onTap) => RendelPressable(
+        semanticLabel: label,
+        onTap: onTap,
+        child: Container(
+          height: 36,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: theme.colors.accent, borderRadius: BorderRadius.circular(10)),
+          child: Text(label, style: theme.text.caption.copyWith(fontSize: 14, fontWeight: FontWeight.w600, color: theme.colors.onAccent)),
         ),
-        child: Row(children: [Expanded(child: field), const SizedBox(width: 6), button]),
       );
 
   InputDecoration _bare(RendelTheme theme, String? hint) => InputDecoration(
@@ -936,30 +1067,25 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   /// What is wrong with what was written, under its field.
   Widget _warning(RendelTheme theme, String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 8, 2, 0),
+        padding: const EdgeInsets.fromLTRB(2, 6, 2, 0),
         child: Semantics(
           liveRegion: true,
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.warning_amber_rounded, size: 16, color: theme.danger)),
-              const SizedBox(width: 6),
-              Expanded(child: Text(text, style: theme.text.caption.copyWith(color: theme.danger))),
+              Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.error_rounded, size: 15, color: theme.danger)),
+              const SizedBox(width: 5),
+              Expanded(child: Text(text, style: theme.text.caption.copyWith(fontSize: 12.5, color: theme.danger))),
             ],
           ),
         ),
       );
 
-  /// What the page asks of the person (an email, a code, a read): a raised card, never a grey slab.
+  /// What the page asks of the person (an email, a code, a read): a card in the team's column.
   Widget _plate(RendelTheme theme, List<Widget> children) => Container(
-        margin: EdgeInsets.only(bottom: theme.space.sm),
+        width: double.infinity,
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: theme.colors.surfaceRaised,
-          border: Border.all(color: theme.hairline),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.2), offset: const Offset(0, 12), blurRadius: 26, spreadRadius: -18)],
-        ),
+        decoration: _cardShell(theme),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: children),
       );
 }
@@ -968,10 +1094,15 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 const _runGap = Duration(minutes: 5);
 
 class _Run {
-  _Run({required this.key, required this.mine, required this.who, required this.at, required this.entries});
+  _Run({required this.key, required this.mine, required this.who, required this.avatar, required this.at, required this.entries});
   final String key;
   final bool mine;
+
+  /// "Dana · Halden team" over the team's run.
   final String who;
+
+  /// Whose initial is in the circle at its foot.
+  final String avatar;
 
   /// When its newest line was written.
   DateTime at;

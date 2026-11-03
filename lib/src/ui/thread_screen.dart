@@ -1373,21 +1373,24 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final who = last == null ? null : (last.author == RendelSupportAuthorKind.user ? strings.supportYou : (last.authorName ?? team));
     final said = last == null
         ? ((v.state?.teamHere ?? false) ? strings.supportHere : strings.supportAway)
-        : '$who: ${(last.text?.isNotEmpty ?? false) ? last.text : last.files.join(', ')}';
+        : '$who: ${(last.text?.isNotEmpty ?? false) ? last.text : last.files.isNotEmpty ? last.files.join(', ') : strings.photos}';
     final agent = v.entries.reversed.where((e) => e.author == RendelSupportAuthorKind.agent).firstOrNull?.authorName;
     final title = strings.supportRowTitleOf(team);
     final unread = v.unread;
     final initial = (agent ?? team).trim();
+    // Read out in full; seen as the team's name, as the page's header says it.
     return RendelPressable(
       semanticLabel: unread > 0 ? '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}' : title,
       onTap: () => widget.onSupportOpen?.call(),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: theme.space.md, vertical: theme.space.sm + 4),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: theme.colors.surfaceRaised,
-          borderRadius: BorderRadius.circular(theme.radius.card),
-          border: Border.all(color: theme.colors.line),
-          boxShadow: theme.lift,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.06), spreadRadius: 1),
+            BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.25), offset: const Offset(0, 16), blurRadius: 30, spreadRadius: -24),
+          ],
         ),
         child: Row(
           children: [
@@ -1395,10 +1398,10 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
               width: 36,
               height: 36,
               alignment: Alignment.center,
-              decoration: BoxDecoration(shape: BoxShape.circle, color: theme.colors.surfaceHigh, border: Border.all(color: theme.hairline)),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.14), theme.colors.surfaceRaised)),
               child: Text(
                 initial.isEmpty ? '·' : initial.characters.first.toUpperCase(),
-                style: theme.text.caption.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w600, fontSize: 15, height: 1),
+                style: theme.text.caption.copyWith(color: theme.accentText, fontWeight: FontWeight.w700, fontSize: 15, height: 1),
               ),
             ),
             SizedBox(width: theme.space.sm + 4),
@@ -1407,7 +1410,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(title, style: theme.text.labelEmphasis),
+                  Text(strings.supportTeamOf(team), style: theme.text.labelEmphasis.copyWith(fontSize: 15.5)),
                   const SizedBox(height: 1),
                   Text(said, style: theme.text.labelSoft, maxLines: 1, overflow: TextOverflow.ellipsis),
                 ],

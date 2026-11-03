@@ -5,6 +5,32 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.76.0
+
+**Changed**
+
+- The page where a person writes to the app's team is drawn as a messaging
+  app people already know (Web 0.52.0 draws the same). A back control to the
+  assistant, the team with who is helping and when they answer ("Dana is
+  here · replies in about 10 minutes" in green, "Back tomorrow at 09:00" in
+  amber), and a close, or a tick once the conversation is sorted. The
+  person's bubbles sit at the end in the app's accent with "Read" under the
+  newest run the team has read; the team's are white under "Dana · Halden
+  team" with the avatar at the run's foot; what happened is small in the
+  middle with its time; pictures show as pictures. While the team is away,
+  its auto-reply and the email ask sit in the team's column; a card the team
+  prepared says who prepared it; sorted is a card at the end and the box to
+  write in stays. "I'm sorted" is a chip above a white pill composer whose
+  hint names the team.
+
+**Added**
+
+- `RendelSupportState.presence` and `teamReadSeq`, and the entry's
+  `pictures` and `markerKind`. New strings `supportRead`,
+  `supportSortedTitle`, `supportSortedBody` and `supportPreparedBy` in every
+  language; `supportWriteTeam` reads "Message the {team} team" in English.
+  `showRendelSupport` takes the assistant's name for the way back.
+
 ## 0.75.1
 
 **Fixed**

@@ -33,8 +33,10 @@ class RendelSupportEntry {
     this.text,
     this.blocks = const [],
     this.files = const [],
+    this.pictures = const [],
     this.clientMsgId,
     required this.createdAt,
+    this.markerKind,
   });
 
   final String id;
@@ -42,6 +44,9 @@ class RendelSupportEntry {
 
   /// A line the server wrote about the thread, drawn as a caption.
   final bool marker;
+
+  /// What the marker says happened: handoff, joined, resolved, auto_resolved…
+  final String? markerKind;
   final RendelSupportAuthorKind author;
 
   /// The name the app chose to show for the team's line: a first name, or the team's.
@@ -51,8 +56,11 @@ class RendelSupportEntry {
   /// Catalog blocks the team sent, checked by the server as the assistant's are.
   final List<Map<String, dynamic>> blocks;
 
-  /// The names of the files the person sent with this line.
+  /// The names of the files sent with this line that are not shown as pictures.
   final List<String> files;
+
+  /// The pictures sent with this line, by the address the server gave them.
+  final List<String> pictures;
   final String? clientMsgId;
   final DateTime createdAt;
 
@@ -83,13 +91,22 @@ class RendelSupportEntry {
       files: [
         if (raw['attachments'] case final List<dynamic> files)
           for (final file in files)
-            if (file is Map) '${file['name'] ?? file['media_type'] ?? ''}',
+            if (file is Map && !_picture(file)) '${file['name'] ?? file['media_type'] ?? ''}',
+      ],
+      pictures: [
+        if (raw['attachments'] case final List<dynamic> files)
+          for (final file in files)
+            if (file is Map && _picture(file)) file['url'] as String,
       ],
       clientMsgId: client is String ? client : null,
       createdAt: DateTime.tryParse('${raw['created_at']}') ?? DateTime.now(),
+      markerKind: raw['marker'] is String ? raw['marker'] as String : null,
     );
   }
 }
+
+/// An image the server can show: drawn as a picture rather than by its name.
+bool _picture(Map<dynamic, dynamic> file) => '${file['media_type']}'.startsWith('image/') && file['url'] is String;
 
 /// The thread's state (`support.state`).
 class RendelSupportState {
@@ -99,7 +116,9 @@ class RendelSupportState {
     required this.resolved,
     required this.teamHere,
     this.expectation,
+    this.presence,
     this.agentName,
+    this.teamReadSeq = 0,
     required this.userReadSeq,
     required this.lastSeq,
     required this.contactState,
@@ -115,7 +134,13 @@ class RendelSupportState {
 
   /// A sentence the server wrote in the person's language: "Usually replies in about 10 minutes."
   final String? expectation;
+
+  /// A short line under the team's name: "Dana is here · replies in about 10 minutes", "Back tomorrow at 09:00".
+  final String? presence;
   final String? agentName;
+
+  /// Lines up to this one were read by the team: "Read" goes under the person's newest run among them.
+  final int teamReadSeq;
   final int userReadSeq;
   final int lastSeq;
 
@@ -131,7 +156,9 @@ class RendelSupportState {
         resolved: resolved,
         teamHere: teamHere,
         expectation: expectation,
+        presence: presence,
         agentName: agentName,
+        teamReadSeq: teamReadSeq,
         userReadSeq: seq,
         lastSeq: lastSeq,
         contactState: contactState,
@@ -146,13 +173,16 @@ class RendelSupportState {
     final contact = raw['contact'];
     final agent = raw['agent'];
     final expectation = raw['expectation'];
+    final presence = raw['presence'];
     return RendelSupportState(
       threadId: thread,
       mode: mode,
       resolved: raw['state'] == 'resolved',
       teamHere: raw['team_here'] == true,
       expectation: expectation is String ? expectation : null,
+      presence: presence is String ? presence : null,
       agentName: agent is Map && agent['name'] is String ? agent['name'] as String : null,
+      teamReadSeq: raw['team_read_seq'] is int ? raw['team_read_seq'] as int : 0,
       userReadSeq: raw['user_read_seq'] is int ? raw['user_read_seq'] as int : 0,
       lastSeq: raw['last_seq'] is int ? raw['last_seq'] as int : 0,
       contactState: contact is Map && contact['state'] is String ? contact['state'] as String : 'not_needed',
