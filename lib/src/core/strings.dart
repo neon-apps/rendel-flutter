@@ -217,6 +217,8 @@ class RendelStrings {
     this.supportContactOptional = 'Want the reply by email too?',
     this.supportContactWhy = 'We only use this address to reply to this conversation.',
     this.supportContactPlaceholder = 'you@example.com',
+    this.supportContactEmpty = 'Enter your email address first.',
+    this.supportContactInvalid = 'Check the address. It should look like you@example.com.',
     this.supportContactSend = 'Save',
     this.supportContactSaved = 'Thanks. Check your inbox to confirm the address.',
     this.supportCodeLabel = 'Got a code by email? Enter it here',
@@ -645,6 +647,10 @@ class RendelStrings {
   final String supportContactOptional;
   final String supportContactWhy;
   final String supportContactPlaceholder;
+
+  /// Under the email field, after the person leaves it or taps Save: nothing written, or not an address.
+  final String supportContactEmpty;
+  final String supportContactInvalid;
   final String supportContactSend;
   final String supportContactSaved;
   final String supportCodeLabel;
@@ -963,6 +969,8 @@ class RendelStrings {
     String? supportContactOptional,
     String? supportContactWhy,
     String? supportContactPlaceholder,
+    String? supportContactEmpty,
+    String? supportContactInvalid,
     String? supportContactSend,
     String? supportContactSaved,
     String? supportCodeLabel,
@@ -1169,6 +1177,8 @@ class RendelStrings {
       supportContactOptional: supportContactOptional ?? this.supportContactOptional,
       supportContactWhy: supportContactWhy ?? this.supportContactWhy,
       supportContactPlaceholder: supportContactPlaceholder ?? this.supportContactPlaceholder,
+      supportContactEmpty: supportContactEmpty ?? this.supportContactEmpty,
+      supportContactInvalid: supportContactInvalid ?? this.supportContactInvalid,
       supportContactSend: supportContactSend ?? this.supportContactSend,
       supportContactSaved: supportContactSaved ?? this.supportContactSaved,
       supportCodeLabel: supportCodeLabel ?? this.supportCodeLabel,
@@ -1392,6 +1402,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactOptional: 'Yanıtı e-posta ile de almak ister misiniz?',
     supportContactWhy: 'Bu adresi yalnızca bu sohbete yanıt vermek için kullanırız.',
     supportContactPlaceholder: 'adiniz@ornek.com',
+    supportContactEmpty: 'Lütfen e-posta adresinizi yazın.',
+    supportContactInvalid: 'Lütfen adresi kontrol edin. Örnek: adiniz@ornek.com',
     supportContactSend: 'Kaydet',
     supportContactSaved: 'Teşekkürler. Adresi onaylamak için gelen kutunuzu kontrol edin.',
     supportCodeLabel: 'E-posta ile bir kod mu aldınız? Buraya girin',
@@ -1604,6 +1616,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactOptional: 'Möchten Sie die Antwort auch per E-Mail?',
     supportContactWhy: 'Wir nutzen diese Adresse nur, um auf dieses Gespräch zu antworten.',
     supportContactPlaceholder: 'sie@beispiel.de',
+    supportContactEmpty: 'Geben Sie zuerst Ihre E-Mail-Adresse ein.',
+    supportContactInvalid: 'Prüfen Sie die Adresse. Sie sollte so aussehen: sie@beispiel.de',
     supportContactSend: 'Speichern',
     supportContactSaved: 'Danke. Bitte bestätigen Sie die Adresse in Ihrem Postfach.',
     supportCodeLabel: 'Code per E-Mail erhalten? Hier eingeben',
@@ -1815,6 +1829,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactOptional: 'Voulez-vous aussi la réponse par e-mail ?',
     supportContactWhy: 'Nous utilisons cette adresse uniquement pour répondre à cette conversation.',
     supportContactPlaceholder: 'vous@exemple.fr',
+    supportContactEmpty: 'Saisissez d’abord votre adresse e-mail.',
+    supportContactInvalid: 'Vérifiez l’adresse. Elle doit ressembler à vous@exemple.fr',
     supportContactSend: 'Enregistrer',
     supportContactSaved: 'Merci. Vérifiez votre boîte de réception pour confirmer l’adresse.',
     supportCodeLabel: 'Vous avez reçu un code par e-mail ? Saisissez-le ici',
@@ -2025,6 +2041,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactOptional: '¿Quieres recibir la respuesta también por correo?',
     supportContactWhy: 'Solo usamos esta dirección para responder a esta conversación.',
     supportContactPlaceholder: 'tu@ejemplo.com',
+    supportContactEmpty: 'Escribe primero tu correo electrónico.',
+    supportContactInvalid: 'Revisa la dirección. Debe parecerse a tu@ejemplo.com',
     supportContactSend: 'Guardar',
     supportContactSaved: 'Gracias. Revisa tu bandeja de entrada para confirmar la dirección.',
     supportCodeLabel: '¿Te llegó un código por correo? Escríbelo aquí',
@@ -2234,6 +2252,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactOptional: 'هل تريد الرد عبر البريد الإلكتروني أيضًا؟',
     supportContactWhy: 'نستخدم هذا العنوان فقط للرد على هذه المحادثة.',
     supportContactPlaceholder: 'you@example.com',
+    supportContactEmpty: 'أدخل بريدك الإلكتروني أولاً.',
+    supportContactInvalid: 'تحقق من العنوان. يجب أن يكون مثل you@example.com',
     supportContactSend: 'حفظ',
     supportContactSaved: 'شكرًا. تحقق من بريدك لتأكيد العنوان.',
     supportCodeLabel: 'وصلك رمز عبر البريد؟ أدخله هنا',

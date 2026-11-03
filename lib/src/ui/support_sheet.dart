@@ -40,7 +40,7 @@ Future<void> showRendelSupport(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    backgroundColor: drawn.colors.surface,
+    backgroundColor: drawn.colors.surfaceRaised,
     shape: RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(drawn.radius.hero)),
     ),
@@ -105,6 +105,14 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   /// The paperclip's two choices, under the box, while open.
   bool _menu = false;
 
+  /// The email card: whether the person has left the field or tapped Save (a warning shows from then on), what the
+  /// server refused, and that the address went; the code card's wrong code.
+  final FocusNode _emailFocus = FocusNode();
+  bool _emailWarned = false;
+  String? _emailRefused;
+  bool _contactSaved = false;
+  bool _codeWrong = false;
+
   /// A line landed while the person had scrolled up to read: the pill brings them back.
   bool _newBelow = false;
 
@@ -133,6 +141,10 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   @override
   void initState() {
     super.initState();
+    // Leaving the field with something in it is when a wrong address is said, never while the first letters go in.
+    _emailFocus.addListener(() {
+      if (!_emailFocus.hasFocus && _email.text.trim().isNotEmpty && !_emailWarned && mounted) setState(() => _emailWarned = true);
+    });
     WidgetsBinding.instance.addObserver(this);
     widget.support.value.addListener(_changed);
     // The stream follows a thread, so it opens once the thread is read.
@@ -186,6 +198,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     _typingEnds?.cancel();
     _input.dispose();
     _email.dispose();
+    _emailFocus.dispose();
     _code.dispose();
     _scroll.dispose();
     super.dispose();
@@ -221,21 +234,37 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     }
   }
 
+  /// Sends only an address the server would take; what it refuses is said under the field.
   Future<void> _saveEmail(RendelStrings strings) async {
+    setState(() {
+      _emailWarned = true;
+      _emailRefused = null;
+    });
+    if (supportEmailProblem(_email.text) != null) return _emailFocus.requestFocus();
     final result = await widget.support.contact(_email.text.trim());
     if (!mounted) return;
     setState(() {
-      _note = switch (result) {
-        'invalid' => strings.supportContactPlaceholder,
-        'failed' => strings.turnFailed,
-        _ => strings.supportContactSaved,
-      };
+      switch (result) {
+        case 'invalid':
+          _emailRefused = strings.supportContactInvalid;
+        case 'failed':
+          _emailRefused = strings.turnFailed;
+        default:
+          _email.clear();
+          _emailWarned = false;
+          _contactSaved = true;
+      }
     });
   }
 
   Future<void> _verify(RendelStrings strings) async {
     final ok = await widget.support.verify(_code.text.trim());
-    if (mounted) setState(() => _note = ok ? null : strings.supportCodeWrong);
+    if (mounted) {
+      setState(() {
+        _codeWrong = !ok;
+        if (ok) _contactSaved = false;
+      });
+    }
   }
 
   @override
@@ -366,6 +395,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
               child: Stack(
                 alignment: Alignment.bottomCenter,
                 children: [
+                  // The conversation sits on the panel's own ground with a breath of the app's colour; the team's lines and the cards are raised on it.
+                  Positioned.fill(child: ColoredBox(color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.03), theme.colors.surface))),
                   Semantics(
                     liveRegion: true,
                     child: ListView.separated(
@@ -561,29 +592,33 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     );
   }
 
-  /// When the team will answer, while nobody has: a card of its own in the middle of the page.
-  Widget _wait(BuildContext context, RendelTheme theme, String expectation) => Center(
-        child: Container(
-          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.9),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: theme.colors.surfaceHigh,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: theme.hairline),
+  /// When the team will answer, while nobody has: a quiet note on the team's side, not a box.
+  Widget _wait(BuildContext context, RendelTheme theme, String expectation) => Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(child: _mark(theme, Icons.schedule_rounded, size: 28, circle: true)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Padding(
+              padding: EdgeInsets.only(top: 5, right: MediaQuery.sizeOf(context).width * 0.1),
+              child: Text(expectation, style: theme.text.caption),
+            ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Icon(Icons.schedule_rounded, size: 16, color: theme.colors.onSurfaceSoft),
-              ),
-              const SizedBox(width: 8),
-              Flexible(child: Text(expectation, style: theme.text.caption)),
-            ],
-          ),
+        ],
+      );
+
+  /// The app's colour, lightly, behind a glyph: the wait note's, a card's.
+  Widget _mark(RendelTheme theme, IconData glyph, {double size = 34, bool circle = false}) => Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.12), theme.colors.surfaceRaised),
+          borderRadius: circle ? null : BorderRadius.circular(12),
+          shape: circle ? BoxShape.circle : BoxShape.rectangle,
+          border: Border.all(color: theme.colors.accent.withValues(alpha: 0.18)),
         ),
+        child: Icon(glyph, size: size * 0.52, color: theme.accentText),
       );
 
   /// What happened to the conversation itself, across the page between hairlines.
@@ -608,7 +643,14 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
       decoration: BoxDecoration(
-        color: failed ? theme.colors.surface : (mine ? theme.colors.accent : theme.colors.surfaceHigh),
+        color: failed ? theme.colors.surfaceRaised : (mine ? theme.colors.accent : theme.colors.surfaceRaised),
+        boxShadow: failed
+            ? null
+            : [
+                mine
+                    ? BoxShadow(color: theme.colors.accent.withValues(alpha: 0.35), offset: const Offset(0, 6), blurRadius: 14, spreadRadius: -10)
+                    : BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.06), offset: const Offset(0, 1), blurRadius: 2),
+              ],
         borderRadius: mine
             ? BorderRadiusDirectional.only(topStart: round, bottomStart: round, topEnd: first ? round : joined, bottomEnd: joined)
             : BorderRadiusDirectional.only(topEnd: round, bottomEnd: round, topStart: first ? round : joined, bottomStart: joined),
@@ -627,14 +669,15 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           width: size,
           height: size,
           alignment: Alignment.center,
+          // The team's circles carry the app's colour, lightly: who answers is the app.
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: theme.colors.surfaceHigh,
-            border: Border.all(color: theme.hairline),
+            color: Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.12), theme.colors.surfaceRaised),
+            border: Border.all(color: theme.colors.accent.withValues(alpha: 0.18)),
           ),
           child: Text(
             name.trim().isEmpty ? '·' : name.trim().characters.first.toUpperCase(),
-            style: theme.text.caption.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w600, fontSize: size * 0.42, height: 1),
+            style: theme.text.caption.copyWith(color: theme.accentText, fontWeight: FontWeight.w600, fontSize: size * 0.42, height: 1),
           ),
         ),
       );
@@ -678,16 +721,6 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   /// A card's heading: `labelStrong` is drawn on the accent, these cards are not.
   TextStyle _heading(RendelTheme theme) => theme.text.labelStrong.copyWith(color: theme.colors.onSurface);
-
-  InputDecoration _field(RendelTheme theme, String? hint) => InputDecoration(
-        isDense: true,
-        hintText: hint,
-        contentPadding: EdgeInsets.symmetric(horizontal: theme.space.sm, vertical: theme.space.xs + 4),
-        filled: true,
-        fillColor: theme.colors.surfaceHigh,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.hairline)),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: theme.hairline)),
-      );
 
   /// One box like the assistant's own: the paperclip, the words, and send once there is something to send.
   Widget _composer(RendelTheme theme, RendelStrings strings) {
@@ -738,6 +771,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
             color: theme.colors.composer,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: theme.composerEdge),
+            boxShadow: [BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.18), offset: const Offset(0, 10), blurRadius: 24, spreadRadius: -18)],
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -791,62 +825,140 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     );
   }
 
+  /// Where the reply can reach the person (K14): checked by the API's own rule, said under the field once they
+  /// leave it or tap Save, and from then on with each change.
   Widget _contactCard(RendelTheme theme, RendelStrings strings, {required bool required}) {
+    final problem = supportEmailProblem(_email.text);
+    final warning = _emailRefused ??
+        (_emailWarned && problem != null ? (problem == 'empty' ? strings.supportContactEmpty : strings.supportContactInvalid) : null);
     return _plate(theme, [
-      Text(required ? strings.supportContactAsk : strings.supportContactOptional, style: _heading(theme)),
-      SizedBox(height: theme.space.xs),
-      Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _email,
-              keyboardType: TextInputType.emailAddress,
-              autofillHints: const [AutofillHints.email],
-              style: theme.text.body,
-              decoration: _field(theme, strings.supportContactPlaceholder),
-              onSubmitted: (_) => _saveEmail(strings),
-            ),
-          ),
-          SizedBox(width: theme.space.xs),
-          RendelActionButton(label: strings.supportContactSend, onTap: () => _saveEmail(strings)),
-        ],
+      _cardHead(theme, Icons.mail_outline_rounded, required ? strings.supportContactAsk : strings.supportContactOptional, strings.supportContactWhy),
+      SizedBox(height: theme.space.sm + 4),
+      _group(
+        theme,
+        invalid: warning != null,
+        field: TextField(
+          controller: _email,
+          focusNode: _emailFocus,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          enableSuggestions: false,
+          textCapitalization: TextCapitalization.none,
+          autofillHints: const [AutofillHints.email],
+          textInputAction: TextInputAction.done,
+          style: theme.text.body,
+          decoration: _bare(theme, strings.supportContactPlaceholder),
+          onChanged: (_) {
+            if (_emailWarned || _emailRefused != null) setState(() => _emailRefused = null);
+          },
+          onSubmitted: (_) => _saveEmail(strings),
+        ),
+        button: RendelActionButton(label: strings.supportContactSend, onTap: () => _saveEmail(strings)),
       ),
-      SizedBox(height: theme.space.xs),
-      Text(strings.supportContactWhy, style: theme.text.caption),
+      if (warning != null) _warning(theme, warning),
     ]);
   }
 
+  /// The code the address got, to show it is theirs; just after the address went, the card says it did.
   Widget _codeCard(RendelTheme theme, RendelStrings strings) {
     return _plate(theme, [
-      Text(strings.supportCodeLabel, style: theme.text.caption),
-      SizedBox(height: theme.space.xs),
-      Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _code,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              autofillHints: const [AutofillHints.oneTimeCode],
-              style: theme.text.body,
-              decoration: _field(theme, null).copyWith(counterText: ''),
-              onSubmitted: (_) => _verify(strings),
-            ),
+      if (_contactSaved) ...[
+        Semantics(
+          liveRegion: true,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.check_circle_outline_rounded, size: 17, color: theme.accentText),
+              const SizedBox(width: 6),
+              Expanded(child: Text(strings.supportContactSaved, style: theme.text.caption.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w500))),
+            ],
           ),
-          SizedBox(width: theme.space.xs),
-          RendelActionButton(label: strings.confirm, quiet: true, onTap: () => _verify(strings)),
-        ],
+        ),
+        SizedBox(height: theme.space.sm + 4),
+      ],
+      _cardHead(theme, Icons.lock_outline_rounded, strings.supportCodeLabel, null),
+      SizedBox(height: theme.space.sm + 4),
+      _group(
+        theme,
+        invalid: _codeWrong,
+        field: TextField(
+          controller: _code,
+          keyboardType: TextInputType.number,
+          maxLength: 6,
+          autofillHints: const [AutofillHints.oneTimeCode],
+          style: theme.text.body,
+          decoration: _bare(theme, null).copyWith(counterText: ''),
+          onSubmitted: (_) => _verify(strings),
+        ),
+        button: RendelActionButton(label: strings.confirm, onTap: () => _verify(strings)),
       ),
+      if (_codeWrong) _warning(theme, strings.supportCodeWrong),
     ]);
   }
 
+  /// A card's mark, title and why.
+  Widget _cardHead(RendelTheme theme, IconData glyph, String title, String? why) => Row(
+        crossAxisAlignment: why == null ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          ExcludeSemantics(child: _mark(theme, glyph)),
+          SizedBox(width: theme.space.sm + 4),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(title, style: _heading(theme)),
+                if (why != null) Padding(padding: const EdgeInsets.only(top: 3), child: Text(why, style: theme.text.caption)),
+              ],
+            ),
+          ),
+        ],
+      );
+
+  /// The field and its button as one control, as the box to write in is; outlined in the warning's colour while wrong.
+  Widget _group(RendelTheme theme, {required Widget field, required Widget button, required bool invalid}) => Container(
+        padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+        decoration: BoxDecoration(
+          color: theme.colors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: invalid ? theme.danger : theme.colors.lineStrong, width: invalid ? 1.5 : 1),
+        ),
+        child: Row(children: [Expanded(child: field), const SizedBox(width: 6), button]),
+      );
+
+  InputDecoration _bare(RendelTheme theme, String? hint) => InputDecoration(
+        isDense: true,
+        hintText: hint,
+        hintStyle: theme.text.body.copyWith(color: theme.colors.onSurfaceFaint),
+        border: InputBorder.none,
+        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+      );
+
+  /// What is wrong with what was written, under its field.
+  Widget _warning(RendelTheme theme, String text) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 8, 2, 0),
+        child: Semantics(
+          liveRegion: true,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(padding: const EdgeInsets.only(top: 1), child: Icon(Icons.warning_amber_rounded, size: 16, color: theme.danger)),
+              const SizedBox(width: 6),
+              Expanded(child: Text(text, style: theme.text.caption.copyWith(color: theme.danger))),
+            ],
+          ),
+        ),
+      );
+
+  /// What the page asks of the person (an email, a code, a read): a raised card, never a grey slab.
   Widget _plate(RendelTheme theme, List<Widget> children) => Container(
         margin: EdgeInsets.only(bottom: theme.space.sm),
-        padding: EdgeInsets.all(theme.space.md),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: theme.glass,
+          color: theme.colors.surfaceRaised,
           border: Border.all(color: theme.hairline),
-          borderRadius: BorderRadius.circular(theme.plateRadius),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [BoxShadow(color: theme.colors.shadow.withValues(alpha: 0.2), offset: const Offset(0, 12), blurRadius: 26, spreadRadius: -18)],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: children),
       );

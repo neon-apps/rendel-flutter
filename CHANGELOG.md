@@ -5,6 +5,27 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.75.1
+
+**Fixed**
+
+- An address that is not one, such as "ahmet", is said under the email
+  field when the person leaves it or taps Save, by the rule the API checks
+  it with, and nothing is sent until it is right; a saved address says so
+  in the card. Before, the field took anything, and the API's refusal
+  showed the placeholder "you@example.com" as a line of its own under the
+  card. New strings `supportContactEmpty` and `supportContactInvalid` in
+  every language.
+
+**Changed**
+
+- The support page's "Want the reply by email too?" card and its note on
+  when the team is back are drawn in the panel's own look instead of as
+  grey boxes: the card is raised, with its own mark, and its field and Save
+  are one control; the note sits quietly on the team's side. The
+  conversation is drawn on the panel's own ground, with the team's lines
+  raised on it.
+
 ## 0.75.0
 
 **Changed**

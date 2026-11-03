@@ -295,6 +295,41 @@ void main() {
       await _close(tester);
     });
 
+    test("holds an address to the API's own rule", () {
+      for (final ok in ['ahmet@example.com', ' Ahmet.Yilmaz+shop@Mail.Example.COM ', "o'neil@example.co.uk", 'a_b-c@x-y.io']) {
+        expect(supportEmailProblem(ok), isNull, reason: ok);
+      }
+      expect(supportEmailProblem('   '), 'empty');
+      for (final bad in ['ahmet', 'ahmet@', '@example.com', 'ahmet@example', 'ahmet@example.c', 'ahmet@@example.com', '.ahmet@example.com', 'ah..met@example.com', 'ahmet.@example.com', 'ahmet@-example.com', 'ahmet @example.com', '${'a' * 250}@x.com']) {
+        expect(supportEmailProblem(bad), 'invalid', reason: bad);
+      }
+    });
+
+    testWidgets('warns under the email field when the address is wrong, and sends nothing until it is right', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Kargom gelmedi')],
+        state: _state(contact: {'state': 'none', 'required': true}),
+      );
+      await _open(tester, server.support());
+      await tester.enterText(find.byType(TextField).first, 'ahmet');
+      await tester.pump();
+      // Not while the first letters go in.
+      expect(find.text('Check the address. It should look like you@example.com.'), findsNothing);
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(find.text('Check the address. It should look like you@example.com.'), findsOneWidget);
+      expect(server.posts.where((p) => p.path == 'contact'), isEmpty);
+      // The placeholder never stands in for a message on the page: only the field's own hint says it.
+      expect(find.text('you@example.com').evaluate().where((e) => e.findAncestorWidgetOfExactType<TextField>() == null), isEmpty);
+      await tester.enterText(find.byType(TextField).first, 'ahmet@example.com');
+      await tester.pump();
+      expect(find.text('Check the address. It should look like you@example.com.'), findsNothing);
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(server.posts.singleWhere((p) => p.path == 'contact').body, {'email': 'ahmet@example.com'});
+      await _close(tester);
+    });
+
     testWidgets('says a line did not go, and sends it again under the same id', (tester) async {
       final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')])..messageStatus.add(500);
       await _open(tester, server.support());

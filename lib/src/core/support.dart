@@ -9,6 +9,18 @@ import 'log.dart';
 /// Who wrote a line of the thread with the app's team.
 enum RendelSupportAuthorKind { user, agent, system }
 
+/// Why an address will not do, by the rule the API holds it to (zod's
+/// `email()` after a trim, at most 254 characters), or null when it is fine:
+/// `empty` or `invalid`. Checked on the phone first, so the person reads it
+/// under the field instead of after a round trip, as the web SDK does.
+String? supportEmailProblem(String value) {
+  final email = value.trim();
+  if (email.isEmpty) return 'empty';
+  return email.length <= 254 && _email.hasMatch(email) ? null : 'invalid';
+}
+
+final _email = RegExp(r"^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$");
+
 /// One durable line of the thread (`support.entry`): the person's, the team's,
 /// or a marker the server wrote ("Your message is with the Grove team.").
 class RendelSupportEntry {
