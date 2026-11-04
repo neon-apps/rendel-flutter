@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../transport/api_client.dart';
 import 'log.dart';
@@ -331,7 +332,9 @@ class RendelSupport {
   /// The thread the person is looking at, or null: its push would only repeat the screen.
   final ValueNotifier<String?> onScreen = ValueNotifier<String?>(null);
 
-  RendelSupport(this.api, {required this.user, required this.locale});
+  RendelSupport(this.api, {required this.user, required this.locale}) {
+    unawaited(_loadSkipped());
+  }
 
   final RendelApiClient api;
 
@@ -567,6 +570,30 @@ class RendelSupport {
 
   /// The team's cards the server would not open on this phone: drawn as not answered.
   final Set<String> refusedCards = {};
+
+  /// The conversations whose optional email card the person put away, kept on this phone (Tuna, 2026-11-04).
+  final ValueNotifier<Set<String>> contactSkipped = ValueNotifier(const {});
+
+  static const _skippedKey = 'rendel_support_email_skipped';
+
+  Future<void> _loadSkipped() async {
+    try {
+      final saved = (await SharedPreferences.getInstance()).getStringList(_skippedKey);
+      if (saved != null) contactSkipped.value = {...contactSkipped.value, ...saved};
+    } catch (_) {
+      // No storage: the card is put away for as long as the app runs.
+    }
+  }
+
+  /// The person would rather not give an email in [threadId]: its optional card goes, and stays gone there.
+  Future<void> skipContact(String threadId) async {
+    contactSkipped.value = {...contactSkipped.value, threadId};
+    try {
+      // The newest fifty: a thread older than that has long had its answer.
+      final kept = contactSkipped.value.toList();
+      await (await SharedPreferences.getInstance()).setStringList(_skippedKey, kept.sublist(max(0, kept.length - 50)));
+    } catch (_) {}
+  }
 
   /// A confirm card the team sent, opened: its confirmation is minted on this
   /// phone now, and the line comes back with the card's `invocation_id`.

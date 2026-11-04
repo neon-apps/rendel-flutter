@@ -19,6 +19,7 @@ import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/support_sheet.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 const _thread = '00000000-0000-4000-8000-000000000001';
 const _past = '00000000-0000-4000-8000-0000000000a1';
@@ -131,7 +132,20 @@ class _Server {
       final block = entries.expand((e) => e['blocks'] as List).firstWhere((b) => (b as Map)['type'] == 'confirm_card');
       return json({'block': block});
     }
-    if (path.endsWith('/continue')) return json({'status': 'succeeded'});
+    if (path.endsWith('/continue')) {
+      // The server's thread has the card answered, as threads.ts spells it for Flutter.
+      entries = [
+        for (final e in entries)
+          {
+            ...e,
+            'blocks': [
+              for (final b in e['blocks'] as List)
+                (b as Map)['type'] == 'confirm_card' ? {...b, 'props': {...(b['props'] as Map), '_resolved': 'confirmed'}} : b,
+            ],
+          },
+      ];
+      return json({'status': 'succeeded'});
+    }
     if (path.endsWith('/confirm')) return json({'status': 'confirmed'});
     if (path.endsWith('/contact')) {
       state = _state(contact: {'state': 'stated', 'required': false});
@@ -442,6 +456,40 @@ void main() {
       await _close(tester);
     });
 
+    testWidgets('puts the optional email card away with its ✕, for this conversation, and keeps it away on the next open (Tuna, 2026-11-04)', (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      final server = _Server(
+        entries: [_entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'), _entry(2, text: 'Kargom gelmedi')],
+        state: _state(contact: {'state': 'none', 'required': false}),
+      );
+      await _open(tester, server.support());
+      expect(find.text('Want the reply by email too?'), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('No thanks'));
+      await _settle(tester);
+      expect(find.text('Want the reply by email too?'), findsNothing);
+      // The place to write stays.
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
+      await _close(tester);
+      // Opened again, on a session that reads it from the phone.
+      await _open(tester, server.support());
+      await _settle(tester);
+      expect(find.text('Want the reply by email too?'), findsNothing);
+      await _close(tester);
+      // A timer the pages set is still running: it goes off before the test ends.
+      await tester.pump(const Duration(minutes: 1));
+    });
+
+    testWidgets('keeps the required email card, with no way to put it away', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'), _entry(2, text: 'Kargom gelmedi')],
+        state: _state(contact: {'state': 'none', 'required': true}),
+      );
+      await _open(tester, server.support());
+      expect(find.text('Where should we send the reply? Add your email to keep going.'), findsOneWidget);
+      expect(find.bySemanticsLabel('No thanks'), findsNothing);
+      await _close(tester);
+    });
+
     testWidgets('asks for an email after the first line when nobody can reach the person, and takes it', (tester) async {
       final server = _Server(
         entries: [_entry(1, text: 'Kargom gelmedi')],
@@ -562,6 +610,9 @@ void main() {
         await _settle(tester);
       }
       expect(server.posts.singleWhere((p) => p.path == 'continue').body, {'invocation_id': _invocation});
+      // Answered, it says so, and asks nothing more.
+      expect(find.text('Confirmed'), findsOneWidget);
+      expect(find.text('Confirm'), findsNothing);
       await _close(tester);
     });
 

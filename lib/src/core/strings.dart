@@ -216,6 +216,7 @@ class RendelStrings {
     this.supportContactAsk = 'Where should we send the reply? Add your email to keep going.',
     this.supportContactOptional = 'Want the reply by email too?',
     this.supportContactWhy = 'We only use this address to reply to this conversation.',
+    this.supportContactSkip = 'No thanks',
     this.supportContactPlaceholder = 'you@example.com',
     this.supportContactEmpty = 'Enter your email address first.',
     this.supportContactInvalid = 'Check the address. It should look like you@example.com.',
@@ -667,6 +668,9 @@ class RendelStrings {
   final String supportContactAsk;
   final String supportContactOptional;
   final String supportContactWhy;
+
+  /// The ✕ that puts the optional email card away for this conversation, said by a screen reader.
+  final String supportContactSkip;
   final String supportContactPlaceholder;
 
   /// Under the email field, after the person leaves it or taps Save: nothing written, or not an address.
@@ -1024,6 +1028,7 @@ class RendelStrings {
     String? supportContactAsk,
     String? supportContactOptional,
     String? supportContactWhy,
+    String? supportContactSkip,
     String? supportContactPlaceholder,
     String? supportContactEmpty,
     String? supportContactInvalid,
@@ -1253,6 +1258,7 @@ class RendelStrings {
       supportContactAsk: supportContactAsk ?? this.supportContactAsk,
       supportContactOptional: supportContactOptional ?? this.supportContactOptional,
       supportContactWhy: supportContactWhy ?? this.supportContactWhy,
+      supportContactSkip: supportContactSkip ?? this.supportContactSkip,
       supportContactPlaceholder: supportContactPlaceholder ?? this.supportContactPlaceholder,
       supportContactEmpty: supportContactEmpty ?? this.supportContactEmpty,
       supportContactInvalid: supportContactInvalid ?? this.supportContactInvalid,
@@ -1499,6 +1505,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactAsk: 'Yanıtı nereye gönderelim? Devam etmek için e-posta adresinizi ekleyin.',
     supportContactOptional: 'Yanıtı e-posta ile de almak ister misiniz?',
     supportContactWhy: 'Bu adresi yalnızca bu sohbete yanıt vermek için kullanırız.',
+    supportContactSkip: 'Hayır, teşekkürler',
     supportContactPlaceholder: 'adiniz@ornek.com',
     supportContactEmpty: 'Lütfen e-posta adresinizi yazın.',
     supportContactInvalid: 'Lütfen adresi kontrol edin. Örnek: adiniz@ornek.com',
@@ -1734,6 +1741,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactAsk: 'Wohin sollen wir die Antwort schicken? Geben Sie Ihre E-Mail-Adresse an, um fortzufahren.',
     supportContactOptional: 'Möchten Sie die Antwort auch per E-Mail?',
     supportContactWhy: 'Wir nutzen diese Adresse nur, um auf dieses Gespräch zu antworten.',
+    supportContactSkip: 'Nein danke',
     supportContactPlaceholder: 'sie@beispiel.de',
     supportContactEmpty: 'Geben Sie zuerst Ihre E-Mail-Adresse ein.',
     supportContactInvalid: 'Prüfen Sie die Adresse. Sie sollte so aussehen: sie@beispiel.de',
@@ -1968,6 +1976,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactAsk: 'Où devons-nous envoyer la réponse ? Ajoutez votre e-mail pour continuer.',
     supportContactOptional: 'Voulez-vous aussi la réponse par e-mail ?',
     supportContactWhy: 'Nous utilisons cette adresse uniquement pour répondre à cette conversation.',
+    supportContactSkip: 'Non merci',
     supportContactPlaceholder: 'vous@exemple.fr',
     supportContactEmpty: 'Saisissez d’abord votre adresse e-mail.',
     supportContactInvalid: 'Vérifiez l’adresse. Elle doit ressembler à vous@exemple.fr',
@@ -2201,6 +2210,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactAsk: '¿Dónde te enviamos la respuesta? Añade tu correo para continuar.',
     supportContactOptional: '¿Quieres recibir la respuesta también por correo?',
     supportContactWhy: 'Solo usamos esta dirección para responder a esta conversación.',
+    supportContactSkip: 'No, gracias',
     supportContactPlaceholder: 'tu@ejemplo.com',
     supportContactEmpty: 'Escribe primero tu correo electrónico.',
     supportContactInvalid: 'Revisa la dirección. Debe parecerse a tu@ejemplo.com',
@@ -2433,6 +2443,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactAsk: 'إلى أين نرسل الرد؟ أضف بريدك الإلكتروني للمتابعة.',
     supportContactOptional: 'هل تريد الرد عبر البريد الإلكتروني أيضًا؟',
     supportContactWhy: 'نستخدم هذا العنوان فقط للرد على هذه المحادثة.',
+    supportContactSkip: 'لا، شكرًا',
     supportContactPlaceholder: 'you@example.com',
     supportContactEmpty: 'أدخل بريدك الإلكتروني أولاً.',
     supportContactInvalid: 'تحقق من العنوان. يجب أن يكون مثل you@example.com',

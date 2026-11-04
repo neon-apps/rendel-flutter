@@ -170,6 +170,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     });
     WidgetsBinding.instance.addObserver(this);
     widget.support.value.addListener(_changed);
+    // The cards the person put away arrive from storage after the page opens.
+    widget.support.contactSkipped.addListener(_redraw);
     // The stream follows a thread, so it opens once the thread is read.
     unawaited(widget.support.load().then((_) {
       if (mounted) widget.support.watch(true);
@@ -182,6 +184,10 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final on = state == AppLifecycleState.resumed;
     widget.support.watch(on);
     if (on) unawaited(widget.support.load());
+  }
+
+  void _redraw() {
+    if (mounted) setState(() {});
   }
 
   void _changed() {
@@ -231,6 +237,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.support.value.removeListener(_changed);
+    widget.support.contactSkipped.removeListener(_redraw);
     widget.support.watch(false);
     _typingEnds?.cancel();
     _input.dispose();
@@ -805,7 +812,11 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final resolved = state?.resolved ?? false;
     final contact = state?.contactState ?? 'not_needed';
     // The optional box is for the wait: once the team is talking, it gives the page back.
-    final offersContact = !needsContact && contact == 'none' && asked && !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent);
+    final offersContact = !needsContact &&
+        contact == 'none' &&
+        asked &&
+        !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent) &&
+        !widget.support.contactSkipped.value.contains(v.threadId);
     final items = <Widget>[
       if (state?.expectation case final expectation? when state!.mode != 'human')
         _bubble(
@@ -1103,8 +1114,41 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final problem = supportEmailProblem(_email.text);
     final warning = _emailRefused ??
         (_emailWarned && problem != null ? (problem == 'empty' ? strings.supportContactEmpty : strings.supportContactInvalid) : null);
+    final title = Text(required ? strings.supportContactAsk : strings.supportContactOptional, style: _heading(theme));
+    final threadId = widget.support.value.value.threadId;
     return _plate(theme, [
-      Text(required ? strings.supportContactAsk : strings.supportContactOptional, style: _heading(theme)),
+      // Asked, not needed: a person who would rather not give one puts the card away, for this conversation.
+      if (required || threadId == null)
+        title
+      else
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: title),
+            const SizedBox(width: 8),
+            Transform.translate(
+              offset: const Offset(6, -6),
+              child: IconButton(
+                tooltip: null,
+                onPressed: () {
+                  _email.clear();
+                  setState(() {
+                    _emailWarned = false;
+                    _emailRefused = null;
+                  });
+                  unawaited(widget.support.skipContact(threadId));
+                },
+                style: IconButton.styleFrom(
+                  backgroundColor: theme.colors.onSurface.withValues(alpha: 0.06),
+                  minimumSize: const Size(32, 32),
+                  fixedSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                ),
+                icon: Icon(Icons.close_rounded, size: 16, color: theme.colors.onSurfaceSoft, semanticLabel: strings.supportContactSkip),
+              ),
+            ),
+          ],
+        ),
       const SizedBox(height: 10),
       _group(
         theme,

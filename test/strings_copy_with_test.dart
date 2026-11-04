@@ -201,6 +201,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'supportContactAsk': (s) => s.supportContactAsk,
   'supportContactOptional': (s) => s.supportContactOptional,
   'supportContactWhy': (s) => s.supportContactWhy,
+  'supportContactSkip': (s) => s.supportContactSkip,
   'supportContactPlaceholder': (s) => s.supportContactPlaceholder,
   'supportContactEmpty': (s) => s.supportContactEmpty,
   'supportContactInvalid': (s) => s.supportContactInvalid,
