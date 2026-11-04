@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.77.1
+
+**Changed**
+
+- ✕ on the team's page closes all of Rendel, as on the web: one tap takes
+  the person back to the app. The way back (‹) still returns to Rendel's
+  page.
+
 ## 0.77.0
 
 **Added**

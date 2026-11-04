@@ -888,7 +888,7 @@ class Rendel {
     }
     if (!context.mounted) return false;
     final controller = _ensureController(api);
-    await showRendelSupport(
+    final closed = await showRendelSupport(
       context,
       support: support,
       team: team,
@@ -904,6 +904,8 @@ class Rendel {
       theme: themeOf(context),
       strings: strings,
     );
+    // ✕ closes all of Rendel, as on the web; the way back leaves its page open.
+    if (closed) _presentation?.dismiss();
     // A thread opened by its id: the phone's current one is the session's again.
     await support.restore();
     unawaited(support.refreshUnread());

@@ -22,7 +22,11 @@ import 'theme.dart';
 ///
 /// [onAction] carries out a tap on a card the team sent: a screen, a link, a
 /// call. The sheet closes first when it opens a screen of the app.
-Future<void> showRendelSupport(
+///
+/// Completes true when the person closed it with ✕, which closes all of
+/// Rendel as the web's does (Tuna, 2026-11-04); false for the way back to the
+/// assistant, a swipe down or a tap outside.
+Future<bool> showRendelSupport(
   BuildContext context, {
   required RendelSupport support,
   required String team,
@@ -37,7 +41,7 @@ Future<void> showRendelSupport(
 }) {
   final drawn = theme ?? RendelThemeScope.of(context);
   final words = strings ?? RendelStringsScope.of(context);
-  return showModalBottomSheet<void>(
+  return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -66,7 +70,7 @@ Future<void> showRendelSupport(
         ),
       ),
     ),
-  );
+  ).then((closed) => closed ?? false);
 }
 
 class RendelSupportSheet extends StatefulWidget {
@@ -535,7 +539,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     )
                   : IconButton(
                       tooltip: null,
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: () => Navigator.of(context).maybePop(true),
                       style: IconButton.styleFrom(
                         backgroundColor: theme.colors.onSurface.withValues(alpha: 0.07),
                         minimumSize: const Size(32, 32),

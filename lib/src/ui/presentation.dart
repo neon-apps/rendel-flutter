@@ -215,7 +215,8 @@ class RendelPresentation extends ChangeNotifier {
 
   /// The app is paused (the organization's messages are used up, or its
   /// budget paused new conversations): an open sheet closes, with nothing
-  /// said; conversations cannot start until it is back.
+  /// said; conversations cannot start until it is back. The ✕ on the team's
+  /// page closes it the same way.
   void dismiss() {
     final sheet = _sheet;
     if (_phase == _Phase.sheet && sheet != null && sheet.mounted) Navigator.of(sheet).maybePop();
