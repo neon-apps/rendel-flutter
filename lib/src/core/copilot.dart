@@ -888,7 +888,7 @@ class Rendel {
     }
     if (!context.mounted) return false;
     final controller = _ensureController(api);
-    final closed = await showRendelSupport(
+    final exit = await showRendelSupport(
       context,
       support: support,
       team: team,
@@ -904,11 +904,13 @@ class Rendel {
       theme: themeOf(context),
       strings: strings,
     );
-    // ✕ closes all of Rendel, as on the web; the way back leaves its page open.
-    if (closed) _presentation?.dismiss();
+    // ✕ closes all of Rendel, as on the web.
+    if (exit == SupportExit.closed) _presentation?.dismiss();
     // A thread opened by its id: the phone's current one is the session's again.
     await support.restore();
     unawaited(support.refreshUnread());
+    // The way back is to Rendel's page, as on the web: opened now when the team's page came first (the launcher, a banner, a push, the app's "Contact us").
+    if (exit == SupportExit.back && _presentation == null && isEnabled && context.mounted) unawaited(open(context));
     return true;
   }
 

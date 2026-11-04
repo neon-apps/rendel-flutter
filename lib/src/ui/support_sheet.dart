@@ -23,10 +23,10 @@ import 'theme.dart';
 /// [onAction] carries out a tap on a card the team sent: a screen, a link, a
 /// call. The sheet closes first when it opens a screen of the app.
 ///
-/// Completes true when the person closed it with ✕, which closes all of
-/// Rendel as the web's does (Tuna, 2026-11-04); false for the way back to the
-/// assistant, a swipe down or a tap outside.
-Future<bool> showRendelSupport(
+/// Completes with how the person left it (Tuna, 2026-11-04: as on the web):
+/// ✕ closes all of Rendel, the way back is to Rendel's page; null for a swipe
+/// down, a tap outside or a screen of the app the page opened.
+Future<SupportExit?> showRendelSupport(
   BuildContext context, {
   required RendelSupport support,
   required String team,
@@ -41,7 +41,7 @@ Future<bool> showRendelSupport(
 }) {
   final drawn = theme ?? RendelThemeScope.of(context);
   final words = strings ?? RendelStringsScope.of(context);
-  return showModalBottomSheet<bool>(
+  return showModalBottomSheet<SupportExit>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -70,8 +70,11 @@ Future<bool> showRendelSupport(
         ),
       ),
     ),
-  ).then((closed) => closed ?? false);
+  );
 }
+
+/// How the person left the team's page: ✕, or the way back to the assistant.
+enum SupportExit { closed, back }
 
 class RendelSupportSheet extends StatefulWidget {
   const RendelSupportSheet({
@@ -479,7 +482,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                 excludeSemantics: true,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(10),
-                  onTap: () => Navigator.of(context).maybePop(),
+                  onTap: () => Navigator.of(context).maybePop(SupportExit.back),
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(minHeight: 44),
                     child: Row(
@@ -539,7 +542,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     )
                   : IconButton(
                       tooltip: null,
-                      onPressed: () => Navigator.of(context).maybePop(true),
+                      onPressed: () => Navigator.of(context).maybePop(SupportExit.closed),
                       style: IconButton.styleFrom(
                         backgroundColor: theme.colors.onSurface.withValues(alpha: 0.07),
                         minimumSize: const Size(32, 32),

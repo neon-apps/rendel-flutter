@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.77.2
+
+**Changed**
+
+- The way back (‹) on the team's page opens Rendel's page when the team's
+  page came first (the launcher, the reply banner, a push, the app's own
+  "Contact us"), as on the web; it used to leave the person in the app.
+
 ## 0.77.1
 
 **Changed**

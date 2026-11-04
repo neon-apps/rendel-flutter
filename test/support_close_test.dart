@@ -1,5 +1,6 @@
 // The way out of the team's page (Tuna, 2026-11-04): ✕ closes all of Rendel,
-// as on the web, and the way back returns to Rendel's own page.
+// as on the web, and the way back returns to Rendel's own page, opened for
+// it when the team's page came first.
 
 import 'dart:async';
 import 'dart:convert';
@@ -70,8 +71,8 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
-/// Rendel open on its page, and the team's page over it.
-Future<void> _openBoth(WidgetTester tester) async {
+/// Rendel open on its page and the team's page over it, or the team's page alone (the launcher, a push, the app's "Contact us").
+Future<void> _openBoth(WidgetTester tester, {bool rendel = true}) async {
   await tester.runAsync(() async {
     await Rendel.init(appKey: _key, config: RendelConfig(httpClient: _client));
     await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -83,12 +84,14 @@ Future<void> _openBoth(WidgetTester tester) async {
       return const Scaffold(body: Text('the app'));
     }),
   ));
-  unawaited(Rendel.open(context));
-  await _settle(tester);
+  if (rendel) {
+    unawaited(Rendel.open(context));
+    await _settle(tester);
+  }
   unawaited(Rendel.openSupport(context));
   await _settle(tester);
   expect(find.byType(RendelSupportSheet), findsOneWidget);
-  expect(Rendel.isOpen, isTrue);
+  expect(Rendel.isOpen, rendel);
 }
 
 void main() {
@@ -111,5 +114,23 @@ void main() {
     expect(find.byType(RendelSupportSheet), findsNothing);
     expect(find.byType(ThreadScreen), findsOneWidget);
     expect(Rendel.isOpen, isTrue);
+  });
+
+  testWidgets("the way back opens Rendel's page when the team's page came first", (tester) async {
+    await _openBoth(tester, rendel: false);
+    await tester.tap(find.bySemanticsLabel('Back to the assistant'));
+    await _settle(tester);
+    expect(find.byType(RendelSupportSheet), findsNothing);
+    expect(find.byType(ThreadScreen), findsOneWidget);
+    expect(Rendel.isOpen, isTrue);
+  });
+
+  testWidgets("✕ on the team's page alone leaves the app as it was", (tester) async {
+    await _openBoth(tester, rendel: false);
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await _settle(tester);
+    expect(find.byType(RendelSupportSheet), findsNothing);
+    expect(find.byType(ThreadScreen), findsNothing);
+    expect(Rendel.isOpen, isFalse);
   });
 }
