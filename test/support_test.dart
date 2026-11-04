@@ -83,7 +83,11 @@ class _Server {
     if (raw.isNotEmpty) sent = jsonDecode(raw) as Map<String, dynamic>;
     http.StreamedResponse json(Object value, [int status = 200]) =>
         http.StreamedResponse(Stream.value(utf8.encode(jsonEncode(value))), status, headers: {'content-type': 'application/json'});
-    if (path == '/v1/support/current') return json({'thread_id': _thread, 'conversation_id': 'c1', 'state': state, 'entries': entries});
+    // As the server reads it: the lines after the cursor.
+    if (path == '/v1/support/current') {
+      final after = int.tryParse(request.url.queryParameters['after'] ?? '') ?? 0;
+      return json({'thread_id': _thread, 'conversation_id': 'c1', 'state': state, 'entries': [for (final e in entries) if ((e['seq'] as int) > after) e]});
+    }
     if (path == '/v1/support/unread') return json({'unread': 2, 'open': state['state'] != 'resolved'});
     if (path == '/v1/support/threads') return json({'threads': threads});
     if (request.method == 'GET' && path.startsWith('/v1/support/threads/') && path.split('/').length == 5) {
@@ -132,20 +136,7 @@ class _Server {
       final block = entries.expand((e) => e['blocks'] as List).firstWhere((b) => (b as Map)['type'] == 'confirm_card');
       return json({'block': block});
     }
-    if (path.endsWith('/continue')) {
-      // The server's thread has the card answered, as threads.ts spells it for Flutter.
-      entries = [
-        for (final e in entries)
-          {
-            ...e,
-            'blocks': [
-              for (final b in e['blocks'] as List)
-                (b as Map)['type'] == 'confirm_card' ? {...b, 'props': {...(b['props'] as Map), '_resolved': 'confirmed'}} : b,
-            ],
-          },
-      ];
-      return json({'status': 'succeeded'});
-    }
+    if (path.endsWith('/continue')) return json({'status': 'succeeded'});
     if (path.endsWith('/confirm')) return json({'status': 'confirmed'});
     if (path.endsWith('/contact')) {
       state = _state(contact: {'state': 'stated', 'required': false});

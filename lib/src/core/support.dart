@@ -621,8 +621,11 @@ class RendelSupport {
                 authorName: e.authorName,
                 text: e.text,
                 blocks: [for (final b in e.blocks) b['id'] == block['id'] ? block : b],
+                files: e.files,
+                pictures: e.pictures,
                 clientMsgId: e.clientMsgId,
                 createdAt: e.createdAt,
+                markerKind: e.markerKind,
               )
             : e,
     ]);
@@ -631,13 +634,44 @@ class RendelSupport {
 
   /// The person's answer to that card, on the assistant's own path; a yes
   /// runs the write once, as them: 'succeeded', 'failed', 'declined' or 'expired'.
+  /// The card answered here says so at once, as the server spells it (`_resolved`): a reload reads only the
+  /// lines after the cursor, so the card's own line would not come back with its answer (Tuna, 2026-11-04).
+  void _answered(String invocationId, String resolved) {
+    bool mine(Map<String, dynamic> b) => b['type'] == 'confirm_card' && b['props'] is Map && (b['props'] as Map)['invocation_id'] == invocationId;
+    value.value = _now.copyWith(entries: [
+      for (final e in _now.entries)
+        e.blocks.any(mine)
+            ? RendelSupportEntry(
+                id: e.id,
+                seq: e.seq,
+                marker: e.marker,
+                author: e.author,
+                authorName: e.authorName,
+                text: e.text,
+                blocks: [
+                  for (final b in e.blocks) mine(b) ? {...b, 'props': {...(b['props'] as Map<String, dynamic>), '_resolved': resolved}} : b,
+                ],
+                files: e.files,
+                pictures: e.pictures,
+                clientMsgId: e.clientMsgId,
+                createdAt: e.createdAt,
+                markerKind: e.markerKind,
+              )
+            : e,
+    ]);
+  }
+
   Future<String> decideCard(String invocationId, {required bool confirm}) async {
     final threadId = _now.threadId;
     if (threadId == null) return 'failed';
     final status = await api.recordDecision(invocationId, confirm: confirm);
-    if (!confirm) return status == 'declined' ? 'declined' : 'failed';
+    if (!confirm) {
+      if (status == 'declined') _answered(invocationId, 'declined');
+      return status == 'declined' ? 'declined' : 'failed';
+    }
     if (status == 'expired') return 'expired';
     if (status != 'confirmed') return 'failed';
+    _answered(invocationId, 'confirmed');
     final ran = await api.support('POST', _path(threadId, 'continue'), user: user(), body: {'invocation_id': invocationId}, asPerson: true);
     await load();
     return ran.status == 200 && ran.json?['status'] == 'succeeded' ? 'succeeded' : 'failed';

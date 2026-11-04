@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.78.1
+
+**Fixed**
+
+- A confirm card the team sent shows its answer as soon as it is given on
+  this phone: a reload reads only the lines after it, so the card kept its
+  buttons. Its line also keeps its pictures and files when its card opens.
+
 ## 0.78.0
 
 **Added**
