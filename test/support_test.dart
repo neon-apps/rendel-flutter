@@ -66,6 +66,9 @@ class _Server {
   /// A line in a sorted thread opens it again; with [otherOpen], another one is open and it cannot.
   String? otherOpen;
 
+  /// What the server says when a card is opened, when not its 200.
+  int? openCard;
+
   /// The stream is held open and says nothing, as a quiet thread's does, until a test [say]s something on it.
   final StreamController<List<int>> _quiet = StreamController<List<int>>();
 
@@ -104,6 +107,7 @@ class _Server {
       return json({'entry': entry});
     }
     if (path.contains('/cards/')) {
+      if (openCard case final status?) return json({'error': {'code': 'not_cardable'}}, status);
       entries = [
         for (final e in entries)
           {
@@ -558,6 +562,32 @@ void main() {
         await _settle(tester);
       }
       expect(server.posts.singleWhere((p) => p.path == 'continue').body, {'invocation_id': _invocation});
+      await _close(tester);
+    });
+
+    testWidgets('draws a card the server will not open here as not answered, never loading, and asks once (Tuna, 2026-11-04)', (tester) async {
+      final server = _Server(
+        entries: [
+          _entry(1, text: 'I want to talk to a person'),
+          _entry(2, author: 'agent', name: 'Dana', blocks: [
+            {
+              'id': 'card-1',
+              'type': 'confirm_card',
+              'fallback_text': 'Apply the code SOCKS to your bag?',
+              'props': {'invocation_id': '', 'action_name': 'apply_coupon', 'summary': 'Apply the code SOCKS to your bag?', 'params': {'code': 'SOCKS'}, 'params_display': <Object>[]},
+            },
+          ]),
+        ],
+        state: _state(mode: 'human'),
+      )..openCard = 409;
+      await _open(tester, server.support());
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.text('Apply the code SOCKS to your bag?'), findsWidgets);
+      expect(find.text('Not answered'), findsOneWidget);
+      expect(find.text('Loading'), findsNothing);
+      expect(find.text('Confirm'), findsNothing);
+      expect(server.posts.where((p) => p.path.startsWith('cards/')).length, 1);
       await _close(tester);
     });
 

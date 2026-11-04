@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.77.3
+
+**Fixed**
+
+- A confirm card the team sent that the server will not open on this phone
+  (the conversation was sorted first) shows as not answered, not loading,
+  and is asked for once (Web 0.53.4 does the same).
+
 ## 0.77.2
 
 **Changed**

@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import '../core/config.dart' show RendelAttachment, RendelAttachSource;
 import '../core/strings.dart';
 import '../core/support.dart';
-import '../protocol/protocol.dart' show CancelAction, ConfirmAction, NavigateAction, UIAction, WireBlock;
+import '../protocol/protocol.dart' show CancelAction, ConfirmAction, NavigateAction, RendelLocalKeys, UIAction, WireBlock;
 import 'renderer/blocks.dart' show RendelActionButton, RendelPressable;
 import 'renderer/registry.dart';
 import 'theme.dart';
@@ -708,7 +708,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       for (final raw in entry.blocks)
         if (_unopened(raw))
           Text(strings.loading, style: theme.text.caption)
-        else if (WireBlock.tryParse(raw) case final block?)
+        else if (WireBlock.tryParse(_asDrawn(entry, raw)) case final block?)
           // A card the team sent, in their column: who prepared it, then the card to act on.
           Container(
             width: double.infinity,
@@ -966,8 +966,20 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final id = props is Map ? props['invocation_id'] : null;
     if (id is String && id.isNotEmpty) return false;
     final entry = widget.support.value.value.entries.where((e) => e.blocks.contains(raw)).firstOrNull;
+    // Refused for good: drawn as not answered (_asDrawn).
+    if (entry != null && widget.support.refusedCards.contains(entry.id)) return false;
     if (entry != null && _opening.add(entry.id)) unawaited(widget.support.openCard(entry.id));
     return true;
+  }
+
+  /// A card as it is drawn: one the server would not open on this phone is not answered.
+  Map<String, dynamic> _asDrawn(RendelSupportEntry entry, Map<String, dynamic> raw) {
+    if (raw['type'] != 'confirm_card' || !widget.support.refusedCards.contains(entry.id)) return raw;
+    final props = raw['props'];
+    return {
+      ...raw,
+      'props': {if (props is Map<String, dynamic>) ...props, RendelLocalKeys.resolved: 'abandoned'},
+    };
   }
 
   /// A card's heading: `labelStrong` is drawn on the accent, these cards are not.

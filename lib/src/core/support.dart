@@ -565,6 +565,9 @@ class RendelSupport {
     return true;
   }
 
+  /// The team's cards the server would not open on this phone: drawn as not answered.
+  final Set<String> refusedCards = {};
+
   /// A confirm card the team sent, opened: its confirmation is minted on this
   /// phone now, and the line comes back with the card's `invocation_id`.
   Future<bool> openCard(String entryId) async {
@@ -572,7 +575,14 @@ class RendelSupport {
     if (threadId == null) return false;
     final answer = await api.support('POST', _path(threadId, 'cards/${Uri.encodeComponent(entryId)}/open'), user: user(), body: const {});
     final block = answer.json?['block'];
-    if (answer.status != 200 || block is! Map<String, dynamic>) return false;
+    if (answer.status != 200 || block is! Map<String, dynamic>) {
+      // Refused for good (the conversation was sorted, or the card is not this phone's): not answered, never left loading.
+      if (answer.status == 404 || answer.status == 409) {
+        refusedCards.add(entryId);
+        value.value = _now.copyWith();
+      }
+      return false;
+    }
     value.value = _now.copyWith(entries: [
       for (final e in _now.entries)
         e.id == entryId
