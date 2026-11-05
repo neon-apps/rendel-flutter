@@ -177,7 +177,10 @@ class RendelApiClient {
   ///
   /// Sends which build this is and what it runs on (§9.7), so the console can
   /// say "Flutter 0.45.0 · iOS connected" and notice a build drifting behind.
-  Future<RendelConfigAnswer?> fetchConfig({String? etag}) async {
+  ///
+  /// [launcher] is which launcher the app draws (`own` or `rendel`), for
+  /// Appearance to say when its launcher look is not the one on screen.
+  Future<RendelConfigAnswer?> fetchConfig({String? etag, String? launcher}) async {
     try {
       final response = await _http
           .get(
@@ -186,6 +189,7 @@ class RendelApiClient {
               ..._headers,
               'X-Rendel-SDK': config.sdkVersion,
               'X-Rendel-Platform': rendelPlatformName(),
+              if (launcher != null) 'X-Rendel-Launcher': launcher,
               if (etag != null) 'If-None-Match': etag,
             },
           )

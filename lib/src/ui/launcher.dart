@@ -40,16 +40,43 @@ import 'theme.dart';
 /// on the app's screen while the thread is closed, as its send chose: over the
 /// launcher, anchored to it in the app's overlay, or as a banner across the
 /// top of the screen.
+///
+/// With [builder], the button is your own widget and Rendel does the rest:
+/// the tap, its spoken label, stepping aside for the bubble, the message
+/// over it, the count or dot on its corner, and the drag.
 class RendelLauncher extends StatefulWidget {
-  const RendelLauncher({super.key, this.label});
+  const RendelLauncher({super.key, this.label, this.builder});
 
   /// Overrides both the code config's `launcherLabel` and anything the console
   /// published. Pass it only when this particular placement needs a different
   /// word from the rest of the app.
   final String? label;
 
+  /// Draws the button as your own widget, in place of Rendel's and of
+  /// Appearance's launcher look. Return the visual only: Rendel makes it
+  /// pressable, says [RendelLauncherStatus.label] to a screen reader and
+  /// puts its own count or dot on the corner.
+  final RendelLauncherBuilder? builder;
+
   @override
   State<RendelLauncher> createState() => _RendelLauncherState();
+}
+
+/// Draws a launcher of your own; see [RendelLauncher.builder].
+typedef RendelLauncherBuilder = Widget Function(BuildContext context, RendelLauncherStatus status);
+
+/// What a launcher of your own can show.
+class RendelLauncherStatus {
+  const RendelLauncherStatus({required this.label, required this.unread, required this.waiting});
+
+  /// The launcher's word: the published or coded `launcherLabel`, or this placement's own.
+  final String label;
+
+  /// Unread lines from the team, 0 when none.
+  final int unread;
+
+  /// An answer that finished unseen or a card that waits for this person.
+  final RendelWaiting waiting;
 }
 
 class _RendelLauncherState extends State<RendelLauncher> {
@@ -332,7 +359,7 @@ class _RendelLauncherState extends State<RendelLauncher> {
     if (!Rendel.isInitialized || !(Rendel.isEnabled || Rendel.supportOpen)) {
       return const SizedBox.shrink();
     }
-    return _button(theme, widget.label ?? Rendel.config.launcherLabel, () => _tap(context));
+    return _button(theme, widget.label ?? Rendel.config.launcherLabel, () => _tap(context), widget.builder);
   }
 }
 
@@ -348,18 +375,28 @@ void _tap(BuildContext context) {
 /// The launcher as drawn, wherever it is: in its slot, or over the app, with
 /// the count of the team's unread lines on its corner (human support), or a
 /// dot while an answer finished unseen or a card waits ([Rendel.waiting]).
-Widget _button(RendelTheme theme, String word, VoidCallback onTap) {
+Widget _button(RendelTheme theme, String word, VoidCallback onTap, [RendelLauncherBuilder? builder]) {
+  Rendel.launcherDrawn(own: builder != null);
   return ValueListenableBuilder<RendelWaiting>(
     valueListenable: Rendel.waiting,
     builder: (context, waiting, _) => ValueListenableBuilder<int>(
       valueListenable: Rendel.supportUnread,
-      builder: (context, unread, _) => _marked(theme, word, onTap, unread: unread, waiting: waiting),
+      builder: (context, unread, _) => _marked(theme, word, onTap, unread: unread, waiting: waiting, builder: builder),
     ),
   );
 }
 
-Widget _marked(RendelTheme theme, String word, VoidCallback onTap, {required int unread, required RendelWaiting waiting}) {
-  final drawn = _plainButton(theme, word, onTap, unread: unread, waiting: waiting);
+Widget _marked(RendelTheme theme, String word, VoidCallback onTap, {required int unread, required RendelWaiting waiting, RendelLauncherBuilder? builder}) {
+  final drawn = builder == null
+      ? _plainButton(theme, word, onTap, unread: unread, waiting: waiting)
+      // The host's own button, pressable and spoken as the icon-only one is.
+      : Builder(
+          builder: (context) => RendelPressable(
+            semanticLabel: _spoken(word, unread, waiting),
+            onTap: onTap,
+            child: builder(context, RendelLauncherStatus(label: word, unread: unread, waiting: waiting)),
+          ),
+        );
   if (unread <= 0 && waiting == RendelWaiting.none) return drawn;
   return Stack(
     clipBehavior: Clip.none,
@@ -409,6 +446,15 @@ Widget _marked(RendelTheme theme, String word, VoidCallback onTap, {required int
   );
 }
 
+/// What a screen reader says for the launcher: [said], then what waits.
+String _spoken(String said, int unread, RendelWaiting waiting) => unread > 0
+    ? '$said. ${Rendel.strings.supportUnreadOf(unread)}'
+    : switch (waiting) {
+        RendelWaiting.answer => '$said. ${Rendel.strings.answerWaiting}',
+        RendelWaiting.approval => '$said. ${Rendel.strings.approvalWaiting}',
+        RendelWaiting.none => said,
+      };
+
 Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {required int unread, RendelWaiting waiting = RendelWaiting.none}) {
   final config = Rendel.config;
   final iconOnly = config.launcherStyle == RendelLauncherStyle.icon;
@@ -428,16 +474,9 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
   final glow = config.launcherGlow;
   // The customer's light, over the fill and under the icon, inside the ring.
   final light = config.launcherLight;
-  final said = iconOnly ? word : Rendel.strings.openCopilot;
   return RendelPressable(
     // The icon alone says nothing to a screen reader, so the word does.
-    semanticLabel: unread > 0
-        ? '$said. ${Rendel.strings.supportUnreadOf(unread)}'
-        : switch (waiting) {
-            RendelWaiting.answer => '$said. ${Rendel.strings.answerWaiting}',
-            RendelWaiting.approval => '$said. ${Rendel.strings.approvalWaiting}',
-            RendelWaiting.none => said,
-          },
+    semanticLabel: _spoken(iconOnly ? word : Rendel.strings.openCopilot, unread, waiting),
     onTap: onTap,
     child: Container(
       width: size,
@@ -890,7 +929,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
             key: _key,
             child: _button(theme, host.widget.label ?? Rendel.config.launcherLabel, () {
               if (!_moved) _tap(host.context);
-            }),
+            }, host.widget.builder),
           ),
         ),
       ),

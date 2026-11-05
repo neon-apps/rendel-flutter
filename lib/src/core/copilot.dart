@@ -297,6 +297,14 @@ class Rendel {
   static RendelConfigStore _store = RendelMemoryConfigStore();
   static String? _configEtag;
 
+  /// Which launcher the app draws, as it was last sent with the config:
+  /// `own` with a [RendelLauncher.builder], `rendel` without, null unknown.
+  /// Kept on the device, so a launch says it before its launcher is built.
+  static String? _launcherKind;
+
+  /// Which launcher this run has drawn so far; one of the app's own makes it `own`.
+  static String? _launcherThisRun;
+
   /// Fires when a published config lands and changes what is on screen, so a
   /// host embedding the thread itself can rebuild. The launcher listens to
   /// it; nothing else in the SDK needs to.
@@ -462,7 +470,7 @@ class Rendel {
     // launcher it precedes, and an unreachable API must not delay it at all.
     await _applyCachedConfig();
     // A follow-up once the app knows whether Rendel is on here at all.
-    unawaited(_refreshConfig().then((_) => _checkFollowup()));
+    unawaited(_recallLauncherKind().then((_) => _refreshConfig()).then((_) => _checkFollowup()));
   }
 
   /// Re-reads the published config. Call it when your app returns to the
@@ -1311,6 +1319,8 @@ class Rendel {
   @visibleForTesting
   static void resetForTest({bool relaunch = false}) {
     _endSession(forget: !relaunch);
+    _launcherKind = null;
+    _launcherThisRun = null;
     // A test that ends with the sheet up never pops it, so the count stayed
     // above zero, `_endSession` kept the controller, and the next test's
     // thread talked through the previous test's client. Dropped rather than
@@ -1387,7 +1397,7 @@ class Rendel {
   static Future<void> _refreshConfig() async {
     final api = _api;
     if (api == null || !_codeConfig.remoteConfig) return;
-    final answer = await api.fetchConfig(etag: _configEtag);
+    final answer = await api.fetchConfig(etag: _configEtag, launcher: _launcherKind);
     // Null is an error status the SDK does not act on: no new config today.
     if (answer == null) return;
     // The API could not be reached: say so on [available], and look again
@@ -1541,6 +1551,33 @@ class Rendel {
     final id = _launcherIconAssetId;
     if (id == null || _config.launcherIcon != 'custom') return null;
     return '${_config.apiBaseUrl}/v1/apps/launcher-icon?v=$id';
+  }
+
+  /// Called by [RendelLauncher] as it draws: whether it is the app's own
+  /// ([RendelLauncher.builder]). Appearance then says its launcher look is
+  /// not what the app draws. Kept for the next launch, and sent at once
+  /// when it changed. You need not call it.
+  static void launcherDrawn({required bool own}) {
+    final kind = own || _launcherThisRun == 'own' ? 'own' : 'rendel';
+    if (kind == _launcherThisRun) return;
+    _launcherThisRun = kind;
+    final key = _appKey;
+    if (kind == _launcherKind || key == null) return;
+    _launcherKind = kind;
+    unawaited(_defaultStore('rendel_launcher_kind_$key').write(kind).catchError((Object _) {}));
+    unawaited(_refreshConfig());
+  }
+
+  /// [_launcherKind] as the last run left it, unless this one has drawn already.
+  static Future<void> _recallLauncherKind() async {
+    final key = _appKey;
+    if (key == null) return;
+    try {
+      final kind = await _defaultStore('rendel_launcher_kind_$key').read().timeout(RendelDeviceId.storeTimeout);
+      if (kind == 'own' || kind == 'rendel') _launcherKind ??= kind;
+    } catch (_) {
+      // Unknown this launch: the console keeps what it was told before.
+    }
   }
 
   /// Where a dragged launcher's place is kept on this device, one per app

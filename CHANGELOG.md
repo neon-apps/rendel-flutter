@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.81.0
+
+**Added**
+
+- `RendelLauncher(builder:)`: the launcher as your own widget. Return the
+  visual only; Rendel makes it pressable and spoken, puts its count or dot
+  on the corner, steps it aside for the bubble, shows a waiting message
+  over it and drags it. `RendelLauncherStatus` carries the label, the
+  team's unread count and what waits. The SDK tells the console which
+  launcher the app draws, so Appearance says when its launcher look does
+  not apply.
+
 ## 0.80.0
 
 **Added**

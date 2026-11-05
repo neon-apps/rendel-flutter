@@ -280,6 +280,64 @@ void main() {
       expect(tester.getSize(_button), const Size(46, 46));
     });
 
+    testWidgets("builder: the host's own widget, pressable and spoken by Rendel", (tester) async {
+      await _start(tester, const RendelConfig(launcherStyle: RendelLauncherStyle.icon, launcherSize: 60));
+      RendelLauncherStatus? seen;
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          floatingActionButton: RendelLauncher(
+            label: 'Ask Skin',
+            builder: (context, status) {
+              seen = status;
+              return const SizedBox(key: ValueKey('own'), width: 64, height: 64);
+            },
+          ),
+        ),
+      ));
+      // Its own widget, not Rendel's look or size, and the word for a screen reader.
+      expect(find.byKey(const ValueKey('own')), findsOneWidget);
+      expect(_glyph, findsNothing);
+      expect(tester.getSize(_button), const Size(64, 64));
+      expect(find.bySemanticsLabel('Ask Skin'), findsOneWidget);
+      expect(seen!.label, 'Ask Skin');
+      expect(seen!.unread, 0);
+      expect(seen!.waiting, RendelWaiting.none);
+
+      // What waits reaches the builder, and Rendel's dot still sits on its corner.
+      Rendel.waiting.value = RendelWaiting.answer;
+      await tester.pump();
+      expect(seen!.waiting, RendelWaiting.answer);
+      expect(find.byKey(const ValueKey('rendel-launcher-dot')), findsOneWidget);
+      Rendel.waiting.value = RendelWaiting.none;
+    });
+
+    testWidgets('says with the config that the launcher is the app\'s own, once it changes', (tester) async {
+      final sent = <String?>[];
+      await tester.runAsync(() => Rendel.init(
+            appKey: _key,
+            config: RendelConfig(
+              httpClient: MockClient((request) async {
+                if (request.url.path.endsWith('/v1/apps/config')) sent.add(request.headers['X-Rendel-Launcher']);
+                return http.Response('{}', 200);
+              }),
+            ),
+          ));
+      await _arrive(tester);
+      // Nothing drawn yet, nothing said.
+      expect(sent, [null]);
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(floatingActionButton: RendelLauncher(builder: (context, status) => const SizedBox(width: 56, height: 56))),
+      ));
+      await _arrive(tester);
+      expect(sent, [null, 'own']);
+      // Drawn again, nothing new to say.
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(floatingActionButton: RendelLauncher(builder: (context, status) => const SizedBox(width: 60, height: 60))),
+      ));
+      await _arrive(tester);
+      expect(sent, [null, 'own']);
+    });
+
     testWidgets('each icon is drawn, and one this build lacks is the sparkle', (tester) async {
       for (final id in ['heart', 'unicorn']) {
         await _start(tester, RendelConfig(launcherIcon: id));

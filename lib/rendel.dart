@@ -44,7 +44,7 @@ export 'src/protocol/protocol.dart'
         AddToCalendarAction;
 // What RendelDispatcher.onUpload throws, so a host can catch it by type.
 export 'src/transport/api_client.dart' show RendelUploadFailure;
-export 'src/ui/launcher.dart' show RendelLauncher;
+export 'src/ui/launcher.dart' show RendelLauncher, RendelLauncherBuilder, RendelLauncherStatus;
 // The registry and what a builder receives, so a host can put a widget of
 // its own in the catalog's place.
 export 'src/ui/renderer/registry.dart'
