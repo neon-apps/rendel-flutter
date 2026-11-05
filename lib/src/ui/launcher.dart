@@ -415,7 +415,7 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
   // The round launcher's size, ring included; its icon keeps the 20 it has
   // at the 46 the padding below makes.
   final size = iconOnly ? config.launcherSize : null;
-  final icon = _LauncherIcon(color: theme.colors.onAccent, size: size == null ? 20 : size * 20 / 46);
+  final icon = _LauncherIcon(color: theme.colors.onAccent, size: config.launcherIconSize ?? (size == null ? 20 : size * 20 / 46));
   // The customer's fill, where its icon (3:1) or word (4.5:1) reads on it;
   // the accent otherwise. The icon alone covers the middle of a round
   // launcher (its 20 of 46), so the colours there; a word runs end to end,
@@ -424,7 +424,10 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
   final grounds = fill == null ? const <Color>[] : (iconOnly ? [0.3, 0.5, 0.7].map((t) => _fillAt(fill, t)) : fill.colors);
   final filled = fill != null && grounds.every((ground) => contrastRatio(theme.colors.onAccent, ground) >= (iconOnly ? 3 : 4.5));
   final ring = config.launcherRing;
+  final ringWidth = ring == null ? 1.0 : config.launcherRingWidth ?? 3;
   final glow = config.launcherGlow;
+  // The customer's light, over the fill and under the icon, inside the ring.
+  final light = config.launcherLight;
   final said = iconOnly ? word : Rendel.strings.openCopilot;
   return RendelPressable(
     // The icon alone says nothing to a screen reader, so the word does.
@@ -439,19 +442,6 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
     child: Container(
       width: size,
       height: size,
-      alignment: size == null ? null : Alignment.center,
-      // Round, as tall as the button with its word: the same 12 above and
-      // below the 20 the icon takes, and on each side of it. A size of its
-      // own centres the icon instead.
-      padding: iconOnly
-          ? (size == null ? EdgeInsets.all(theme.space.md) : EdgeInsets.zero)
-          // The web launcher's 16 before the icon and 20 after the word.
-          : EdgeInsetsDirectional.only(
-              start: theme.space.lg,
-              end: theme.space.lg + theme.space.xs,
-              top: theme.space.md,
-              bottom: theme.space.md,
-            ),
       decoration: BoxDecoration(
         color: filled ? null : theme.colors.accent,
         gradient: filled ? fill : null,
@@ -462,12 +452,33 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
         // boundary WCAG 1.4.11 asks 3:1 of, which a host's raw accent often
         // does not clear against its own ground. A ring or a glow the
         // customer chose takes the place of each.
-        border: ring == null ? Border.all(color: theme.accentEdge) : Border.all(color: ring, width: config.launcherRingWidth ?? 3),
+        border: Border.all(color: ring ?? theme.accentEdge, width: ringWidth),
         boxShadow: glow == null
             ? theme.lift
-            : [BoxShadow(color: glow.withValues(alpha: 0.45), blurRadius: 20, spreadRadius: 2, offset: const Offset(0, 4))],
+            : [BoxShadow(color: glow.withValues(alpha: config.launcherGlowStrength ?? 0.45), blurRadius: 20, spreadRadius: 2, offset: const Offset(0, 4))],
       ),
-      child: iconOnly
+      child: Container(
+        alignment: size == null ? null : Alignment.center,
+        // Round, as tall as the button with its word: the same 12 above and
+        // below the 20 the icon takes, and on each side of it. A size of its
+        // own centres the icon instead.
+        padding: iconOnly
+            ? (size == null ? EdgeInsets.all(theme.space.md) : EdgeInsets.zero)
+            // The web launcher's 16 before the icon and 20 after the word.
+            : EdgeInsetsDirectional.only(
+                start: theme.space.lg,
+                end: theme.space.lg + theme.space.xs,
+                top: theme.space.md,
+                bottom: theme.space.md,
+              ),
+        decoration: light == null
+            ? null
+            : BoxDecoration(
+                gradient: light,
+                shape: iconOnly ? BoxShape.circle : BoxShape.rectangle,
+                borderRadius: iconOnly ? null : BorderRadius.circular(math.max(0, theme.radius.control - ringWidth)),
+              ),
+        child: iconOnly
           ? icon
           // Grows with the reader's text size, but never past 1.5×: at the
           // largest sizes it covered the app it floats over (QA R7, iPhone SE).
@@ -483,6 +494,7 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
                 ],
               ),
             ),
+      ),
     ),
   );
 }

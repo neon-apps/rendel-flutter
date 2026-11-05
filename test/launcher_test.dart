@@ -42,6 +42,9 @@ Future<void> _start(WidgetTester tester, [RendelConfig config = const RendelConf
             launcherRingWidth: config.launcherRingWidth,
             launcherGlow: config.launcherGlow,
             launcherSize: config.launcherSize,
+            launcherLight: config.launcherLight,
+            launcherIconSize: config.launcherIconSize,
+            launcherGlowStrength: config.launcherGlowStrength,
           ),
         ));
 
@@ -96,6 +99,26 @@ void main() {
       expect(applied.launcherRingWidth, 4);
       expect(applied.launcherGlow, const Color(0xFF6C5CFF));
       expect(applied.launcherSize, 60);
+
+      final lit = _parse({
+        'launcherLight': {'color': '#E4E8FF', 'x': 0.3, 'y': 0.25},
+        'launcherIconSize': 30,
+        'launcherGlowStrength': 0.2,
+      }).applyToConfig(code);
+      final light = lit.launcherLight! as RadialGradient;
+      expect(light.center, const Alignment(-0.4, -0.5));
+      expect(light.radius, 0.6);
+      expect(light.colors, [const Color(0xFFE4E8FF).withValues(alpha: 0.7), const Color(0xFFE4E8FF).withValues(alpha: 0)]);
+      expect(lit.launcherIconSize, 30);
+      expect(lit.launcherGlowStrength, 0.2);
+      final dark = _parse({
+        'launcherLight': {'color': '#E4E8FF', 'x': 1.3, 'y': 0.25},
+        'launcherIconSize': 60,
+        'launcherGlowStrength': 0,
+      }).applyToConfig(code);
+      expect(dark.launcherLight, isNull);
+      expect(dark.launcherIconSize, isNull);
+      expect(dark.launcherGlowStrength, isNull);
 
       final wrong = _parse({
         'launcherFill': {
@@ -167,7 +190,7 @@ void main() {
       expect(find.text('Ask'), findsNothing);
       expect(tester.getSize(_button), Size(labelHeight, labelHeight));
       expect(tester.getSize(_glyph), const Size(20, 20));
-      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)).first);
       expect((box.decoration! as BoxDecoration).shape, BoxShape.circle);
       expect(find.bySemanticsLabel('Ask'), findsOneWidget);
     });
@@ -188,12 +211,36 @@ void main() {
       await tester.pumpWidget(_fab());
       expect(tester.getSize(_button), const Size(60, 60));
       expect(tester.getSize(_glyph).width, closeTo(60 * 20 / 46, 0.01));
-      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)).first);
       final decoration = box.decoration! as BoxDecoration;
       expect(decoration.gradient, fill);
       expect(decoration.color, isNull);
       expect((decoration.border! as Border).top, const BorderSide(color: Color(0xFFFFFFFF), width: 4));
       expect(decoration.boxShadow!.single.color, const Color(0xFF6C5CFF).withValues(alpha: 0.45));
+    });
+
+    testWidgets('a light over the fill and under the icon, inside the ring; its own icon size and glow strength', (tester) async {
+      const light = RadialGradient(center: Alignment(-0.4, -0.4), radius: 0.6, colors: [Color(0xB3E4E8FF), Color(0x00E4E8FF)]);
+      await _start(
+        tester,
+        const RendelConfig(
+          launcherStyle: RendelLauncherStyle.icon,
+          launcherRing: Color(0xFFFFFFFF),
+          launcherRingWidth: 4,
+          launcherGlow: Color(0xFF6C5CFF),
+          launcherGlowStrength: 0.2,
+          launcherSize: 60,
+          launcherIconSize: 30,
+          launcherLight: light,
+        ),
+      );
+      await tester.pumpWidget(_fab());
+      final boxes = tester.widgetList<Container>(find.descendant(of: _button, matching: find.byType(Container))).toList();
+      expect((boxes[0].decoration! as BoxDecoration).boxShadow!.single.color, const Color(0xFF6C5CFF).withValues(alpha: 0.2));
+      expect((boxes[1].decoration! as BoxDecoration).gradient, light);
+      // Inside the 4 of the ring, and the icon above it at its own size.
+      expect(tester.getSize(find.byWidget(boxes[1])), const Size(52, 52));
+      expect(tester.getSize(_glyph), const Size(30, 30));
     });
 
     testWidgets("the icon alone is weighed on the fill's middle, where it is drawn", (tester) async {
@@ -202,7 +249,7 @@ void main() {
       const fill = LinearGradient(colors: [Color(0xFFA99BFF), Color(0xFF3B2FE0)]);
       await _start(tester, const RendelConfig(launcherStyle: RendelLauncherStyle.icon, launcherFill: fill));
       await tester.pumpWidget(_fab());
-      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)).first);
       expect((box.decoration! as BoxDecoration).gradient, fill);
       await tester.pumpWidget(const SizedBox());
       Rendel.resetForTest();
@@ -210,7 +257,7 @@ void main() {
       // With its word, which runs end to end, every colour must hold 4.5:1.
       await _start(tester, const RendelConfig(launcherFill: fill));
       await tester.pumpWidget(_fab());
-      final labelled = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      final labelled = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)).first);
       expect((labelled.decoration! as BoxDecoration).gradient, isNull);
     });
 
@@ -223,7 +270,7 @@ void main() {
         ),
       );
       await tester.pumpWidget(_fab());
-      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)).first);
       final decoration = box.decoration! as BoxDecoration;
       expect(decoration.gradient, isNull);
       expect(decoration.color, Rendel.theme.colors.accent);

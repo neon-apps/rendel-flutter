@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.80.0
+
+**Added**
+
+- `RendelConfig.launcherLight`: a light over the launcher's fill and under
+  its icon, inside its ring, published as a colour strongest at a point
+  with its strength and reach. Drawn as given; Appearance warns when the
+  icon is hard to read under it.
+- `launcherIconSize` (12–48) and `launcherGlowStrength` (0.1–1).
+
 ## 0.79.0
 
 **Added**

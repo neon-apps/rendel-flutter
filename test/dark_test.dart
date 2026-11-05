@@ -226,7 +226,7 @@ void main() {
       final box = tester.widget<Container>(find.descendant(
         of: find.byType(RendelLauncher),
         matching: find.byType(Container),
-      ));
+      ).first);
       return (box.decoration! as BoxDecoration).color!;
     }
 

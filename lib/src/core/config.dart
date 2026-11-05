@@ -147,6 +147,9 @@ class RendelConfig {
     this.launcherRingWidth,
     this.launcherGlow,
     this.launcherSize,
+    this.launcherLight,
+    this.launcherIconSize,
+    this.launcherGlowStrength,
     this.composerHint,
     // The "+" the composer opens its menu of Photos, Camera and Files with.
     this.attachIcon = RendelAttachIcon.plus,
@@ -434,6 +437,18 @@ class RendelConfig {
   /// ring included, 40 to 72; its icon grows with it. Null is 46.
   final double? launcherSize;
 
+  /// A light over the launcher's fill and under its icon, inside its ring:
+  /// usually a [RadialGradient] from a colour to the same colour at alpha 0.
+  /// Drawn as given; Appearance says when the icon is hard to read on it.
+  final Gradient? launcherLight;
+
+  /// The launcher's icon in logical pixels, 12 to 48. Null is 20, grown with
+  /// [launcherSize] on the round launcher.
+  final double? launcherIconSize;
+
+  /// How strong [launcherGlow] is at its brightest, 0.1 to 1; 0.45 when null.
+  final double? launcherGlowStrength;
+
   /// The words in the message box before anyone has typed.
   ///
   /// Null is the right default and not an empty one: [RendelStrings.composerHint]
@@ -529,6 +544,9 @@ class RendelConfig {
     double? launcherRingWidth,
     Color? launcherGlow,
     double? launcherSize,
+    Gradient? launcherLight,
+    double? launcherIconSize,
+    double? launcherGlowStrength,
     String? emptyStateTitle,
     String? emptyStateBody,
     List<String>? suggestions,
@@ -565,6 +583,9 @@ class RendelConfig {
       launcherRingWidth: launcherRingWidth ?? this.launcherRingWidth,
       launcherGlow: launcherGlow ?? this.launcherGlow,
       launcherSize: launcherSize ?? this.launcherSize,
+      launcherLight: launcherLight ?? this.launcherLight,
+      launcherIconSize: launcherIconSize ?? this.launcherIconSize,
+      launcherGlowStrength: launcherGlowStrength ?? this.launcherGlowStrength,
       composerHint: composerHint ?? this.composerHint,
       attachIcon: attachIcon ?? this.attachIcon,
       voiceIcon: voiceIcon ?? this.voiceIcon,

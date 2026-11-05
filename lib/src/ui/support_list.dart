@@ -123,6 +123,11 @@ Future<void> showRendelSupportList(
   );
 }
 
+/// Lowercase for search, with I, İ, ı and i as one letter: Dart's
+/// toLowerCase knows no Turkish, so "kırık" would miss "KIRIK".
+String _searchFold(String s) =>
+    s.replaceAll('İ', 'i').replaceAll('I', 'i').toLowerCase().replaceAll('ı', 'i');
+
 class _SupportList extends StatefulWidget {
   const _SupportList({
     required this.threads,
@@ -166,12 +171,11 @@ class _SupportListState extends State<_SupportList> {
     final theme = RendelThemeScope.of(context);
     final strings = RendelStringsScope.of(context);
     final locale = Localizations.maybeLocaleOf(context);
-    final q = _search.text.trim().toLowerCase();
+    final q = _searchFold(_search.text.trim());
     final all = [
       for (final t in _threads)
         if (q.isEmpty ||
-            '${t.title} ${t.last?.text ?? ''} ${t.agent ?? ''}'
-                .toLowerCase()
+            _searchFold('${t.title} ${t.last?.text ?? ''} ${t.agent ?? ''}')
                 .contains(q))
           t,
     ];

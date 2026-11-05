@@ -612,6 +612,24 @@ class RendelRemoteConfig {
     return RendelBackdrop(colors: colors, begin: ends.$1, end: ends.$2, stops: stops);
   }
 
+  /// `copilot.launcherLight`: a colour strongest at (x, y), 0 to 1 across and
+  /// down the button, fading to nothing at `radius` of its width. Anything
+  /// out of shape is no light at all.
+  static RadialGradient? _light(Object? value) {
+    final map = _submap(value);
+    final color = _color(map['color']);
+    final x = _size(map['x'], 0, 1);
+    final y = _size(map['y'], 0, 1);
+    final strength = map.containsKey('strength') ? _size(map['strength'], 0, 1) : 0.7;
+    final radius = map.containsKey('radius') ? _size(map['radius'], 0.1, 1.5) : 0.6;
+    if (color == null || x == null || y == null || strength == null || radius == null) return null;
+    return RadialGradient(
+      center: Alignment(x * 2 - 1, y * 2 - 1),
+      radius: radius,
+      colors: [color.withValues(alpha: strength), color.withValues(alpha: 0)],
+    );
+  }
+
   /// Where each named direction starts and ends: CSS's `to bottom right` is
   /// Flutter's top-left to bottom-right.
   static const _directions = {
@@ -643,6 +661,9 @@ class RendelRemoteConfig {
       launcherRingWidth: _size(copilot['launcherRingWidth'], 1, 8),
       launcherGlow: _color(copilot['launcherGlow']),
       launcherSize: _size(copilot['launcherSize'], 40, 72),
+      launcherLight: _light(copilot['launcherLight']),
+      launcherIconSize: _size(copilot['launcherIconSize'], 12, 48),
+      launcherGlowStrength: _size(copilot['launcherGlowStrength'], 0.1, 1),
       // Clearable, unlike the two above. A name and a launcher label are
       // things the copilot cannot do without, so an empty one means "I said
       // nothing about this". A subtitle is something a customer may genuinely
