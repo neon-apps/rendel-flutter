@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.79.0
+
+**Added**
+
+- The launcher's own look, each optional and publishable from Appearance:
+  `RendelConfig.launcherFill` (a `Gradient` in place of the accent, drawn
+  where the icon or word reads on it), `launcherRing` and
+  `launcherRingWidth`, `launcherGlow`, and the round launcher's
+  `launcherSize` (40–72; its icon grows with it).
+
 ## 0.78.1
 
 **Fixed**

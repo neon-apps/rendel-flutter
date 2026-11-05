@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/painting.dart' show Color, Gradient;
 import 'package:http/http.dart' as http;
 
 import 'log.dart';
@@ -141,6 +142,11 @@ class RendelConfig {
     this.launcherStyle = RendelLauncherStyle.label,
     this.launcherIcon = 'sparkle',
     this.launcherDraggable = false,
+    this.launcherFill,
+    this.launcherRing,
+    this.launcherRingWidth,
+    this.launcherGlow,
+    this.launcherSize,
     this.composerHint,
     // The "+" the composer opens its menu of Photos, Camera and Files with.
     this.attachIcon = RendelAttachIcon.plus,
@@ -410,6 +416,24 @@ class RendelConfig {
   /// `RendelLauncher` was placed; every placement leaves an empty slot.
   final bool launcherDraggable;
 
+  /// The launcher's fill in place of the accent, under its icon and word.
+  /// Null is the accent. A fill the icon (3:1) or the word (4.5:1) cannot be
+  /// read on in [RendelColors.onAccent] is drawn in the accent instead.
+  final Gradient? launcherFill;
+
+  /// A ring round the launcher in place of its hairline edge.
+  final Color? launcherRing;
+
+  /// The ring's width, 1 to 8; 3 when null.
+  final double? launcherRingWidth;
+
+  /// A glow in this colour in place of the launcher's grey shadow.
+  final Color? launcherGlow;
+
+  /// The round launcher's ([RendelLauncherStyle.icon]) width and height,
+  /// ring included, 40 to 72; its icon grows with it. Null is 46.
+  final double? launcherSize;
+
   /// The words in the message box before anyone has typed.
   ///
   /// Null is the right default and not an empty one: [RendelStrings.composerHint]
@@ -500,6 +524,11 @@ class RendelConfig {
     RendelLauncherStyle? launcherStyle,
     String? launcherIcon,
     bool? launcherDraggable,
+    Gradient? launcherFill,
+    Color? launcherRing,
+    double? launcherRingWidth,
+    Color? launcherGlow,
+    double? launcherSize,
     String? emptyStateTitle,
     String? emptyStateBody,
     List<String>? suggestions,
@@ -531,6 +560,11 @@ class RendelConfig {
       launcherStyle: launcherStyle ?? this.launcherStyle,
       launcherIcon: launcherIcon ?? this.launcherIcon,
       launcherDraggable: launcherDraggable ?? this.launcherDraggable,
+      launcherFill: launcherFill ?? this.launcherFill,
+      launcherRing: launcherRing ?? this.launcherRing,
+      launcherRingWidth: launcherRingWidth ?? this.launcherRingWidth,
+      launcherGlow: launcherGlow ?? this.launcherGlow,
+      launcherSize: launcherSize ?? this.launcherSize,
       composerHint: composerHint ?? this.composerHint,
       attachIcon: attachIcon ?? this.attachIcon,
       voiceIcon: voiceIcon ?? this.voiceIcon,

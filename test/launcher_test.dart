@@ -37,6 +37,11 @@ Future<void> _start(WidgetTester tester, [RendelConfig config = const RendelConf
             launcherStyle: config.launcherStyle,
             launcherIcon: config.launcherIcon,
             launcherDraggable: config.launcherDraggable,
+            launcherFill: config.launcherFill,
+            launcherRing: config.launcherRing,
+            launcherRingWidth: config.launcherRingWidth,
+            launcherGlow: config.launcherGlow,
+            launcherSize: config.launcherSize,
           ),
         ));
 
@@ -71,6 +76,41 @@ void main() {
       expect(applied.launcherStyle, RendelLauncherStyle.icon);
       expect(applied.launcherIcon, 'headset');
       expect(applied.launcherDraggable, isTrue);
+    });
+
+    test('its own look is read onto the config, and a value out of shape is said nothing', () {
+      final applied = _parse({
+        'launcherFill': {
+          'colors': ['#A18CFF', '#3B2FE0'],
+          'direction': 'to-bottom-right',
+        },
+        'launcherRing': '#FFFFFF',
+        'launcherRingWidth': 4,
+        'launcherGlow': '#6C5CFF',
+        'launcherSize': 60,
+      }).applyToConfig(code);
+      final fill = applied.launcherFill! as LinearGradient;
+      expect(fill.colors, const [Color(0xFFA18CFF), Color(0xFF3B2FE0)]);
+      expect(fill.begin, Alignment.topLeft);
+      expect(applied.launcherRing, const Color(0xFFFFFFFF));
+      expect(applied.launcherRingWidth, 4);
+      expect(applied.launcherGlow, const Color(0xFF6C5CFF));
+      expect(applied.launcherSize, 60);
+
+      final wrong = _parse({
+        'launcherFill': {
+          'colors': ['#A18CFF'],
+        },
+        'launcherRing': '#FFFFFF80',
+        'launcherRingWidth': 9,
+        'launcherGlow': 'purple',
+        'launcherSize': 90,
+      }).applyToConfig(code);
+      expect(wrong.launcherFill, isNull);
+      expect(wrong.launcherRing, isNull);
+      expect(wrong.launcherRingWidth, isNull);
+      expect(wrong.launcherGlow, isNull);
+      expect(wrong.launcherSize, isNull);
     });
 
     test('default to the label, the sparkle and staying put', () {
@@ -130,6 +170,67 @@ void main() {
       final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
       expect((box.decoration! as BoxDecoration).shape, BoxShape.circle);
       expect(find.bySemanticsLabel('Ask'), findsOneWidget);
+    });
+
+    testWidgets('its own look: a fill, a ring, a glow and a size, the icon grown with it', (tester) async {
+      const fill = LinearGradient(colors: [Color(0xFF6C5CFF), Color(0xFF3B2FE0)]);
+      await _start(
+        tester,
+        const RendelConfig(
+          launcherStyle: RendelLauncherStyle.icon,
+          launcherFill: fill,
+          launcherRing: Color(0xFFFFFFFF),
+          launcherRingWidth: 4,
+          launcherGlow: Color(0xFF6C5CFF),
+          launcherSize: 60,
+        ),
+      );
+      await tester.pumpWidget(_fab());
+      expect(tester.getSize(_button), const Size(60, 60));
+      expect(tester.getSize(_glyph).width, closeTo(60 * 20 / 46, 0.01));
+      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      final decoration = box.decoration! as BoxDecoration;
+      expect(decoration.gradient, fill);
+      expect(decoration.color, isNull);
+      expect((decoration.border! as Border).top, const BorderSide(color: Color(0xFFFFFFFF), width: 4));
+      expect(decoration.boxShadow!.single.color, const Color(0xFF6C5CFF).withValues(alpha: 0.45));
+    });
+
+    testWidgets("the icon alone is weighed on the fill's middle, where it is drawn", (tester) async {
+      // The customer's design (2026-11-05): white on #A99BFF alone is 2.4:1,
+      // but the icon sits where the gradient is already darker.
+      const fill = LinearGradient(colors: [Color(0xFFA99BFF), Color(0xFF3B2FE0)]);
+      await _start(tester, const RendelConfig(launcherStyle: RendelLauncherStyle.icon, launcherFill: fill));
+      await tester.pumpWidget(_fab());
+      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      expect((box.decoration! as BoxDecoration).gradient, fill);
+      await tester.pumpWidget(const SizedBox());
+      Rendel.resetForTest();
+
+      // With its word, which runs end to end, every colour must hold 4.5:1.
+      await _start(tester, const RendelConfig(launcherFill: fill));
+      await tester.pumpWidget(_fab());
+      final labelled = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      expect((labelled.decoration! as BoxDecoration).gradient, isNull);
+    });
+
+    testWidgets('a fill its icon cannot be read on is drawn in the accent', (tester) async {
+      await _start(
+        tester,
+        const RendelConfig(
+          launcherStyle: RendelLauncherStyle.icon,
+          launcherFill: LinearGradient(colors: [Color(0xFFFFFFFF), Color(0xFFF2F2F2)]),
+        ),
+      );
+      await tester.pumpWidget(_fab());
+      final box = tester.widget<Container>(find.descendant(of: _button, matching: find.byType(Container)));
+      final decoration = box.decoration! as BoxDecoration;
+      expect(decoration.gradient, isNull);
+      expect(decoration.color, Rendel.theme.colors.accent);
+      // Nothing else set: the hairline edge, the theme's lift and the 46 it always was.
+      expect((decoration.border! as Border).top.color, Rendel.theme.accentEdge);
+      expect(decoration.boxShadow, Rendel.theme.lift);
+      expect(tester.getSize(_button), const Size(46, 46));
     });
 
     testWidgets('each icon is drawn, and one this build lacks is the sparkle', (tester) async {

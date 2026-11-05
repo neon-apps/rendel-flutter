@@ -636,6 +636,13 @@ class RendelRemoteConfig {
       // nothing", and the host's icon stays.
       launcherIcon: _launcherIcon(copilot['launcherIcon']),
       launcherDraggable: copilot['launcherDraggable'] is bool ? copilot['launcherDraggable'] as bool : null,
+      // The launcher's own look: a value out of shape says nothing, and the
+      // launcher keeps the host's.
+      launcherFill: _backdrop(copilot['launcherFill'])?.gradient,
+      launcherRing: _color(copilot['launcherRing']),
+      launcherRingWidth: _size(copilot['launcherRingWidth'], 1, 8),
+      launcherGlow: _color(copilot['launcherGlow']),
+      launcherSize: _size(copilot['launcherSize'], 40, 72),
       // Clearable, unlike the two above. A name and a launcher label are
       // things the copilot cannot do without, so an empty one means "I said
       // nothing about this". A subtitle is something a customer may genuinely

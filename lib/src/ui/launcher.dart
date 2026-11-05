@@ -410,8 +410,21 @@ Widget _marked(RendelTheme theme, String word, VoidCallback onTap, {required int
 }
 
 Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {required int unread, RendelWaiting waiting = RendelWaiting.none}) {
-  final iconOnly = Rendel.config.launcherStyle == RendelLauncherStyle.icon;
-  final icon = _LauncherIcon(color: theme.colors.onAccent);
+  final config = Rendel.config;
+  final iconOnly = config.launcherStyle == RendelLauncherStyle.icon;
+  // The round launcher's size, ring included; its icon keeps the 20 it has
+  // at the 46 the padding below makes.
+  final size = iconOnly ? config.launcherSize : null;
+  final icon = _LauncherIcon(color: theme.colors.onAccent, size: size == null ? 20 : size * 20 / 46);
+  // The customer's fill, where its icon (3:1) or word (4.5:1) reads on it;
+  // the accent otherwise. The icon alone covers the middle of a round
+  // launcher (its 20 of 46), so the colours there; a word runs end to end,
+  // so every colour of it. The web SDK weighs it the same way.
+  final fill = config.launcherFill;
+  final grounds = fill == null ? const <Color>[] : (iconOnly ? [0.3, 0.5, 0.7].map((t) => _fillAt(fill, t)) : fill.colors);
+  final filled = fill != null && grounds.every((ground) => contrastRatio(theme.colors.onAccent, ground) >= (iconOnly ? 3 : 4.5));
+  final ring = config.launcherRing;
+  final glow = config.launcherGlow;
   final said = iconOnly ? word : Rendel.strings.openCopilot;
   return RendelPressable(
     // The icon alone says nothing to a screen reader, so the word does.
@@ -424,10 +437,14 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
           },
     onTap: onTap,
     child: Container(
+      width: size,
+      height: size,
+      alignment: size == null ? null : Alignment.center,
       // Round, as tall as the button with its word: the same 12 above and
-      // below the 20 the icon takes, and on each side of it.
+      // below the 20 the icon takes, and on each side of it. A size of its
+      // own centres the icon instead.
       padding: iconOnly
-          ? EdgeInsets.all(theme.space.md)
+          ? (size == null ? EdgeInsets.all(theme.space.md) : EdgeInsets.zero)
           // The web launcher's 16 before the icon and 20 after the word.
           : EdgeInsetsDirectional.only(
               start: theme.space.lg,
@@ -436,15 +453,19 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
               bottom: theme.space.md,
             ),
       decoration: BoxDecoration(
-        color: theme.colors.accent,
+        color: filled ? null : theme.colors.accent,
+        gradient: filled ? fill : null,
         shape: iconOnly ? BoxShape.circle : BoxShape.rectangle,
         borderRadius: iconOnly ? null : BorderRadius.circular(theme.radius.control),
         // The one control in the product that is always on screen is the
         // one that earns the deepest elevation. `accentEdge` is the
         // boundary WCAG 1.4.11 asks 3:1 of, which a host's raw accent often
-        // does not clear against its own ground.
-        border: Border.all(color: theme.accentEdge),
-        boxShadow: theme.lift,
+        // does not clear against its own ground. A ring or a glow the
+        // customer chose takes the place of each.
+        border: ring == null ? Border.all(color: theme.accentEdge) : Border.all(color: ring, width: config.launcherRingWidth ?? 3),
+        boxShadow: glow == null
+            ? theme.lift
+            : [BoxShadow(color: glow.withValues(alpha: 0.45), blurRadius: 20, spreadRadius: 2, offset: const Offset(0, 4))],
       ),
       child: iconOnly
           ? icon
@@ -466,15 +487,28 @@ Widget _plainButton(RendelTheme theme, String word, VoidCallback onTap, {require
   );
 }
 
+/// The colour [t] of the way along [fill], its stops or evenly spaced.
+Color _fillAt(Gradient fill, double t) {
+  final colors = fill.colors;
+  final stops = fill.stops ?? [for (var i = 0; i < colors.length; i++) i / (colors.length - 1)];
+  if (t <= stops.first) return colors.first;
+  for (var i = 1; i < colors.length; i++) {
+    if (t <= stops[i]) {
+      final span = stops[i] - stops[i - 1];
+      return Color.lerp(colors[i - 1], colors[i], span > 0 ? (t - stops[i - 1]) / span : 1)!;
+    }
+  }
+  return colors.last;
+}
+
 /// The launcher's icon, 20 square like the web's: one of [launcherIconPaths],
 /// or the customer's own, fetched like the logo and drawn in [color]. The
 /// sparkle stands in while their own loads, and for good if it cannot.
 class _LauncherIcon extends StatelessWidget {
-  const _LauncherIcon({required this.color});
+  const _LauncherIcon({required this.color, this.size = 20});
 
   final Color color;
-
-  static const double size = 20;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
