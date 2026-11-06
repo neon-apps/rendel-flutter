@@ -5,6 +5,27 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.82.0
+
+**Added**
+
+- Pairing with the console from the message box. On a test key, the code
+  the console's Test page shows (`K7Q2-M9XD`) sent as a message pairs the
+  device instead of being asked, and a line over the composer says until
+  when, or that the code did not work. No pairing screen of your own and
+  no rebuild. Live keys send it as any other message. `Rendel.pair` is
+  unchanged, for a pairing screen of your own. New strings `paired` and
+  `pairFailed`.
+
+**Fixed**
+
+- A question typed while the answer before it was still being written went
+  nowhere. The box a question was typed in now stays while the answer is
+  written: it says what the turn is doing, Send turns until the answer is
+  done, and what is typed meanwhile is kept for it. The keyboard still goes
+  on Send, so the page has the screen; the empty box goes back to rest
+  once the answer is done, as before.
+
 ## 0.81.1
 
 **Fixed**

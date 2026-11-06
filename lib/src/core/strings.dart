@@ -128,6 +128,8 @@ class RendelStrings {
     this.statusDetail = 'Getting the details…',
     this.detailAsk = 'Tell me about {title}',
     this.closeDetail = 'Close',
+    this.paired = 'Paired with the console until {time}.',
+    this.pairFailed = "That code did not pair this device. Make a new one on the console's Test page.",
     this.backToAssistant = 'Back to the assistant',
     this.choiceSubmit = 'Continue',
     this.choiceSend = 'Send',
@@ -505,6 +507,11 @@ class RendelStrings {
   final String statusDetail;
   final String detailAsk;
   final String closeDetail;
+
+  /// A test build's pairing code sent as a message: it worked, until
+  /// `{time}`, or it did not.
+  final String paired;
+  final String pairFailed;
 
   /// The bubble the copilot shrinks into while a screen of the app it opened
   /// is showing (`design/NAVIGATE.md`): what a screen reader says it does.
@@ -940,6 +947,8 @@ class RendelStrings {
     String? statusDetail,
     String? detailAsk,
     String? closeDetail,
+    String? paired,
+    String? pairFailed,
     String? backToAssistant,
     String? choiceSubmit,
     String? choiceSend,
@@ -1170,6 +1179,8 @@ class RendelStrings {
       statusDetail: statusDetail ?? this.statusDetail,
       detailAsk: detailAsk ?? this.detailAsk,
       closeDetail: closeDetail ?? this.closeDetail,
+      paired: paired ?? this.paired,
+      pairFailed: pairFailed ?? this.pairFailed,
       backToAssistant: backToAssistant ?? this.backToAssistant,
       choiceSubmit: choiceSubmit ?? this.choiceSubmit,
       choiceSend: choiceSend ?? this.choiceSend,
@@ -1415,6 +1426,8 @@ const Map<String, RendelStrings> _byLocale = {
     previousPage: 'Önceki sayfa',
     nextPage: 'Sonraki sayfa',
     statusDetail: 'Ayrıntılar getiriliyor…',
+    paired: 'Panel ile eşleşti. Bitiş saati: {time}.',
+    pairFailed: 'Kod bu cihazı eşleştiremedi. Panelin Test sayfasından yeni bir kod alın.',
     detailAsk: '{title} hakkında bilgi ver',
     closeDetail: 'Kapat',
     backToAssistant: 'Asistana dön',
@@ -1651,6 +1664,8 @@ const Map<String, RendelStrings> _byLocale = {
     previousPage: 'Vorherige Seite',
     nextPage: 'Nächste Seite',
     statusDetail: 'Details werden geladen…',
+    paired: 'Bis {time} mit der Konsole gekoppelt.',
+    pairFailed: 'Mit diesem Code wurde das Gerät nicht gekoppelt. Erstellen Sie auf der Test-Seite der Konsole einen neuen.',
     detailAsk: 'Erzähl mir mehr über {title}',
     closeDetail: 'Schließen',
     backToAssistant: 'Zurück zum Assistenten',
@@ -1886,6 +1901,8 @@ const Map<String, RendelStrings> _byLocale = {
     previousPage: 'Page précédente',
     nextPage: 'Page suivante',
     statusDetail: 'Récupération des détails…',
+    paired: 'Associé à la console jusqu’à {time}.',
+    pairFailed: 'Ce code n’a pas associé cet appareil. Créez-en un nouveau sur la page Test de la console.',
     detailAsk: 'Parle-moi de {title}',
     closeDetail: 'Fermer',
     backToAssistant: 'Retour à l’assistant',
@@ -2120,6 +2137,8 @@ const Map<String, RendelStrings> _byLocale = {
     previousPage: 'Página anterior',
     nextPage: 'Página siguiente',
     statusDetail: 'Obteniendo los detalles…',
+    paired: 'Vinculado con la consola hasta las {time}.',
+    pairFailed: 'Ese código no vinculó este dispositivo. Crea uno nuevo en la página Test de la consola.',
     detailAsk: 'Háblame de {title}',
     closeDetail: 'Cerrar',
     backToAssistant: 'Volver al asistente',
@@ -2353,6 +2372,8 @@ const Map<String, RendelStrings> _byLocale = {
     previousPage: 'الصفحة السابقة',
     nextPage: 'الصفحة التالية',
     statusDetail: 'جارٍ جلب التفاصيل…',
+    paired: 'تم الربط مع لوحة التحكم حتى {time}.',
+    pairFailed: 'لم يربط هذا الرمز هذا الجهاز. أنشئ رمزًا جديدًا في صفحة Test في لوحة التحكم.',
     detailAsk: 'أخبرني عن {title}',
     closeDetail: 'إغلاق',
     backToAssistant: 'العودة إلى المساعد',

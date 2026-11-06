@@ -437,7 +437,46 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     _voiceFalls.dispose();
     _held?.cancel();
     _sendHold?.cancel();
+    _noteTimer?.cancel();
     super.dispose();
+  }
+
+  /// A quiet line over the composer for a few seconds: what pairing with the
+  /// console came to, as the web's `.rd-note` says it.
+  String? _note;
+  Timer? _noteTimer;
+
+  void _showNote(String words) {
+    _noteTimer?.cancel();
+    setState(() => _note = words);
+    _noteTimer = Timer(const Duration(seconds: 5), () {
+      if (mounted) setState(() => _note = null);
+    });
+  }
+
+  /// The code the console's Test page shows (`K7Q2-M9XD`): four and four
+  /// from its alphabet, which has no 0, 1, I, L or O. The dash, or a space,
+  /// is required, so a word typed as a question is never taken for one.
+  static final _pairingCode = RegExp(
+    r'^[2-9A-HJKMNP-Z]{4}[- ][2-9A-HJKMNP-Z]{4}$',
+    caseSensitive: false,
+  );
+
+  /// A test build pairs with the console here: the code its Test page
+  /// shows, sent as a message, goes to the console and never to the model.
+  /// Test keys only, and the server refuses a live one besides.
+  Future<void> _pair(String code) async {
+    _input.clear();
+    final strings = _strings;
+    final result = await widget.controller.api.pair(code);
+    if (!mounted) return;
+    final endsAt = result.ok ? DateTime.tryParse(result.endsAt!)?.toLocal() : null;
+    if (endsAt == null) {
+      RendelLog.warn('pair_${result.reason?.name ?? 'failed'}', result.message ?? 'pairing failed');
+      return _showNote(strings.pairFailed);
+    }
+    final time = MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(endsAt));
+    _showNote(strings.paired.replaceAll('{time}', time));
   }
 
   /// Set for a moment after a question is sent (`sendHoldDuration`), while
@@ -724,6 +763,11 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final text = typed.trim().isEmpty && _attachments.isNotEmpty
         ? _attachments.map((pending) => pending.name).join(', ')
         : typed;
+    if (widget.controller.sandbox && _attachments.isEmpty && _pairingCode.hasMatch(text.trim())) {
+      unawaited(_pair(text.trim()));
+      return;
+    }
+    // While an answer is written, what was typed stays in the box until it is done.
     if (text.trim().isEmpty || widget.controller.busy) return;
 
     /* Nothing goes out half-uploaded: an id that does not exist yet is a file
@@ -933,6 +977,22 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                                 liveRegion: true,
                                 child: Text(
                                   controller.hint!,
+                                  textAlign: TextAlign.center,
+                                  style: theme.text.prose.copyWith(
+                                    fontSize: 13,
+                                    color: theme.colors.onSurfaceSoft,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          // What pairing with the console came to.
+                          if (_note != null)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Semantics(
+                                liveRegion: true,
+                                child: Text(
+                                  _note!,
                                   textAlign: TextAlign.center,
                                   style: theme.text.prose.copyWith(
                                     fontSize: 13,
@@ -2952,10 +3012,21 @@ class _ComposerState extends State<_Composer> {
   @override
   void didUpdateWidget(_Composer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // A question on its way puts the box away: the pill says what is
-    // happening, and the page needs the room the keyboard took.
+    // A question on its way puts the keyboard away: the page needs the room
+    // it took. A box the question was typed in stays, says what is
+    // happening, and keeps what is typed while the answer is written; a
+    // menu goes back to rest, where the pill says it (customer review
+    // 2026-11-05: a second question typed meanwhile went nowhere).
     if (oldWidget.status == null && widget.status != null) {
       _focus.unfocus();
+      if (_mode == _Mode.menu) _mode = _Mode.rest;
+    }
+    // The answer done, a box nobody typed in goes back to rest, as it did.
+    if (oldWidget.status != null &&
+        widget.status == null &&
+        _mode == _Mode.text &&
+        !_focus.hasFocus &&
+        widget.input.text.trim().isEmpty) {
       _mode = _Mode.rest;
     }
   }
@@ -2978,6 +3049,7 @@ class _ComposerState extends State<_Composer> {
   /// away under the user.
   _Mode get _shown {
     if (widget.status != null &&
+        _mode != _Mode.text &&
         widget.attachments.isEmpty &&
         !widget.attaching) {
       return _Mode.rest;
@@ -2985,6 +3057,13 @@ class _ComposerState extends State<_Composer> {
     if (!_voice) return _Mode.text;
     if (widget.attachments.isNotEmpty || widget.attaching) return _Mode.text;
     return _mode;
+  }
+
+  /// Sent from the box: it is the box the question was typed in, and it
+  /// stays while the answer is written, with or without a microphone.
+  void _sendTyped() {
+    _mode = _Mode.text;
+    widget.onSend();
   }
 
   void _type() {
@@ -3280,13 +3359,14 @@ class _ComposerState extends State<_Composer> {
                   child: TextField(
                     controller: widget.input,
                     focusNode: _focus,
-                    enabled: !busy,
+                    // Open while an answer is written: the next question
+                    // can be typed, and Send waits for the answer.
                     // Two lines before anything is written: room to see a
                     // question taking shape, not a single-line search box.
                     minLines: 2,
                     maxLines: 5,
                     textInputAction: TextInputAction.send,
-                    onSubmitted: (_) => widget.onSend(),
+                    onSubmitted: (_) => _sendTyped(),
                     // At the body size, as the web's box is: the size an
                     // app's own fields are written in. The heading size the
                     // thread's prose takes was 22 points in Protein Ocean,
@@ -3296,8 +3376,10 @@ class _ComposerState extends State<_Composer> {
                       color: theme.colors.onComposer,
                     ),
                     decoration: InputDecoration(
-                      hintText:
-                          busy ? strings.working : (widget.hint ?? strings.composerHint),
+                      // While a turn runs, what it is doing, as the pill says it.
+                      hintText: busy
+                          ? (widget.status ?? strings.working)
+                          : (widget.hint ?? strings.composerHint),
                       hintStyle: theme.text.prose.copyWith(
                         fontSize: theme.type.body,
                         color: theme.onComposerFaint,
@@ -3355,7 +3437,7 @@ class _ComposerState extends State<_Composer> {
                       final still = MediaQuery.disableAnimationsOf(context);
                       return RendelPressable(
                         semanticLabel: strings.sendMessage,
-                        onTap: enabled ? widget.onSend : null,
+                        onTap: enabled ? _sendTyped : null,
                         // The press target keeps its 44pt floor; the circle
                         // is drawn inside it.
                         child: SizedBox(
@@ -3387,8 +3469,17 @@ class _ComposerState extends State<_Composer> {
                                           .withValues(alpha: 0.45),
                                 ),
                               ),
-                              // The glyph eases with its own plate.
-                              child: TweenAnimationBuilder<Color?>(
+                              // An answer being written: Send turns until
+                              // it is done. Otherwise the glyph eases with
+                              // its own plate.
+                              child: busy
+                                  ? Center(
+                                      child: _Ring(
+                                        color: theme.onComposerFaint
+                                            .withValues(alpha: 0.6),
+                                      ),
+                                    )
+                                  : TweenAnimationBuilder<Color?>(
                                 duration:
                                     still ? Duration.zero : theme.motion.swap,
                                 curve: theme.motion.curve,
