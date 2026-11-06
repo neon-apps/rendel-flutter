@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.81.1
+
+**Fixed**
+
+- A button turning enabled (a confirmation card's, once a required quantity
+  is stepped up from 0) blends into its colour and darkens its shadow in
+  place, and back. It drew a dark smudge with no fill for a frame, then
+  jumped to the accent.
+
 ## 0.81.0
 
 **Added**

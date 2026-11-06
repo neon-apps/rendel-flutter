@@ -8328,6 +8328,36 @@ BoxDecoration _lit(RendelTheme theme, BorderRadiusGeometry radius,
         {List<BoxShadow> shadow = RendelTheme.litShadow}) =>
     _Lit(gradient: theme.litFill, borderRadius: radius, boxShadow: shadow);
 
+/// [off] in a shape that tweens into [on] and back: [on]'s shadows at their
+/// own size with no colour, and [on]'s gradient drawn in [off]'s colour.
+///
+/// A shadow tweened in from none grows out of a point at full darkness, and a
+/// gradient from none fades in over a colour fading out. A confirm button
+/// arming (a quantity stepped up from 0) drew a dark smudge with no fill for a
+/// frame, then jumped to the accent (Protein Ocean, 2026-11-06).
+BoxDecoration _tweenableTo(BoxDecoration off, BoxDecoration on) {
+  final gradient = on.gradient;
+  final color = off.color;
+  final tinted = gradient is LinearGradient && color != null;
+  return BoxDecoration(
+    color: tinted ? null : color,
+    gradient: tinted
+        ? LinearGradient(
+            begin: gradient.begin,
+            end: gradient.end,
+            stops: gradient.stops,
+            colors: [for (final _ in gradient.colors) color],
+          )
+        : null,
+    border: off.border,
+    borderRadius: off.borderRadius,
+    boxShadow: [
+      for (final shadow in on.boxShadow ?? const <BoxShadow>[])
+        shadow.copyWith(color: shadow.color.withValues(alpha: 0)),
+    ],
+  );
+}
+
 const BorderSide _unpainted = BorderSide(width: 1, style: BorderStyle.none);
 
 /// The lit fill: a ring of nothing, so a lit control is exactly the size of a
@@ -8618,51 +8648,56 @@ class RendelActionButton extends StatelessWidget {
     //    and a small lift, never a heavy dark ring;
     //  * quiet is white with the hairline and ink words;
     //  * a card part's own fill is drawn flat, as the customer chose it.
-    final BoxDecoration decoration;
     final dangerous = danger && !quiet && !disabled && fill == null;
-    if (fill != null) {
-      decoration = BoxDecoration(
-        color: fill,
-        border: Border.all(color: fill),
-        borderRadius: radius,
-      );
-    } else if (dangerous) {
-      decoration = BoxDecoration(color: theme.danger, borderRadius: radius);
-    } else if (quiet) {
-      decoration = disabled
-          ? BoxDecoration(
-              border: Border.all(color: theme.hairline),
-              borderRadius: radius,
-            )
-          : _white(theme, own?.radius ?? theme.radius.control);
-    } else if (disabled) {
-      // A tint, not a grey slab, and no lift: a disabled control that casts
-      // a shadow is claiming to be pressable.
-      decoration = BoxDecoration(
-        color: theme.tint,
-        border: Border.all(color: theme.hairline),
-        borderRadius: radius,
-      );
-    } else if (outlined) {
-      decoration = BoxDecoration(
-        color: theme.colors.surfaceHigh,
-        border: Border.all(
-          color: theme.colors.accent.withValues(alpha: 0.45),
-          width: 1.5,
-        ),
-        borderRadius: radius,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x59000000),
-            offset: Offset(0, 8),
-            blurRadius: 18,
-            spreadRadius: -12,
+    BoxDecoration look(bool off) {
+      final fill = off ? null : own?.fill;
+      if (fill != null) {
+        return BoxDecoration(
+          color: fill,
+          border: Border.all(color: fill),
+          borderRadius: radius,
+        );
+      } else if (danger && !quiet && !off) {
+        return BoxDecoration(color: theme.danger, borderRadius: radius);
+      } else if (quiet) {
+        return off
+            ? BoxDecoration(
+                border: Border.all(color: theme.hairline),
+                borderRadius: radius,
+              )
+            : _white(theme, own?.radius ?? theme.radius.control);
+      } else if (off) {
+        // A tint, not a grey slab, and no lift: a disabled control that casts
+        // a shadow is claiming to be pressable.
+        return BoxDecoration(
+          color: theme.tint,
+          border: Border.all(color: theme.hairline),
+          borderRadius: radius,
+        );
+      } else if (outlined) {
+        return BoxDecoration(
+          color: theme.colors.surfaceHigh,
+          border: Border.all(
+            color: theme.colors.accent.withValues(alpha: 0.45),
+            width: 1.5,
           ),
-        ],
-      );
-    } else {
-      decoration = _lit(theme, radius);
+          borderRadius: radius,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x59000000),
+              offset: Offset(0, 8),
+              blurRadius: 18,
+              spreadRadius: -12,
+            ),
+          ],
+        );
+      }
+      return _lit(theme, radius);
     }
+
+    // Disabled, it already holds the shape of the look it will turn into,
+    // so arming blends one into the other (`_tweenableTo`).
+    final decoration = disabled ? _tweenableTo(look(true), look(false)) : look(false);
     final words = _asPart(
       theme,
       part == null ? null : '${part}_text',
