@@ -53,11 +53,42 @@ class RendelMemoryNote {
   }
 }
 
-/// `GET /v1/memory`: whether the app keeps preferences at all, and the notes.
+/// One of the person's `identify` traits as `GET /v1/memory` lists it: the
+/// key in words, and its value. The app's own, so it cannot be forgotten.
+class RendelMemoryTrait {
+  const RendelMemoryTrait({required this.key, required this.label, required this.value});
+
+  final String key;
+  final String label;
+  final String value;
+
+  static RendelMemoryTrait? tryParse(Object? raw) {
+    if (raw is! Map) return null;
+    final key = raw['key'];
+    final label = raw['label'];
+    final value = raw['value'];
+    if (key is! String || label is! String || value is! String) return null;
+    return RendelMemoryTrait(key: key, label: label, value: value);
+  }
+}
+
+/// `GET /v1/memory`: whether the app keeps preferences at all, the notes,
+/// what Rendel noticed without naming it ([other]) and the app's [traits].
+/// The last two read empty from a server before them.
 class RendelMemoryList {
-  const RendelMemoryList({required this.enabled, required this.notes});
+  const RendelMemoryList({
+    required this.enabled,
+    required this.notes,
+    this.other = const [],
+    this.traits = const [],
+  });
   final bool enabled;
   final List<RendelMemoryNote> notes;
+
+  /// Notes Rendel noticed without naming them: read into answers too, so
+  /// listed under "Other", by their sentence.
+  final List<RendelMemoryNote> other;
+  final List<RendelMemoryTrait> traits;
 }
 
 /// What Rendel remembers about the person on this device
@@ -80,13 +111,20 @@ class RendelMemory {
     try {
       final parsed = jsonDecode(answer.body);
       if (parsed is! Map) return null;
-      final notes = parsed['notes'];
+      List<RendelMemoryNote> notesOf(Object? raw) => [
+            if (raw is List)
+              for (final item in raw)
+                if (RendelMemoryNote.tryParse(item) case final note?) note,
+          ];
+      final traits = parsed['traits'];
       return RendelMemoryList(
         enabled: parsed['enabled'] != false,
-        notes: [
-          if (notes is List)
-            for (final raw in notes)
-              if (RendelMemoryNote.tryParse(raw) case final note?) note,
+        notes: notesOf(parsed['notes']),
+        other: notesOf(parsed['other']),
+        traits: [
+          if (traits is List)
+            for (final raw in traits)
+              if (RendelMemoryTrait.tryParse(raw) case final trait?) trait,
         ],
       );
     } catch (_) {

@@ -125,6 +125,7 @@ class RendelSupportState {
     required this.lastSeq,
     required this.contactState,
     required this.contactRequired,
+    this.contactOffered = false,
   });
 
   final String threadId;
@@ -155,6 +156,10 @@ class RendelSupportState {
   /// The next line waits for an email: nobody could reach the person otherwise.
   final bool contactRequired;
 
+  /// The optional "Want the reply by email too?" may be offered: the app emails people who can't get a notification.
+  /// Off, or from a server that does not say, an address given there would never be written to.
+  final bool contactOffered;
+
   RendelSupportState read(int seq) => RendelSupportState(
         threadId: threadId,
         mode: mode,
@@ -169,6 +174,7 @@ class RendelSupportState {
         lastSeq: lastSeq,
         contactState: contactState,
         contactRequired: contactRequired,
+        contactOffered: contactOffered,
       );
 
   static RendelSupportState? tryParse(Object? raw) {
@@ -195,6 +201,7 @@ class RendelSupportState {
       lastSeq: raw['last_seq'] is int ? raw['last_seq'] as int : 0,
       contactState: contact is Map && contact['state'] is String ? contact['state'] as String : 'not_needed',
       contactRequired: contact is Map && contact['required'] == true,
+      contactOffered: contact is Map && contact['offer'] == true,
     );
   }
 }

@@ -811,8 +811,10 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final state = v.state;
     final resolved = state?.resolved ?? false;
     final contact = state?.contactState ?? 'not_needed';
-    // The optional box is for the wait: once the team is talking, it gives the page back.
+    // The optional box is for the wait: once the team is talking, it gives the page back. Only where the app emails
+    // people, or the address would never be written to.
     final offersContact = !needsContact &&
+        (state?.contactOffered ?? false) &&
         contact == 'none' &&
         asked &&
         !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent) &&

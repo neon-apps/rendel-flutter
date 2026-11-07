@@ -144,6 +144,46 @@ void main() {
       expect(find.text('+ Answer in Turkish.'), findsOneWidget);
     });
 
+    // Product gaps [34]: the console switches the changes on, and the card says so.
+    testWidgets('tells the app the card asks for the changes when the console switched them on', (tester) async {
+      bool? told;
+      Future<String?>? source(String action, Map<String, dynamic> params, {bool asked = false}) {
+        told = asked;
+        return Future.value('Be brief.');
+      }
+
+      await pump(
+        tester,
+        {
+          'risk': 'write',
+          'full_text': {'param': 'instructions', 'value': 'Be brief.\nAnswer in Turkish.', 'current': true},
+        },
+        cardSource: source,
+      );
+      await tester.pump();
+      expect(told, isTrue);
+      expect(find.text('Changes'), findsOneWidget);
+    });
+
+    test('asks the app for the current text when the card asks, even if the action did not', () {
+      final controller = ConversationController(
+        api: _Api(),
+        sdkVersion: 'flutter/test',
+        actions: {
+          'save_note': RendelAction(
+            name: 'save_note',
+            description: 'Save a note',
+            params: RendelSchema.object({'text': RendelSchema.string()}),
+            risk: RendelRisk.write,
+            handler: (_) async => RendelResult.ok({}),
+          ),
+        },
+        cardSources: {'save_note': (_) async => 'old'},
+      );
+      expect(controller.currentTextFor('save_note', const {}), isNull);
+      expect(controller.currentTextFor('save_note', const {}, asked: true), isNotNull);
+    });
+
     test('diffs by line', () {
       expect(lineDiff('a\nb\nc', 'a\nc\nd'), [('same', 'a'), ('del', 'b'), ('same', 'c'), ('add', 'd')]);
     });

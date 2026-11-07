@@ -259,6 +259,7 @@ class RendelStrings {
     this.memoryForgetAll = 'Forget all',
     this.memoryForgetAllConfirm = 'Forget everything I remember for you?',
     this.memoryFromApp = 'From the app',
+    this.memoryOther = 'Other',
     this.memoryNoticed = 'Noticed',
     this.memoryUntil = 'Until {date}',
     this.memoryFooter = 'The app\'s team can see these too.',
@@ -734,6 +735,9 @@ class RendelStrings {
   final String memoryForgetAll;
   final String memoryForgetAllConfirm;
   final String memoryFromApp;
+
+  /// "What I remember for you": the heading over what Rendel noticed without naming it.
+  final String memoryOther;
   final String memoryNoticed;
   final String memoryUntil;
   final String memoryFooter;
@@ -1078,6 +1082,7 @@ class RendelStrings {
     String? memoryForgetAll,
     String? memoryForgetAllConfirm,
     String? memoryFromApp,
+    String? memoryOther,
     String? memoryNoticed,
     String? memoryUntil,
     String? memoryFooter,
@@ -1310,6 +1315,7 @@ class RendelStrings {
       memoryForgetAll: memoryForgetAll ?? this.memoryForgetAll,
       memoryForgetAllConfirm: memoryForgetAllConfirm ?? this.memoryForgetAllConfirm,
       memoryFromApp: memoryFromApp ?? this.memoryFromApp,
+      memoryOther: memoryOther ?? this.memoryOther,
       memoryNoticed: memoryNoticed ?? this.memoryNoticed,
       memoryUntil: memoryUntil ?? this.memoryUntil,
       memoryFooter: memoryFooter ?? this.memoryFooter,
@@ -1559,6 +1565,7 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgetAll: 'Tümünü unut',
     memoryForgetAllConfirm: 'Sizin için hatırladığım her şeyi unutayım mı?',
     memoryFromApp: 'Uygulamadan',
+    memoryOther: 'Diğer',
     memoryNoticed: 'Fark ettim',
     memoryUntil: '{date} gününe dek',
     memoryFooter: 'Uygulama ekibi de bu notları görebilir.',
@@ -1797,6 +1804,7 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgetAll: 'Alles vergessen',
     memoryForgetAllConfirm: 'Alles vergessen, was ich mir für Sie gemerkt habe?',
     memoryFromApp: 'Von der App',
+    memoryOther: 'Sonstiges',
     memoryNoticed: 'Bemerkt',
     memoryUntil: 'Bis {date}',
     memoryFooter: 'Das Team der App kann diese Notizen auch sehen.',
@@ -2034,6 +2042,7 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgetAll: 'Tout oublier',
     memoryForgetAllConfirm: 'Oublier tout ce que je retiens pour vous ?',
     memoryFromApp: 'De l’application',
+    memoryOther: 'Autre',
     memoryNoticed: 'Remarqué',
     memoryUntil: 'Jusqu’au {date}',
     memoryFooter: 'L’équipe de l’application peut aussi voir ces notes.',
@@ -2270,6 +2279,7 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgetAll: 'Olvidar todo',
     memoryForgetAllConfirm: '¿Olvido todo lo que recuerdo para ti?',
     memoryFromApp: 'De la app',
+    memoryOther: 'Otros',
     memoryNoticed: 'Lo noté',
     memoryUntil: 'Hasta el {date}',
     memoryFooter: 'El equipo de la app también puede ver estas notas.',
@@ -2505,6 +2515,7 @@ const Map<String, RendelStrings> _byLocale = {
     memoryForgetAll: 'انسَ الكل',
     memoryForgetAllConfirm: 'هل أنسى كل ما أتذكره لك؟',
     memoryFromApp: 'من التطبيق',
+    memoryOther: 'أخرى',
     memoryNoticed: 'لاحظته',
     memoryUntil: 'حتى {date}',
     memoryFooter: 'يمكن لفريق التطبيق رؤية هذه الملاحظات أيضًا.',

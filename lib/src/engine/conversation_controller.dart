@@ -224,10 +224,11 @@ class ConversationController extends ChangeNotifier {
   final Map<String, Future<String?> Function(Map<String, dynamic> params)> cardSources;
 
   /// The current text for [action]'s full-text card, or null when the app
-  /// gave none (or the action did not ask for it with `fullText.current`).
-  /// Resolves null when the app's source failed.
-  Future<String?>? currentTextFor(String action, Map<String, dynamic> params) {
-    if (actions[action]?.fullText?.current != true) return null;
+  /// gave none (or neither the action, with `fullText.current`, nor the card,
+  /// when the console switched the changes on, [asked] for it). Resolves null
+  /// when the app's source failed.
+  Future<String?>? currentTextFor(String action, Map<String, dynamic> params, {bool asked = false}) {
+    if (!asked && actions[action]?.fullText?.current != true) return null;
     final source = cardSources[action];
     if (source == null) return null;
     return source(params).then<String?>((text) => text, onError: (Object _) => null);

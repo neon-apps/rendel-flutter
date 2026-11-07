@@ -185,6 +185,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'memoryForgetAll': (s) => s.memoryForgetAll,
   'memoryForgetAllConfirm': (s) => s.memoryForgetAllConfirm,
   'memoryFromApp': (s) => s.memoryFromApp,
+  'memoryOther': (s) => s.memoryOther,
   'memoryNoticed': (s) => s.memoryNoticed,
   'memoryUntil': (s) => s.memoryUntil,
   'memoryFooter': (s) => s.memoryFooter,

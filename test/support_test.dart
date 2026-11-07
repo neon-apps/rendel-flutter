@@ -451,7 +451,7 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       final server = _Server(
         entries: [_entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'), _entry(2, text: 'Kargom gelmedi')],
-        state: _state(contact: {'state': 'none', 'required': false}),
+        state: _state(contact: {'state': 'none', 'required': false, 'offer': true}),
       );
       await _open(tester, server.support());
       expect(find.text('Want the reply by email too?'), findsOneWidget);
@@ -467,6 +467,24 @@ void main() {
       expect(find.text('Want the reply by email too?'), findsNothing);
       await _close(tester);
       // A timer the pages set is still running: it goes off before the test ends.
+      await tester.pump(const Duration(minutes: 1));
+    });
+
+    testWidgets("offers no optional email card where the app doesn't email people, or the server doesn't say (§4 Q24)", (tester) async {
+      SharedPreferences.setMockInitialValues({});
+      for (final contact in [
+        {'state': 'none', 'required': false, 'offer': false},
+        {'state': 'none', 'required': false},
+      ]) {
+        final server = _Server(
+          entries: [_entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'), _entry(2, text: 'Kargom gelmedi')],
+          state: _state(contact: contact),
+        );
+        await _open(tester, server.support());
+        expect(find.text('Want the reply by email too?'), findsNothing);
+        expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
+        await _close(tester);
+      }
       await tester.pump(const Duration(minutes: 1));
     });
 

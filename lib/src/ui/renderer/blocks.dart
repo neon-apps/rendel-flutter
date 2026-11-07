@@ -1526,7 +1526,11 @@ class _ConfirmExtrasState extends State<_ConfirmExtras> {
     final source = widget.dispatch.cardSource;
     if (full != null && widget.open && source != null && !_props.containsKey(RendelLocalKeys.current)) {
       final params = _props['params'] is Map ? Map<String, dynamic>.from(_props['params'] as Map) : <String, dynamic>{};
-      final pending = source(_str(_props['action_name']) ?? '', params);
+      final action = _str(_props['action_name']) ?? '';
+      // The card asks for the changes when the console switched them on, whatever the action's own definition says.
+      final fullText = _props['full_text'];
+      final asked = fullText is Map && fullText['current'] == true;
+      final pending = source is CardSourceAsked ? source(action, params, asked: asked) : source(action, params);
       if (pending != null) {
         unawaited(pending.then((text) {
           if (!mounted) return;

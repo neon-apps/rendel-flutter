@@ -445,6 +445,36 @@ void main() {
       expect('${server.memory.single.method} ${server.memory.single.url.path}', 'GET /v1/memory');
     });
 
+    /* Answers read what Rendel noticed without naming it and what the app
+       passed to identify, so the sheet shows both (Tuna, 2026-11-07): the
+       traits as the app's own, the unnamed under "Other", by their sentence,
+       each with Forget, and Forget all takes them too. */
+    testWidgets('lists the app\'s traits as its own, and what Rendel noticed unnamed under Other', (tester) async {
+      final body = jsonDecode(notes([three.first])) as Map<String, dynamic>;
+      body['other'] = [
+        {'id': _n2, 'kind': 'learned', 'key': 'goal', 'label': null, 'value': 'Reads the short version first', 'category': null, 'expires_at': null, 'updated_at': '2026-10-23T10:00:00.000Z'},
+      ];
+      body['traits'] = [
+        {'key': 'loyalty_tier', 'label': 'Loyalty tier', 'value': 'Gold'},
+      ];
+      final server = _Server(list: jsonEncode(body));
+      await open(tester, server);
+      expect(find.text('Loyalty tier'), findsOneWidget);
+      expect(find.text('Gold'), findsOneWidget);
+      expect(find.text('From the app'), findsOneWidget);
+      expect(find.text('Other'), findsOneWidget);
+      expect(find.text('Reads the short version first'), findsOneWidget);
+      // Never the internal key.
+      expect(find.text('goal'), findsNothing);
+      // The person's note and the noticed one; never the app's trait.
+      expect(find.text('Forget'), findsNWidgets(2));
+      await tester.tap(find.text('Forget').last);
+      await _settle(tester);
+      expect('${server.memory.last.method} ${server.memory.last.url.path}', 'DELETE /v1/memory/$_n2');
+      expect(find.text('Other'), findsNothing);
+      expect(find.text('Loyalty tier'), findsOneWidget);
+    });
+
     testWidgets('says how to start when there is nothing yet', (tester) async {
       await open(tester, _Server(list: notes(const [])));
       expect(find.textContaining('Tell me a preference once'), findsOneWidget);

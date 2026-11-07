@@ -5,6 +5,25 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.83.0
+
+**Added**
+
+- What I remember for you lists the facts the app passes with `identify`
+  and the ones its backend sets (`POST /v1/people/:id/notes`) under **From
+  the app**, and notes Rendel kept without a label under **Other**, each
+  with Forget. New string `memoryOther`.
+- `currentTextFor` gains an optional `{bool asked}`: a confirmation card
+  whose action has **Show the lines that change** on asks the app for the
+  current text and marks what changes. Existing implementations keep
+  compiling.
+
+**Changed**
+
+- Support's "Want the reply by email too?" card shows only when the server
+  says the app emails people who can't get a notification
+  (`contact.offer`).
+
 ## 0.82.0
 
 **Added**

@@ -13,6 +13,12 @@ typedef ComponentBuilder = Widget Function(
   RendelDispatcher dispatch,
 );
 
+/// A [RendelDispatcher.cardSource] that is also told whether the card itself
+/// asks for the changes (`full_text.current`, switched on in the console),
+/// as `ConversationController.currentTextFor` is. A plain one is still called
+/// as before.
+typedef CardSourceAsked = Future<String?>? Function(String action, Map<String, dynamic> params, {bool asked});
+
 /// How rendered blocks talk back: chip taps, confirmations, cancellations and
 /// form submissions.
 ///
@@ -52,7 +58,8 @@ class RendelDispatcher {
   final VoidCallback? onOpenMemory;
 
   /// The current text a full-text card's action replaces, from the app
-  /// (`Rendel.setCardSource`): null when the app gave none.
+  /// (`Rendel.setCardSource`): null when the app gave none. One that is also a
+  /// [CardSourceAsked] is told whether the card itself asks for the changes.
   final Future<String?>? Function(String action, Map<String, dynamic> params)? cardSource;
 
   /// A channel of a `contact` block was tapped: [channel] is its kind

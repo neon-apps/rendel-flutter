@@ -48,7 +48,9 @@ Future<void> showRendelMemory(
 
 /// Every note Rendel keeps for the person on this device: label and value,
 /// "Noticed", "From the app" and "Until …" where they hold, Forget on each
-/// the person may take back, and Forget all, asked once more in place.
+/// the person may take back, and Forget all, asked once more in place. The
+/// app's `identify` traits show beside its facts, and what Rendel noticed
+/// without naming it under "Other", by its sentence.
 class RendelMemorySheet extends StatefulWidget {
   const RendelMemorySheet({super.key, required this.memory});
 
@@ -97,7 +99,9 @@ class _RendelMemorySheetState extends State<RendelMemorySheet> {
       if (gone && list != null) {
         _list = RendelMemoryList(
           enabled: list.enabled,
-          notes: [for (final other in list.notes) if (other.id != note.id) other],
+          notes: [for (final kept in list.notes) if (kept.id != note.id) kept],
+          other: [for (final kept in list.other) if (kept.id != note.id) kept],
+          traits: list.traits,
         );
       }
     });
@@ -111,11 +115,12 @@ class _RendelMemorySheetState extends State<RendelMemorySheet> {
       _forgettingAll = false;
       _asking = false;
       final list = _list;
-      // The app's own facts stay; the server keeps them too.
+      // The app's own facts and traits stay; the server keeps them too.
       if (done && list != null) {
         _list = RendelMemoryList(
           enabled: list.enabled,
           notes: [for (final note in list.notes) if (!note.forgettable) note],
+          traits: list.traits,
         );
       }
     });
@@ -127,7 +132,14 @@ class _RendelMemorySheetState extends State<RendelMemorySheet> {
     final strings = RendelStringsScope.of(context);
     final list = _list;
     final notes = list?.notes ?? const <RendelMemoryNote>[];
+    final other = list?.other ?? const <RendelMemoryNote>[];
+    final traits = list?.traits ?? const <RendelMemoryTrait>[];
     final inset = theme.space.plate;
+    // The app's traits are read into answers as its facts are: rows of their own, "From the app", with no Forget.
+    final rows = <Widget>[
+      for (final note in notes) _row(context, theme, strings, note),
+      for (final trait in traits) _traitRow(theme, strings, trait),
+    ];
 
     final List<Widget> body;
     if (_loading) {
@@ -140,27 +152,22 @@ class _RendelMemorySheetState extends State<RendelMemorySheet> {
       ];
     } else if (!list.enabled) {
       body = [Text(strings.memoryOff, style: theme.text.body)];
-    } else if (notes.isEmpty) {
+    } else if (rows.isEmpty && other.isEmpty) {
       body = [Text(strings.memoryEmpty, style: theme.text.body)];
     } else {
       body = [
-        Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: theme.colors.surfaceHigh,
-            border: Border.all(color: theme.hairline),
-            borderRadius: BorderRadius.circular(theme.radius.card),
+        if (rows.isNotEmpty) _card(theme, rows),
+        // What Rendel noticed without naming it, by its sentence: its key is an internal word.
+        if (other.isNotEmpty) ...[
+          if (rows.isNotEmpty) SizedBox(height: theme.space.lg),
+          Semantics(
+            header: true,
+            child: Text(strings.memoryOther, style: theme.text.labelSoft),
           ),
-          child: Column(
-            children: [
-              for (var i = 0; i < notes.length; i++) ...[
-                if (i > 0) Container(height: 1, color: theme.hairline),
-                _row(context, theme, strings, notes[i]),
-              ],
-            ],
-          ),
-        ),
-        if (notes.any((note) => note.forgettable)) ...[
+          SizedBox(height: theme.space.sm),
+          _card(theme, [for (final note in other) _row(context, theme, strings, note, unnamed: true)]),
+        ],
+        if (other.isNotEmpty || notes.any((note) => note.forgettable)) ...[
           SizedBox(height: theme.space.md),
           _asking
               ? _confirmAll(theme, strings)
@@ -209,7 +216,50 @@ class _RendelMemorySheetState extends State<RendelMemorySheet> {
     );
   }
 
-  Widget _row(BuildContext context, RendelTheme theme, RendelStrings strings, RendelMemoryNote note) {
+  /// Rows on one card, a hairline between each.
+  Widget _card(RendelTheme theme, List<Widget> rows) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: theme.colors.surfaceHigh,
+        border: Border.all(color: theme.hairline),
+        borderRadius: BorderRadius.circular(theme.radius.card),
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) Container(height: 1, color: theme.hairline),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// One of the app's traits: its name, its value, "From the app".
+  Widget _traitRow(RendelTheme theme, RendelStrings strings, RendelMemoryTrait trait) {
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: theme.space.md, vertical: theme.space.sm),
+      child: SizedBox(
+        width: double.infinity,
+        child: MergeSemantics(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(trait.label, style: theme.text.label),
+              SizedBox(height: theme.space.hair),
+              Text(trait.value, style: theme.text.captionSoft),
+              SizedBox(height: theme.space.xs),
+              Text(strings.memoryFromApp, style: theme.text.caption),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// A note's row; an [unnamed] one shows its sentence alone, never its key.
+  Widget _row(BuildContext context, RendelTheme theme, RendelStrings strings, RendelMemoryNote note, {bool unnamed = false}) {
     final tags = [
       if (note.kind == MemoryKind.learned) strings.memoryNoticed,
       if (note.kind == MemoryKind.set) strings.memoryFromApp,
@@ -224,9 +274,13 @@ class _RendelMemorySheetState extends State<RendelMemorySheet> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(note.name, style: theme.text.label),
-                  SizedBox(height: theme.space.hair),
-                  Text(note.value, style: theme.text.captionSoft),
+                  if (unnamed)
+                    Text(note.value, style: theme.text.label)
+                  else ...[
+                    Text(note.name, style: theme.text.label),
+                    SizedBox(height: theme.space.hair),
+                    Text(note.value, style: theme.text.captionSoft),
+                  ],
                   if (tags.isNotEmpty) ...[
                     SizedBox(height: theme.space.xs),
                     Text(tags.join(' · '), style: theme.text.caption),
