@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.84.0
+
+**Changed**
+
+- Cards are raised by default, as the console's Appearance already showed
+  them: a plate and a product card draw the glass with a soft shadow unless
+  the published look sets `style.card` to `outlined` or `flat`. The shadow
+  is about a third lighter than `raised` drew before. To keep the earlier
+  look, choose **Cards › Flat** in Appearance and publish; no rebuild.
+  `RendelTheme.card` defaults to `RendelCardStyle.raised`.
+
 ## 0.83.0
 
 **Added**

@@ -511,12 +511,12 @@ enum RendelArrowStyle {
 }
 
 /// How the parts are built, not only what colour they are: `theme.style` on
-/// the wire. Each is a closed set. Since 0.31 a card is flat unless a style
-/// asks otherwise: flat and filled are the one look (v6, design/BLOCKS-v6.md);
-/// raised and outlined are still drawn for a config that names them.
+/// the wire. Each is a closed set. Since 0.84 a card is raised unless a style
+/// asks otherwise (Tuna, 2026-11-07, product gaps [21]), with a shadow about a
+/// third lighter than before; flat and outlined draw for a config that names them.
 class RendelStyle {
   const RendelStyle({
-    this.card = RendelCardStyle.flat,
+    this.card = RendelCardStyle.raised,
     this.button = RendelButtonStyle.filled,
     this.product = RendelProductStyle.tile,
     this.tracker = RendelTrackerStyle.vertical,
@@ -998,7 +998,7 @@ class RendelTheme {
   /// (black on a deep ground, where nothing is lighter to fall on).
   late final List<BoxShadow> plateShadow = [
     BoxShadow(
-      color: colors.shadow.withValues(alpha: _lightOnDark ? 0.55 : 0.32),
+      color: colors.shadow.withValues(alpha: _lightOnDark ? 0.36 : 0.21),
       offset: const Offset(0, 18),
       blurRadius: 36,
       spreadRadius: -20,
@@ -1008,7 +1008,7 @@ class RendelTheme {
   /// The same shadow, shorter, under a product card.
   late final List<BoxShadow> cardShadow = [
     BoxShadow(
-      color: colors.shadow.withValues(alpha: _lightOnDark ? 0.55 : 0.32),
+      color: colors.shadow.withValues(alpha: _lightOnDark ? 0.36 : 0.21),
       offset: const Offset(0, 12),
       blurRadius: 26,
       spreadRadius: -18,

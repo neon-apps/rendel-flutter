@@ -519,7 +519,7 @@ void main() {
         'nothing', () {
       final theme = _parse('{"config":{"theme":{"radius":{"card":20}}}}')!
           .applyTo(_base());
-      expect(theme.style.card, RendelCardStyle.flat);
+      expect(theme.style.card, RendelCardStyle.raised);
       expect(theme.style.button, RendelButtonStyle.filled);
       expect(theme.style.product, RendelProductStyle.tile);
       expect(theme.style.tracker, RendelTrackerStyle.vertical);
@@ -565,7 +565,7 @@ void main() {
         }}}}
       ''')!
           .applyTo(_base());
-      expect(theme.style.card, RendelCardStyle.flat);
+      expect(theme.style.card, RendelCardStyle.raised);
       expect(theme.style.button, RendelButtonStyle.filled);
       expect(theme.style.product, RendelProductStyle.tile);
       expect(theme.style.tracker, RendelTrackerStyle.vertical);
@@ -576,7 +576,7 @@ void main() {
         '{"config":{"theme":{"style":{"card":"Outlined","product":" row"}}}}',
       )!
           .applyTo(_base());
-      expect(theme.style.card, RendelCardStyle.flat);
+      expect(theme.style.card, RendelCardStyle.raised);
       expect(theme.style.product, RendelProductStyle.tile);
     });
 
@@ -584,7 +584,7 @@ void main() {
       for (final style in ['"outlined"', '[1,2]', '42', 'null']) {
         final theme = _parse('{"config":{"theme":{"style":$style}}}')!
             .applyTo(_base());
-        expect(theme.style.card, RendelCardStyle.flat, reason: style);
+        expect(theme.style.card, RendelCardStyle.raised, reason: style);
         expect(theme.style.tracker, RendelTrackerStyle.vertical, reason: style);
       }
     });

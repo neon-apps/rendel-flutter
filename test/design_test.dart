@@ -191,7 +191,7 @@ void main() {
     // chips — and a destructive one by its words, not by its plate.
     final theme = raisedOf(RendelTheme.paper());
 
-    testWidgets('by default a plate is the glass alone (flat)', (tester) async {
+    testWidgets('by default a plate is raised: the glass with its shadow', (tester) async {
       await pump(tester, Builder(builder: (c) => buildSkeleton(c, 'receipt')));
       final plate = tester
           .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
@@ -199,8 +199,8 @@ void main() {
           .whereType<BoxDecoration>()
           .first;
       expect(plate.color, RendelTheme.paper().glass);
-      expect(plate.boxShadow ?? const <BoxShadow>[], isEmpty,
-          reason: 'a flat plate casts no shadow');
+      expect(plate.boxShadow, RendelTheme.paper().plateShadow,
+          reason: 'raised is the default since 0.84.0');
     });
 
     for (final type in [...asking, 'receipt', 'stat_group', 'table', 'chart']) {
