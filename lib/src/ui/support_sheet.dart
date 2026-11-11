@@ -139,6 +139,10 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   /// The person sorted it on this page: the card says so, where a sorted one opened later keeps its "Sorted" line.
   bool _sortedHere = false;
 
+  /// The words of the card that asks how it went, and the thread they were asked of.
+  RendelSupportRating? _rateWords;
+  String? _rateThread;
+
   /// Cards the team sent that this phone asked to open, so each is minted once.
   final Set<String> _opening = {};
 
@@ -332,6 +336,11 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final items = <Object>[];
     _Run? run;
     var newPlaced = false;
+    // Held once asked: the server stops asking at the thumb, and the comment and the thanks are still this page's.
+    if (state?.rating case final words?) {
+      _rateWords = words;
+      _rateThread = state!.threadId;
+    }
     final lastMarker = v.entries.where((e) => e.marker).lastOrNull;
     for (final entry in v.entries) {
       if (entry.marker) {
@@ -385,6 +394,14 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           ),
         ),
       if (resolved && _sortedHere) _sorted(theme, strings),
+      if (resolved && _rateWords != null && _rateThread == state?.threadId)
+        _RatingCard(
+          key: ValueKey(_rateThread),
+          words: _rateWords!,
+          asking: state?.rating != null,
+          closeLabel: strings.closeDetail,
+          answer: widget.support.rate,
+        ),
     ];
 
     return SafeArea(
@@ -1281,6 +1298,143 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 const _runGap = Duration(minutes: 5);
 
 /// Where the lines the person had not read begin.
+/// How it went, under a thread the team closed: a thumb, then perhaps a
+/// comment, then thanks. Counted at the thumb, so leaving after it loses nothing.
+class _RatingCard extends StatefulWidget {
+  const _RatingCard({super.key, required this.words, required this.asking, required this.closeLabel, required this.answer});
+
+  final RendelSupportRating words;
+
+  /// The server is still asking; false once it was answered, here or elsewhere.
+  final bool asking;
+  final String closeLabel;
+  final Future<void> Function(Map<String, Object> answer) answer;
+
+  @override
+  State<_RatingCard> createState() => _RatingCardState();
+}
+
+class _RatingCardState extends State<_RatingCard> {
+  final _comment = TextEditingController();
+  var _step = 'ask';
+
+  @override
+  void dispose() {
+    _comment.dispose();
+    super.dispose();
+  }
+
+  void _rate(String rating) {
+    setState(() => _step = 'comment');
+    unawaited(widget.answer({'rating': rating}));
+  }
+
+  void _send() {
+    final text = _comment.text.trim();
+    setState(() => _step = 'thanks');
+    if (text.isNotEmpty) unawaited(widget.answer({'comment': text}));
+  }
+
+  void _away() {
+    if (_step == 'ask') unawaited(widget.answer({'dismissed': true}));
+    setState(() => _step = 'gone');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_step == 'gone' || (_step == 'ask' && !widget.asking)) return const SizedBox.shrink();
+    final theme = RendelThemeScope.of(context);
+    final words = widget.words;
+    Widget thumb(String rating, IconData glyph, String label) => Expanded(
+          child: RendelPressable(
+            semanticLabel: label,
+            onTap: () => _rate(rating),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 44),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(color: theme.tint, borderRadius: BorderRadius.circular(theme.radius.control)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(glyph, size: 18, color: theme.colors.onSurface),
+                  const SizedBox(width: 6),
+                  Flexible(child: Text(label, style: theme.text.label)),
+                ],
+              ),
+            ),
+          ),
+        );
+    final Widget body = switch (_step) {
+      'ask' => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: Text(words.question, style: theme.text.labelEmphasis)),
+                RendelPressable(
+                  semanticLabel: widget.closeLabel,
+                  onTap: _away,
+                  child: SizedBox(width: 44, height: 44, child: Icon(Icons.close_rounded, size: 18, color: theme.colors.onSurfaceSoft)),
+                ),
+              ],
+            ),
+            Row(children: [
+              thumb('up', Icons.thumb_up_outlined, words.up),
+              const SizedBox(width: 8),
+              thumb('down', Icons.thumb_down_outlined, words.down),
+            ]),
+          ],
+        ),
+      'comment' => Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _comment,
+              minLines: 2,
+              maxLines: 4,
+              maxLength: 1000,
+              style: theme.text.body,
+              decoration: InputDecoration(hintText: words.commentHint, counterText: '', isDense: true),
+            ),
+            const SizedBox(height: 8),
+            Row(children: [
+              RendelPressable(
+                semanticLabel: words.send,
+                onTap: _send,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 18),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: theme.colors.accent, borderRadius: BorderRadius.circular(theme.radius.control)),
+                  child: Text(words.send, style: theme.text.labelStrong.copyWith(color: theme.colors.onAccent)),
+                ),
+              ),
+              const SizedBox(width: 8),
+              RendelPressable(
+                semanticLabel: words.skip,
+                onTap: _away,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 44),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  alignment: Alignment.center,
+                  child: Text(words.skip, style: theme.text.label),
+                ),
+              ),
+            ]),
+          ],
+        ),
+      _ => Semantics(liveRegion: true, child: Text(words.thanks, style: theme.text.labelSoft)),
+    };
+    return Container(
+      margin: const EdgeInsets.fromLTRB(10, 16, 10, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: theme.colors.surfaceRaised, borderRadius: BorderRadius.circular(20), border: Border.all(color: theme.colors.line)),
+      child: body,
+    );
+  }
+}
+
 class _NewMark {
   _NewMark(this.at);
   final DateTime at;

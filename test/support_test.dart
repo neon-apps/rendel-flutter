@@ -301,6 +301,43 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('asks how it went once the team closed it: a thumb, a comment, then thanks', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, author: 'agent', name: 'Ayşe', text: 'Çözüldü.')],
+        state: {
+          ..._state(mode: 'closed'),
+          'state': 'resolved',
+          'rating': {
+            'question': 'How did it go?',
+            'up': 'It went well',
+            'down': 'It did not',
+            'comment_hint': 'Anything else?',
+            'send': 'Send it',
+            'skip': 'Not now',
+            'thanks': 'Thanks for telling us.',
+          },
+        },
+      );
+      await _open(tester, server.support());
+      expect(find.text('How did it go?'), findsOneWidget);
+      await tester.tap(find.text('It went well'));
+      await tester.pumpAndSettle();
+      expect(server.posts.singleWhere((p) => p.path == 'rating').body, {'rating': 'up'});
+      // The server stops asking at the thumb; the comment is still this page's.
+      server.state = {...server.state}..remove('rating');
+      await tester.enterText(find.byType(TextField).first, 'Quick');
+      await tester.tap(find.text('Send it'));
+      await tester.pumpAndSettle();
+      expect(server.posts.where((p) => p.path == 'rating').last.body, {'comment': 'Quick'});
+      expect(find.text('Thanks for telling us.'), findsOneWidget);
+    });
+
+    testWidgets('an unasked thread shows no card', (tester) async {
+      final server = _Server(entries: [_entry(1, author: 'agent', name: 'Ayşe', text: 'Çözüldü.')], state: {..._state(mode: 'closed'), 'state': 'resolved'});
+      await _open(tester, server.support());
+      expect(find.byIcon(Icons.thumb_up_outlined), findsNothing);
+    });
+
     testWidgets('lists the sorted ones under the suggestions, and See all opens them by week with a search', (tester) async {
       final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: {..._state(), 'state': 'resolved'});
       final now = DateTime.now().toUtc();

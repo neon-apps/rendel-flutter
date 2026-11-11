@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.86.0
+
+**Added**
+
+- After the team closes a Support thread, the person is asked once how it
+  went: a thumb, then an optional comment, in the server's words for the
+  conversation's language. `RendelSupportState.rating` holds them.
+
 ## 0.85.0
 
 **Changed**

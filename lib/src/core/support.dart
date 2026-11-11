@@ -109,6 +109,42 @@ class RendelSupportEntry {
 /// An image the server can show: drawn as a picture rather than by its name.
 bool _picture(Map<dynamic, dynamic> file) => '${file['media_type']}'.startsWith('image/') && file['url'] is String;
 
+/// The words of the card that asks how it went, as the server wrote them.
+class RendelSupportRating {
+  const RendelSupportRating({
+    required this.question,
+    required this.up,
+    required this.down,
+    required this.commentHint,
+    required this.send,
+    required this.skip,
+    required this.thanks,
+  });
+
+  final String question;
+  final String up;
+  final String down;
+  final String commentHint;
+  final String send;
+  final String skip;
+  final String thanks;
+
+  static RendelSupportRating? tryParse(Object? raw) {
+    if (raw is! Map) return null;
+    final words = [raw['question'], raw['up'], raw['down'], raw['comment_hint'], raw['send'], raw['skip'], raw['thanks']];
+    if (words.any((w) => w is! String)) return null;
+    return RendelSupportRating(
+      question: words[0] as String,
+      up: words[1] as String,
+      down: words[2] as String,
+      commentHint: words[3] as String,
+      send: words[4] as String,
+      skip: words[5] as String,
+      thanks: words[6] as String,
+    );
+  }
+}
+
 /// The thread's state (`support.state`).
 class RendelSupportState {
   const RendelSupportState({
@@ -126,9 +162,13 @@ class RendelSupportState {
     required this.contactState,
     required this.contactRequired,
     this.contactOffered = false,
+    this.rating,
   });
 
   final String threadId;
+
+  /// The team closed this and has not heard how it went: the card's words, in the conversation's language.
+  final RendelSupportRating? rating;
 
   /// ai, waiting, human or closed.
   final String mode;
@@ -175,6 +215,7 @@ class RendelSupportState {
         contactState: contactState,
         contactRequired: contactRequired,
         contactOffered: contactOffered,
+        rating: rating,
       );
 
   static RendelSupportState? tryParse(Object? raw) {
@@ -191,6 +232,7 @@ class RendelSupportState {
       threadId: thread,
       mode: mode,
       resolved: raw['state'] == 'resolved',
+      rating: RendelSupportRating.tryParse(raw['rating']),
       teamHere: raw['team_here'] == true,
       expectation: expectation is String ? expectation : null,
       presence: presence is String ? presence : null,
@@ -543,6 +585,13 @@ class RendelSupport {
     if (threadId == null || seq == 0 || state == null || state.userReadSeq >= seq) return;
     unawaited(api.support('POST', _path(threadId, 'read'), user: user(), body: {'seq': seq}));
     value.value = _now.copyWith(unread: 0, state: state.read(seq));
+  }
+
+  /// The answer to how it went: `{'rating': 'up'}`, then perhaps `{'comment': …}`, or `{'dismissed': true}`.
+  Future<void> rate(Map<String, Object> answer) async {
+    final threadId = _now.threadId;
+    if (threadId == null) return;
+    await api.support('POST', _path(threadId, 'rating'), user: user(), body: answer);
   }
 
   /// "I'm sorted", or "By mistake? Back to the assistant".
