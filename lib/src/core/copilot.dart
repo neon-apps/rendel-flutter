@@ -441,7 +441,7 @@ class Rendel {
     await RendelAnalytics.instance.load(_analytics);
     // The screens, events and taps since launch go now that there is a device
     // to count them against, as whoever is signed in when they leave.
-    RendelScreens.instance.send = (items) => unawaited(_api?.sendEvents(items, user: _user));
+    RendelScreens.instance.send = (items) => unawaited(_api?.sendEvents(items, user: _user, consent: RendelAnalytics.instance.consent == true));
     RendelTaps.instance
       ..deviceId = (() => _deviceId)
       ..attach();
@@ -1201,6 +1201,15 @@ class Rendel {
   /// launches. The assistant keeps working either way.
   static void setAnalyticsEnabled(bool enabled) => RendelAnalytics.instance.setEnabled(enabled);
 
+  /// The person's answer, for an app with "Wait for the user's consent" on in
+  /// Settings: true starts taps and screen views, false stops them and drops
+  /// what waits. Not kept: call it on every start, after reading your own
+  /// record of it. Safe to call before [init].
+  static void setAnalyticsConsent(bool given) {
+    RendelAnalytics.instance.consent = given;
+    RendelScreens.instance.consentChanged();
+  }
+
   /// Whether this device counts screen views, taps, events and sessions.
   static bool get analyticsEnabled => RendelAnalytics.instance.enabled;
 
@@ -1496,7 +1505,10 @@ class Rendel {
     // Before the empty check: an app that published no look can still be
     // switched to one read at a time.
     _parallelReads = remote.parallelReads;
-    RendelAnalytics.instance.capture = remote.capture;
+    RendelAnalytics.instance
+      ..capture = remote.capture
+      ..captureKnown = true;
+    RendelScreens.instance.consentChanged();
     // The launcher's count is read with the config: at launch and when the app comes back.
     _supportTeam = remote.supportTeam;
     if (_supportTeam != null) {

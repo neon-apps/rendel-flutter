@@ -227,8 +227,36 @@ class RendelScreens {
   void add(Map<String, dynamic> item) {
     final analytics = RendelAnalytics.instance;
     if (!analytics.enabled) return;
+    if (item['type'] == 'tap' || item['type'] == 'screen_view') {
+      switch (analytics.consentGate) {
+        case RendelConsentGate.drop:
+          return;
+        case RendelConsentGate.hold:
+          if (_waiting.length < _early) _waiting.add(item);
+          return;
+        case RendelConsentGate.send:
+          break;
+      }
+    }
     item['session'] = analytics.touch();
     _push(item);
+  }
+
+  /// Taps and screen views held until the app config says whether consent is needed.
+  final List<Map<String, dynamic>> _waiting = [];
+
+  /// The app answered, or the config was read: what is held goes or goes away.
+  void consentChanged() {
+    final analytics = RendelAnalytics.instance;
+    if (analytics.consent == false) {
+      _waiting.clear();
+      _queue.removeWhere((item) => item['type'] == 'tap' || item['type'] == 'screen_view');
+      return;
+    }
+    if (analytics.consentGate == RendelConsentGate.hold) return;
+    final held = List.of(_waiting);
+    _waiting.clear();
+    held.forEach(add);
   }
 
   /// A session's item still waiting is replaced rather than repeated, so a
@@ -322,6 +350,7 @@ class RendelScreens {
     _opened = null;
     _last = null;
     _queue.clear();
+    _waiting.clear();
     _timer?.cancel();
     _timer = null;
     _settling = false;

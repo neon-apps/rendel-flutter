@@ -60,6 +60,8 @@ void main() {
   late List<Map<String, dynamic>> sent;
 
   setUp(() {
+    // No config in these tests: the setting is known to be off.
+    RendelAnalytics.instance.captureKnown = true;
     sent = [];
     _screens.send = sent.addAll;
     _taps

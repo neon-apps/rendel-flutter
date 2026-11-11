@@ -146,7 +146,7 @@ class RendelTaps {
   bool get _counting {
     final analytics = RendelAnalytics.instance;
     final capture = analytics.capture;
-    if (!analytics.enabled || capture.taps == 'off') return false;
+    if (!analytics.enabled || capture.taps == 'off' || analytics.consentGate == RendelConsentGate.drop) return false;
     if (capture.sample >= 1) return true;
     final id = deviceId?.call() ?? '';
     final sample = _sample?.id == id ? _sample! : (_sample = (id: id, share: sampleOf(id)));

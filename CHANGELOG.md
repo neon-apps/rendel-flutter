@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.87.0
+
+**Added**
+
+- `Rendel.setAnalyticsConsent(bool)`. With "Wait for the user's consent" on in
+  Settings, taps and screen views wait for `true`; `false` stops them and
+  drops what waits. Not kept between starts.
+
 ## 0.86.0
 
 **Added**

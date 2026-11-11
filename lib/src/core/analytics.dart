@@ -59,11 +59,14 @@ Map<String, Object?> cleanProps(Map<String, dynamic> given, {int room = maxProps
 
 String _cut(String text, int max) => text.length > max ? text.substring(0, max) : text;
 
+/// What consent mode does with a tap or a screen view.
+enum RendelConsentGate { send, hold, drop }
+
 /// What the server says about tap capture (`capture` in the app config),
 /// each field its default when it is missing or wrong.
 @immutable
 class RendelCapture {
-  const RendelCapture({this.taps = 'on', this.sample = 1, this.mask = const []});
+  const RendelCapture({this.taps = 'on', this.sample = 1, this.mask = const [], this.consent = false});
 
   /// `on`, `no_text` (taps without labels) or `off`.
   final String taps;
@@ -74,9 +77,12 @@ class RendelCapture {
   /// Screen names whose taps keep no label.
   final List<String> mask;
 
+  /// Taps and screen views wait for `Rendel.setAnalyticsConsent(true)`.
+  final bool consent;
+
   static const RendelCapture defaults = RendelCapture();
 
-  bool get isDefault => taps == 'on' && sample == 1 && mask.isEmpty;
+  bool get isDefault => taps == 'on' && sample == 1 && mask.isEmpty && !consent;
 
   static RendelCapture parse(Object? raw) {
     if (raw is! Map) return defaults;
@@ -87,17 +93,18 @@ class RendelCapture {
       taps: taps == 'off' || taps == 'no_text' ? taps as String : 'on',
       sample: sample is num && sample >= 0 && sample <= 1 ? sample.toDouble() : 1,
       mask: mask is List ? [for (final m in mask.take(50)) if (m is String && m.length <= 200) m] : const [],
+      consent: raw['consent'] == true,
     );
   }
 
-  Map<String, Object?> toJson() => {'taps': taps, 'sample': sample, 'mask': mask};
+  Map<String, Object?> toJson() => {'taps': taps, 'sample': sample, 'mask': mask, if (consent) 'consent': true};
 
   @override
   bool operator ==(Object other) =>
-      other is RendelCapture && other.taps == taps && other.sample == sample && listEquals(other.mask, mask);
+      other is RendelCapture && other.taps == taps && other.sample == sample && listEquals(other.mask, mask) && other.consent == consent;
 
   @override
-  int get hashCode => Object.hash(taps, sample, Object.hashAll(mask));
+  int get hashCode => Object.hash(taps, sample, Object.hashAll(mask), consent);
 }
 
 /// 0 up to 1 from the device id, the same on every launch: whether this
@@ -145,6 +152,20 @@ class RendelAnalytics {
 
   /// What the server last said about taps.
   RendelCapture capture = RendelCapture.defaults;
+
+  /// The app's `setAnalyticsConsent`, for this run only: null until it says.
+  bool? consent;
+
+  /// The app config has been read, so whether consent is needed is known.
+  bool captureKnown = false;
+
+  /// What to do with a tap or a screen view now.
+  RendelConsentGate get consentGate {
+    if (consent == true) return RendelConsentGate.send;
+    if (consent == false) return RendelConsentGate.drop;
+    if (!captureKnown) return RendelConsentGate.hold;
+    return capture.consent ? RendelConsentGate.drop : RendelConsentGate.send;
+  }
 
   String? _session;
   DateTime? _started;
@@ -354,6 +375,8 @@ class RendelAnalytics {
     _enabled = true;
     _super.clear();
     capture = RendelCapture.defaults;
+    consent = null;
+    captureKnown = true;
     _session = _started = _last = _hidden = null;
     _store = null;
     _loaded = false;
