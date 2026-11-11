@@ -15,6 +15,7 @@ class RendelFollowup {
     this.channel = 'in_app',
     this.style = 'popup',
     this.conversationId,
+    this.imageUrl,
   });
 
   final String id;
@@ -25,6 +26,9 @@ class RendelFollowup {
   final String title;
   final String body;
   final String button;
+
+  /// The product or offer it is about; null when it is about neither.
+  final String? imageUrl;
 
   /// The channel it went on: `in_app`, `push` or `email`. Whatever it was, it
   /// also waits inside Rendel as a card.
@@ -45,7 +49,7 @@ class RendelFollowup {
     if (raw is! Map) return null;
     final id = raw['id'], title = raw['title'], body = raw['body'], button = raw['button'];
     if (id is! String || title is! String || body is! String || button is! String) return null;
-    final type = raw['type'], channel = raw['channel'], style = raw['style'], conversation = raw['conversation_id'];
+    final type = raw['type'], channel = raw['channel'], style = raw['style'], conversation = raw['conversation_id'], image = raw['image_url'];
     return RendelFollowup(
       id: id,
       type: type is String ? type : '',
@@ -55,6 +59,7 @@ class RendelFollowup {
       channel: channel is String ? channel : 'in_app',
       style: style == 'banner' ? 'banner' : 'popup',
       conversationId: conversation is String && conversation.isNotEmpty ? conversation : null,
+      imageUrl: image is String && image.startsWith('https://') ? image : null,
     );
   }
 }

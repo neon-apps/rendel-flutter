@@ -1445,6 +1445,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                                 closeLabel: _strings.closeDetail,
                                 onOpen: () => widget.onFollowupOpen?.call(card.id),
                                 onDismiss: () => RendelFollowups.instance.dismiss(card.id),
+                                logoUrl: widget.logoUrl,
+                                logoHeaders: widget.logoHeaders,
                               ),
                             ),
                         ],
@@ -3129,7 +3131,10 @@ class _ComposerState extends State<_Composer> {
         // 2 at the sides, not 6, as on the web: the room goes to a lit
         // action's label.
         padding: const EdgeInsets.fromLTRB(2, 2, 2, 4),
-        child: Row(
+        // 52 tall as it always was: voice mode writes what it hears from this height.
+        child: SizedBox(
+          height: 52,
+          child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             if (_attach)
@@ -3140,9 +3145,10 @@ class _ComposerState extends State<_Composer> {
               )
             else
               const SizedBox(width: _Round.side),
-            // While an answer page is on its way, a pill in the microphone's
-            // place says what the turn is doing.
-            Flexible(
+            const SizedBox(width: 8),
+            // While an answer page is on its way, a pill in the field's place
+            // says what the turn is doing.
+            Expanded(
               child: AnimatedSwitcher(
                 duration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
                 reverseDuration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
@@ -3154,47 +3160,46 @@ class _ComposerState extends State<_Composer> {
                 ),
                 child: status != null
                     ? _StatusPill(key: const ValueKey('status'), label: status)
-                    : Row(
-                        key: const ValueKey('mic'),
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          _MicPill(
-                            icon: switch (widget.voiceIcon) {
-                              RendelVoiceIcon.waveform => Icons.graphic_eq_rounded,
-                              _ => Icons.mic_rounded,
-                            },
-                            label: strings.speak,
-                            onTap: widget.busy ? null : _listen,
-                            onDown: widget.busy ? null : widget.onHoldStart,
-                            onUp: widget.onHoldEnd,
-                            // A circle beside a lit action, as on the web, so
-                            // at 360pt "Add to basket" and "Track my order"
-                            // read whole; at 92 they cut off past ~9 letters.
-                            width: primary == null ? 128 : 52,
-                          ),
-                          if (primary != null) ...[
-                            const SizedBox(width: 8),
-                            Flexible(
-                              child: _Arrive(
-                                key: ValueKey(primary.label),
-                                child: _LitAction(
-                                  label: primary.label,
-                                  onTap: primary.onTap,
-                                  go: primary.go,
-                                ),
-                              ),
+                    : primary != null
+                        ? _Arrive(
+                            key: ValueKey(primary.label),
+                            child: _LitAction(
+                              label: primary.label,
+                              onTap: primary.onTap,
+                              go: primary.go,
                             ),
-                          ],
-                        ],
-                      ),
+                          )
+                        : _AskField(
+                            key: const ValueKey('field'),
+                            hint: widget.hint ?? strings.composerHint,
+                            label: strings.typeMessage,
+                            onTap: _type,
+                          ),
               ),
             ),
-            _Round(
-              icon: Icons.keyboard_outlined,
-              label: strings.typeMessage,
-              onTap: status != null ? null : _type,
+            const SizedBox(width: 8),
+            // Beside a lit action there is no room for the field: a round
+            // keyboard stands in for it.
+            if (primary != null && status == null) ...[
+              _Round(
+                icon: Icons.keyboard_outlined,
+                label: strings.typeMessage,
+                onTap: _type,
+              ),
+              const SizedBox(width: 8),
+            ],
+            _MicPill(
+              icon: switch (widget.voiceIcon) {
+                RendelVoiceIcon.waveform => Icons.graphic_eq_rounded,
+                _ => Icons.mic_rounded,
+              },
+              label: strings.speak,
+              onTap: widget.busy ? null : _listen,
+              onDown: widget.busy ? null : widget.onHoldStart,
+              onUp: widget.onHoldEnd,
             ),
           ],
+          ),
         ),
       ),
     );
@@ -3312,7 +3317,7 @@ class _ComposerState extends State<_Composer> {
          boundary that identifies a control, and `composerEdge` is the token
          derived for it against whatever ground the box is drawn on. */
       child: _Glass(
-        radius: theme.radius.card,
+        radius: math.min(theme.radius.card, theme.radius.control),
         tint: theme.colors.composer,
         edge: theme.composerEdge,
         child: Column(
@@ -3451,7 +3456,7 @@ class _ComposerState extends State<_Composer> {
                               width: 38,
                               height: 38,
                               decoration: BoxDecoration(
-                                shape: BoxShape.circle,
+                                borderRadius: BorderRadius.circular(theme.radius.control),
                                 // Nothing to send: a ghost ring, never a
                                 // grey filled disc (QA 2026-10-24).
                                 color: enabled
@@ -3516,6 +3521,42 @@ class _ComposerState extends State<_Composer> {
   }
 }
 
+/// The place to type, at rest: the widest thing in the row, and one tap opens
+/// the box with the keyboard up (demo persona test, 2026-11-11: typing first,
+/// voice second).
+class _AskField extends StatelessWidget {
+  const _AskField({super.key, required this.hint, required this.label, required this.onTap});
+
+  final String hint;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return RendelPressable(
+      semanticLabel: label,
+      onTap: onTap,
+      child: Container(
+        height: _Round.side,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        alignment: AlignmentDirectional.centerStart,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(theme.radius.control),
+          color: theme.colors.composer.withValues(alpha: 0.7),
+          border: Border.all(color: theme.composerEdge),
+        ),
+        child: Text(
+          hint,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.text.label.copyWith(color: theme.onComposerFaint),
+        ),
+      ),
+    );
+  }
+}
+
 /// A round control at rest: the "+" and the keyboard. Half-clear, so the
 /// thread shows through it the way it shows through the dock.
 class _Round extends StatelessWidget {
@@ -3537,7 +3578,7 @@ class _Round extends StatelessWidget {
         width: side,
         height: side,
         decoration: BoxDecoration(
-          shape: BoxShape.circle,
+          borderRadius: BorderRadius.circular(theme.radius.control),
           color: theme.colors.composer.withValues(alpha: 0.7),
           border: Border.all(color: theme.composerEdge),
           boxShadow: [
@@ -3669,8 +3710,9 @@ class _MicPill extends StatelessWidget {
     this.onDown,
     this.onUp,
     this.held = false,
-    this.width = 128,
   });
+
+  static const double side = 46;
 
   final IconData icon;
   final String label;
@@ -3678,11 +3720,10 @@ class _MicPill extends StatelessWidget {
   final VoidCallback? onDown;
   final VoidCallback? onUp;
   final bool held;
-  final double width;
 
   static BoxDecoration _decoration(RendelTheme theme) => BoxDecoration(
         color: theme.colors.accent,
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(theme.radius.control),
       );
 
   @override
@@ -3697,8 +3738,8 @@ class _MicPill extends StatelessWidget {
         builder: (context, t, child) => Transform.scale(
           scale: 1 + 0.2 * Curves.easeOutBack.transform(t),
           child: Container(
-            width: width,
-            height: 52,
+            width: side,
+            height: side,
             decoration: _decoration(theme),
             child: child,
           ),
@@ -3714,8 +3755,8 @@ class _MicPill extends StatelessWidget {
     final pill = AnimatedContainer(
       duration: still ? Duration.zero : theme.motion.settle,
       curve: theme.motion.curve,
-      width: width,
-      height: 52,
+      width: side,
+      height: side,
       decoration: _decoration(theme),
       child: glyph,
     );
@@ -4583,7 +4624,7 @@ class _LitAction extends StatelessWidget {
       semanticLabel: label,
       onTap: onTap,
       child: Container(
-        height: 52,
+        height: 46,
         // The web's widths (Web 0.23.0): with the microphone a circle beside
         // it, ~14 letters fit at a 360pt screen.
         padding: EdgeInsets.symmetric(horizontal: go ? 14 : 18),

@@ -212,6 +212,8 @@ class _RendelLauncherState extends State<RendelLauncher> {
           closeLabel: Rendel.strings.closeDetail,
           onOpen: () => unawaited(Rendel.openFollowup(context)),
           onDismiss: Rendel.dismissFollowup,
+          logoUrl: Rendel.logoUrl,
+          logoHeaders: Rendel.logoHeaders,
         ),
       ),
     );
@@ -314,6 +316,8 @@ class _RendelLauncherState extends State<RendelLauncher> {
             closeLabel: Rendel.strings.closeDetail,
             onOpen: () => unawaited(Rendel.openFollowup(context)),
             onDismiss: Rendel.dismissFollowup,
+            logoUrl: Rendel.logoUrl,
+            logoHeaders: Rendel.logoHeaders,
           ),
         ),
       ),

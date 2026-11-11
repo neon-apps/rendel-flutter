@@ -5570,7 +5570,7 @@ class _Field extends StatelessWidget {
                     focusNode: node('list'),
                     onTap: flip,
                     child: RendelPressable(
-                      semanticLabel: '$label, ${selected != null ? shown : 'not chosen'}',
+                      semanticLabel: '$label, ${selected != null ? shown : strings.notChosen}',
                       expanded: options.isEmpty ? null : open != null,
                       onTap: flip,
                       child: row(

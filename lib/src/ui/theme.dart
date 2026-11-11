@@ -966,11 +966,11 @@ class RendelTheme {
   late final Color rail = colors.onSurface.withValues(alpha: 0.16);
 
   /// What a marked phrase sits on (`==x==` in a text block) and the round
-  /// behind a way-on card's mark (`design/PAGES.md`): the brand's Toprak
+  /// behind a way-on card's mark (`design/PAGES.md`): the app's own accent
   /// mixed into the surface, 18% on a light ground and 30% on a deep one. A
   /// fill only; the words on it keep the ink, so their contrast is the ink's.
   late final Color mark = Color.lerp(
-      colors.surface, const Color(0xFFB5532B), _lightOnDark ? 0.3 : 0.18)!;
+      colors.surface, colors.accent, _lightOnDark ? 0.3 : 0.18)!;
 
   /// What a readout is filled with — a progress value, the tracker's current
   /// mark: the ink 72% of the way from the ground. Soft, never the solid ink.

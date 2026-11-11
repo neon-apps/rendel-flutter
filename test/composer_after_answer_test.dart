@@ -82,7 +82,7 @@ void main() {
     await tester.testTextInput.receiveAction(TextInputAction.send);
     await answer(tester);
     expect(find.byType(TextField), findsNothing);
-    expect(find.byIcon(Icons.keyboard_outlined), findsOneWidget);
+    expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
   });
 
   testWidgets('send button: the composer is back at rest after the answer', (tester) async {
@@ -94,6 +94,6 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Send message'));
     await answer(tester);
     expect(find.byType(TextField), findsNothing);
-    expect(find.byIcon(Icons.keyboard_outlined), findsOneWidget);
+    expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
   });
 }

@@ -780,11 +780,11 @@ void main() {
     test('the mark role is Toprak mixed into the ground', () {
       final paper = RendelTheme.paper();
       expect(paper.mark,
-          Color.lerp(paper.colors.surface, const Color(0xFFB5532B), 0.18));
+          Color.lerp(paper.colors.surface, paper.colors.accent, 0.18));
       final deep = RendelTheme.deep();
       expect(
         deep.mark,
-        Color.lerp(deep.colors.surface, const Color(0xFFB5532B), 0.3),
+        Color.lerp(deep.colors.surface, deep.colors.accent, 0.3),
       );
     });
   });

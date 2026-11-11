@@ -324,7 +324,7 @@ void main() {
       ]);
     });
 
-    testWidgets('the first item is lit beside the microphone, which narrows to a circle',
+    testWidgets('the first item is lit in the place to type, before the microphone',
         (tester) async {
       await pump(tester, controller(), [
         _block('lede', 'text', {'markdown': 'It arrives today.'}),
@@ -336,8 +336,8 @@ void main() {
       expect(find.descendant(of: _lit, matching: find.byIcon(Icons.north_east_rounded)), findsOneWidget);
       final mic = tester.getRect(find.bySemanticsLabel('Speak instead of typing'));
       final lit = tester.getRect(_lit);
-      expect(mic.width, 52);
-      expect(lit.left, greaterThan(mic.right));
+      expect(mic.width, 46);
+      expect(lit.right, lessThan(mic.left));
       expect(lit.center.dy, closeTo(mic.center.dy, 1));
 
       await tester.tap(_lit);

@@ -285,12 +285,12 @@ void main() {
 
     testWidgets('draws the defaults', (tester) async {
       await pump(tester);
-      // At rest: the "+", the microphone and the keyboard.
+      // At rest: the "+", the place to type and the microphone.
       expect(find.byIcon(Icons.add_rounded), findsOneWidget);
       expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.keyboard_outlined), findsOneWidget);
+      expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
 
-      // The keyboard opens the box: the three sources and send.
+      // The field opens the box: the three sources and send.
       await tester.tap(find.bySemanticsLabel('Type a message'));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsOneWidget);
@@ -322,7 +322,7 @@ void main() {
       await tester.tapAt(const Offset(200, 200));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsNothing);
-      expect(find.byIcon(Icons.keyboard_outlined), findsOneWidget);
+      expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
     });
 
     testWidgets('a box with words in it stays open', (tester) async {

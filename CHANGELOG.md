@@ -5,6 +5,26 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.85.0
+
+**Changed**
+
+- The composer comes first: at rest a round "+", the place to type as the
+  widest thing in the row, and a round microphone after it. One tap on the
+  field opens the box with the keyboard up. Beside a lit action a round
+  keyboard stands in for the field.
+- `theme.radius.control` reaches the composer's buttons and the microphone.
+- The highlight behind a marked phrase is made from `colors.accent`.
+
+**Added**
+
+- `RendelFollowup.imageUrl`, drawn on the follow-up card; without one, the
+  app's published logo.
+
+**Fixed**
+
+- A form's unchosen dropdown said "not chosen" in English in every language.
+
 ## 0.84.0
 
 **Changed**

@@ -16,6 +16,8 @@ class RendelFollowupCard extends StatelessWidget {
     required this.onOpen,
     required this.onDismiss,
     this.raised = false,
+    this.logoUrl,
+    this.logoHeaders = const {},
   });
 
   final RendelFollowup followup;
@@ -27,6 +29,12 @@ class RendelFollowupCard extends StatelessWidget {
   /// Floating over the app rather than inside the thread: it carries the
   /// launcher's elevation.
   final bool raised;
+
+  /// The app's published logo, drawn when the message has no picture of its own.
+  final String? logoUrl;
+
+  /// Sent with the logo request: the app's key.
+  final Map<String, String> logoHeaders;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +57,22 @@ class RendelFollowupCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (followup.imageUrl != null || logoUrl != null) ...[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(theme.radius.sm),
+                    child: Image.network(
+                      followup.imageUrl ?? logoUrl!,
+                      headers: followup.imageUrl != null ? null : logoHeaders,
+                      width: followup.imageUrl != null ? 56 : 36,
+                      height: followup.imageUrl != null ? 56 : 36,
+                      fit: followup.imageUrl != null ? BoxFit.cover : BoxFit.contain,
+                      excludeFromSemantics: true,
+                      // A picture that will not load leaves the words as they were.
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                    ),
+                  ),
+                  SizedBox(width: space.md),
+                ],
                 Expanded(
                   child: Padding(
                     padding: EdgeInsets.only(top: space.xs),
