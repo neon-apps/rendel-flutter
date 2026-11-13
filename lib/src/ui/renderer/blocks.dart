@@ -1302,13 +1302,17 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _Thumbnail(
-                  url: _str(item['image_url']),
-                  width: theme.size.cardImageWidth,
-                  height: theme.size.cardImageHeight,
-                  fit: BoxFit.contain,
-                ),
-                SizedBox(height: theme.space.sm),
+                // No picture, no picture area (Vitalo, 13 November).
+                if (_str(item['image_url']) case final image?) ...[
+                  _Thumbnail(
+                    url: image,
+                    width: theme.size.cardImageWidth,
+                    height: theme.size.cardImageHeight,
+                    fit: BoxFit.contain,
+                    collapse: true,
+                  ),
+                  SizedBox(height: theme.space.sm),
+                ],
                 ...details(item, gap: theme.space.xs),
               ],
             ),
@@ -1319,14 +1323,17 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
             decoration: decoration,
             child: Row(
               children: [
-                _Thumbnail(
-                  url: _str(item['image_url']),
-                  width: theme.size.cardRowImage,
-                  height: theme.size.cardRowImage,
-                  radius: theme.radius.sm,
-                  fit: BoxFit.contain,
-                ),
-                SizedBox(width: theme.space.md),
+                if (_str(item['image_url']) case final image?) ...[
+                  _Thumbnail(
+                    url: image,
+                    width: theme.size.cardRowImage,
+                    height: theme.size.cardRowImage,
+                    radius: theme.radius.sm,
+                    fit: BoxFit.contain,
+                    collapse: true,
+                  ),
+                  SizedBox(width: theme.space.md),
+                ],
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1356,11 +1363,8 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _Thumbnail(
-                  url: _str(item['image_url']),
-                  height: theme.size.cardPhotoHeight,
-                  radius: 0,
-                ),
+                if (_str(item['image_url']) case final image?)
+                  _Thumbnail(url: image, height: theme.size.cardPhotoHeight, radius: 0, collapse: true),
                 Padding(
                   padding: EdgeInsetsDirectional.fromSTEB(
                     theme.space.md + theme.space.hair,
@@ -8099,9 +8103,15 @@ class _Thumbnail extends StatelessWidget {
     this.radius,
     this.alt,
     this.fit = BoxFit.cover,
+    this.collapse = false,
   });
 
   final String? url;
+
+  /// Nothing at all, rather than a plate, when there is no picture or it does
+  /// not load: a product card's blank tile read as a photo still coming
+  /// (Vitalo, 13 November).
+  final bool collapse;
   final double width;
   final double height;
   final double? radius;
@@ -8149,7 +8159,7 @@ class _Thumbnail extends StatelessWidget {
     // untrusted host: `url-guard.ts`) looked exactly like one whose photo
     // failed to load, and neither the customer nor we could tell which from
     // the screen. An absent image is the plate alone from here.
-    if (url == null) return placeholder(broken: false);
+    if (url == null) return collapse ? const SizedBox.shrink() : placeholder(broken: false);
 
     // Decode at the size actually drawn, on whichever axis `cover` will be
     // driven by. A 2000px product shot decoded for a 40pt row is most of a
@@ -8209,7 +8219,7 @@ class _Thumbnail extends StatelessWidget {
               child: child,
             );
           },
-          errorBuilder: (context, _, __) => placeholder(),
+          errorBuilder: (context, _, __) => collapse ? const SizedBox.shrink() : placeholder(),
           ),
         ),
       ),

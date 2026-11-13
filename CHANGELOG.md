@@ -5,6 +5,13 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.89.0
+
+**Changed**
+
+- A product card with no picture, or one that does not load, draws no
+  picture area instead of a blank plate.
+
 ## 0.88.1
 
 **Fixed**
