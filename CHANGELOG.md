@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.88.1
+
+**Fixed**
+
+- `identify` with what a missing field becomes (`'null'`, `'undefined'`, blank)
+  logs `invalid_user` and signs the person out instead of making every user
+  one person, so the next person on a shared phone never opens on the last
+  one's thread. `reset()` also forgets the conversation a relaunch would open
+  on when no thread was open.
+
 ## 0.88.0
 
 **Breaking**

@@ -133,6 +133,20 @@ void main() {
     expect(find.textContaining(_answer, findRichText: true), findsNothing);
   });
 
+  // Vitalo, 13 November: the app sent '${user['id']}' for a user with no id,
+  // so Nermin and then Berk were both "null", and Berk opened on her thread.
+  testWidgets('two people with no id told apart on one phone: the second opens fresh', (tester) async {
+    final server = _Server();
+    await tester.runAsync(() => Rendel.identify(userId: 'null'));
+    await _askAndKill(tester, server);
+
+    await _launch(tester, server);
+    await tester.runAsync(() => Rendel.identify(userId: 'null'));
+    await _open(tester);
+    expect(server.read, 0, reason: 'a missing id is nobody, and nobody is told apart from nobody');
+    expect(find.textContaining(_answer, findRichText: true), findsNothing);
+  });
+
   testWidgets('a conversation older than the window opens fresh', (tester) async {
     final server = _Server();
     await tester.runAsync(() => Rendel.identify(userId: 'olivia'));

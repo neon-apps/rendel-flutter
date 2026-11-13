@@ -553,6 +553,16 @@ class Rendel {
     Map<String, dynamic>? traits,
     String? userHmac,
   }) async {
+    /* "null" is what a missing field becomes in '${user['id']}': every user
+       of an app was one person to Rendel, and on a shared phone the next
+       one opened on the last one's thread and notes (Vitalo, 13 November).
+       Not an id: the person is treated as signed out, loudly. */
+    if (_notAnId(userId)) {
+      RendelLog.error('invalid_user',
+          'identify needs the signed-in user\'s own id, not "$userId": a missing field gives every user the same one. Treated as signed out.');
+      reset();
+      return;
+    }
     final previous = _user?['id'];
     // Another person from here on: what waits goes as who it was, and a new
     // session starts.
@@ -576,6 +586,11 @@ class Rendel {
     _identity = identity;
     await _sendIdentity(identity);
   }
+
+  /// Whether [userId] is what a missing or empty value turns into rather than
+  /// a person's id: empty, "null", "undefined", "none", "nil", "nan".
+  static bool _notAnId(String userId) =>
+      RegExp(r'^(?:|null|undefined|none|nil|nan|\[object object\])$').hasMatch(userId.trim().toLowerCase());
 
   /// The traits, and the anonymous history this phone had before the sign-in.
   /// The turns carry the user themselves, so a failure here costs neither.
@@ -1300,6 +1315,9 @@ class Rendel {
     waiting.value = RendelWaiting.none;
     if (forget) {
       unawaited(_storeUser(''));
+      // And the conversation a relaunch would open on, with the thread or
+      // without one open: two people with no id told apart shared it (Vitalo).
+      _rememberConversation(null);
       // A follow-up was for whoever was signed in, on the app's screen and inside Rendel.
       RendelFollowups.instance.clear();
       _inboxAsked = null;
