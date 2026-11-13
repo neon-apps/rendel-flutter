@@ -507,6 +507,9 @@ sealed class RendelWireEvent {
           requestId: _text(data['request_id']),
           lang: _text(data['lang']),
         );
+      case 'turn.lang':
+        final lang = _text(data['lang']);
+        return lang == null ? null : TurnLang(lang);
       case 'turn.status':
         final step = _text(data['step']);
         if (step == null) return null;
@@ -633,6 +636,14 @@ class TurnStart extends RendelWireEvent {
   /// `en-AU`). Null against an older API. The SDK's own words follow it, so
   /// a Turkish answer is not framed in English chrome.
   final String? lang;
+}
+
+/// The language the answer will be in, ahead of [TurnStart], once the
+/// person's own words say it, so the SDK's words around the wait ("Thinking…")
+/// are in it while the server gets the turn ready. Not sent by an older API.
+class TurnLang extends RendelWireEvent {
+  const TurnLang(this.lang);
+  final String lang;
 }
 
 /// What the turn is doing while the reader waits: `action` when the model

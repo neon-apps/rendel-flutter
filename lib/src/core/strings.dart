@@ -1445,7 +1445,7 @@ const Map<String, RendelStrings> _byLocale = {
     reveal: 'Göster',
     showMore: '{n} tane daha göster',
     asOf: '{time} itibarıyla',
-    arrives: 'Varış {time}',
+    arrives: 'Tahmini varış: {time}',
     inMinutes: 'yaklaşık {n} dk içinde',
     inHours: '{n} saat içinde',
     tomorrowAt: 'yarın {time}',

@@ -5,7 +5,7 @@ import PackageDescription
 let package = Package(
     name: "rendel_push",
     platforms: [
-        .iOS("13.0")
+        .iOS("15.0")
     ],
     products: [
         .library(name: "rendel-push", targets: ["rendel_push"])

@@ -1510,6 +1510,10 @@ class ConversationController extends ChangeNotifier {
             if (question >= 0) messages.removeAt(question);
             handedOff = true;
             onSupportHandoff?.call(threadId);
+          case TurnLang(:final lang):
+            // Heard ahead of turn.start, for the words around the wait.
+            visible = lang != answerLanguage;
+            answerLanguage = lang;
           case TurnStatus(:final step):
             if (step == 'action' || step == 'composing') {
               turnStatus = step;

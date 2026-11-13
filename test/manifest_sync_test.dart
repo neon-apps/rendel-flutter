@@ -49,4 +49,33 @@ void main() {
     expect(overlapped, isFalse);
     expect(sent.last, unorderedEquals(['home', 'orders', 'help']));
   });
+
+  // Night 13 November (PERF B): every launch posted the same manifest again.
+  test('an unchanged manifest is not posted again on the next launch, a changed one is', () async {
+    var posts = 0;
+    Future<void> launch(String description) async {
+      await Rendel.init(
+        appKey: 'nc_pk_test_sent_0000000000000000000000000',
+        config: RendelConfig(
+          remoteConfig: false,
+          httpClient: MockClient((request) async {
+            if (request.url.path.endsWith('/v1/apps/manifest')) posts++;
+            return http.Response('{}', 200);
+          }),
+        ),
+      );
+      Rendel.registerRoute('home', title: 'Home', description: description, open: (_) {});
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+
+    // The empty manifest at init, then the whole one.
+    await launch('The home screen.');
+    expect(posts, 2);
+    Rendel.resetForTest(relaunch: true);
+    await launch('The home screen.');
+    expect(posts, 2);
+    Rendel.resetForTest(relaunch: true);
+    await launch('The home screen, with offers.');
+    expect(posts, 3);
+  });
 }

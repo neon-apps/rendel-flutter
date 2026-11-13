@@ -5,6 +5,23 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.88.0
+
+**Breaking**
+
+- iOS 15 or newer. The podspecs and Swift packages of `rendel` and
+  `rendel_push` said 13, below what the package builds on, so an app set to
+  13 or 14 failed to build. Set `platform :ios, '15.0'` in `ios/Podfile` (and
+  the Runner's deployment target) if yours is lower.
+
+**Fixed**
+
+- A question in another language than the app's no longer waits under "Thinking…" in the app's language: the panel's words switch as soon as the server hears the language (`turn.lang`), before the answer starts.
+
+**Changed**
+
+- A launch no longer posts an unchanged manifest again: the SDK remembers what it sent for the app key in the last day, and sends it again once a day.
+
 ## 0.87.0
 
 **Added**

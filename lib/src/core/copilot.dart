@@ -97,6 +97,12 @@ class Rendel {
 
   /// Where the analytics switch, the super properties and the session are
   /// kept: the same kind of store as the device id, under its own key.
+  /// The manifest this install last sent, for which key, by which SDK and
+  /// when: a launch does not post an unchanged one again, and once a day it
+  /// does, so the server's view never goes stale for good.
+  static RendelConfigStore? _manifestSentStore;
+  static RendelConfigStore get _manifestSent => _manifestSentStore ??= _defaultStore('nc_manifest_sent');
+
   static RendelConfigStore? _analyticsStore;
   static RendelConfigStore get _analytics => _analyticsStore ??= _defaultStore('nc_analytics');
 
@@ -1328,6 +1334,7 @@ class Rendel {
   @visibleForTesting
   static void resetForTest({bool relaunch = false}) {
     _endSession(forget: !relaunch);
+    if (!relaunch) _manifestSentStore = null;
     _launcherKind = null;
     _launcherThisRun = null;
     // A test that ends with the sheet up never pops it, so the count stayed
@@ -1666,8 +1673,22 @@ class Rendel {
     await Future<void>.microtask(() {});
     final edits = _manifestEdits;
     _cachedHash = null;
+    final sent = '$_appKey ${_config.sdkVersion} ${_currentManifestHash() ?? 'empty'}';
+    final already = await _sentManifests();
+    if (already.containsKey(sent)) {
+      _manifestSynced = edits == _manifestEdits;
+      _controller?.manifestHash = _currentManifestHash();
+      return;
+    }
     try {
       await api.syncManifest(_manifest(), _config.sdkVersion);
+      final kept = ({...already, sent: DateTime.now().millisecondsSinceEpoch}.entries.toList()
+            ..sort((a, b) => b.value.compareTo(a.value)))
+          .take(8);
+      unawaited(_manifestSent
+          .write(jsonEncode({for (final entry in kept) entry.key: entry.value}))
+          .timeout(RendelDeviceId.storeTimeout)
+          .catchError((Object _) {}));
       // Only if nothing was registered while it was on the wire; otherwise
       // the queued pass sends the newer manifest.
       _manifestSynced = edits == _manifestEdits;
@@ -1676,6 +1697,26 @@ class Rendel {
       RendelLog.warn('manifest_sync_failed',
           'manifest sync failed; it is retried the next time open() runs',
           error: err);
+    }
+  }
+
+  /// The manifests this install sent in the last day ("key sdk hash" → when).
+  /// Several, because an app that registers after `init` sends the part
+  /// before the whole.
+  static Future<Map<String, int>> _sentManifests() async {
+    try {
+      final stored = await _manifestSent.read().timeout(RendelDeviceId.storeTimeout);
+      if (stored == null || stored.isEmpty) return {};
+      final now = DateTime.now().millisecondsSinceEpoch;
+      return {
+        for (final entry in (jsonDecode(stored) as Map).entries)
+          if (entry.value is int &&
+              now - (entry.value as int) >= 0 &&
+              now - (entry.value as int) < const Duration(days: 1).inMilliseconds)
+            entry.key as String: entry.value as int,
+      };
+    } catch (_) {
+      return {};
     }
   }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
-import 'package:rendel/src/core/followups.dart';
 import 'package:rendel/src/ui/followup_card.dart';
 
 /// The SDK's half of the demo persona test (2026-11-11): S-C and S-F.

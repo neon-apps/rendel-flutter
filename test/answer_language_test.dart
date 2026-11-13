@@ -106,6 +106,46 @@ void main() {
     });
   });
 
+  // Grove, 13 November: "Thinking…" in English for 7 s under a Turkish
+  // question, until turn.start named the language.
+  testWidgets('turn.lang puts the wait in the person\'s words, ahead of turn.start', (tester) async {
+    expect(RendelWireEvent.tryParse('turn.lang', {'lang': 'tr'}), isA<TurnLang>().having((e) => e.lang, 'lang', 'tr'));
+    expect(RendelWireEvent.tryParse('turn.lang', {'lang': 7}), isNull);
+
+    final frames = StreamController<List<int>>();
+    final c = ConversationController(
+      api: RendelApiClient(
+        appKey: 'nc_pk_test_x',
+        deviceId: 'd',
+        config: const RendelConfig(),
+        httpClient: MockClient.streaming((request, _) async {
+          if (!request.url.path.endsWith('/v1/chat')) return http.StreamedResponse(Stream.value(utf8.encode('{}')), 200);
+          return http.StreamedResponse(frames.stream, 200, headers: {'content-type': 'text/event-stream'});
+        }),
+      ),
+      actions: const {},
+      sdkVersion: 'flutter/test',
+    );
+    await pump(tester, c);
+    unawaited(c.send('Siparişim nerede?'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Thinking…'), findsOneWidget);
+
+    frames.add(utf8.encode(sse([('turn.lang', {'lang': 'tr'})])));
+    await tester.pump(const Duration(milliseconds: 100));
+    // The old words fade out under the new.
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(c.answerLanguage, 'tr');
+    expect(find.text('Düşünüyor…'), findsOneWidget);
+    expect(find.text('Thinking…'), findsNothing);
+
+    frames.add(utf8.encode(turn(lang: 'tr')));
+    await frames.close();
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  });
+
   test('the controller keeps the language until the conversation starts over', () async {
     final c = controller(lang: 'tr');
     addTearDown(c.dispose);

@@ -785,7 +785,7 @@ void main() {
     expect(turkish.copied, 'Kopyalandı');
     expect(turkish.showMoreCount(3), '3 tane daha göster');
     expect(turkish.asOfTime('14:02'), '14:02 itibarıyla');
-    expect(turkish.arrivesAt('14:20'), 'Varış 14:20');
+    expect(turkish.arrivesAt('14:20'), 'Tahmini varış: 14:20');
     expect(turkish.reveal, 'Göster');
     for (final language in ['tr', 'de', 'fr', 'es', 'ar']) {
       final strings = RendelStrings.forLocale(language);
