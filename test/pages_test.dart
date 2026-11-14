@@ -198,6 +198,26 @@ void main() {
       expect(tester.widget<Text>(find.text('Which shoe should I buy?')).maxLines, 1);
     });
 
+    // Tuna, 2026-11-14: 12pt in a colour that reads, still one line.
+    testWidgets('reads at 12pt in the soft ink, cut short on one line', (tester) async {
+      final api = _LiveApi();
+      final c = controller(api);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+
+      await _send(tester, c, 'Can you compare two to four products side by side: price, rating and allergens?');
+      await api.answer(tester, [_text('b0', 'I can compare them.')]);
+      await settle(tester);
+      final line = tester.widget<Text>(
+          find.text('Can you compare two to four products side by side: price, rating and allergens?'));
+      final paper = RendelTheme.paper();
+      expect(line.style!.fontSize, 12);
+      expect(line.style!.color, paper.colors.onSurfaceSoft);
+      expect(line.style!.color, isNot(paper.colors.onSurfaceFaint));
+      expect(line.maxLines, 1);
+      expect(line.overflow, TextOverflow.ellipsis);
+    });
+
     testWidgets('is revealed a word at a time, unless it was spoken',
         (tester) async {
       // How far the last word has come in: its ink's opacity.

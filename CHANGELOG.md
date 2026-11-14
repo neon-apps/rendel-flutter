@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.91.0
+
+**Changed**
+
+- The person's question over an answer is 12pt in the soft ink instead of
+  12.5pt in the faint one, so it reads at a glance. It stays on one line.
+- Without a `locale`, the SDK's own words follow the phone's language only
+  when your assistant answers in it (`languages`, else the languages picked
+  under Persona, which the app config now carries), and are English
+  otherwise. A phone outside the app's `languages` used to get the first of
+  them; pass your app's language as `locale` to keep its words in it.
+
 ## 0.90.0
 
 **Changed**

@@ -65,7 +65,14 @@ class RendelRemoteConfig {
     this.parallelReads = true,
     this.capture = RendelCapture.defaults,
     this.supportTeam,
+    this.publishedLanguages = const [],
   });
+
+  /// The languages the persona answers in, as published (`languages`, sent
+  /// only when it names some): the SDK's own words follow the phone only
+  /// into one of them (`resolveSpokenLocale`). Kept in the cache like
+  /// [parallelReads], so a 304 keeps it too.
+  final List<String> publishedLanguages;
 
   /// The team's name when the app has Support on (human support), sent only
   /// then: null means people cannot reach the team from inside the app. Kept
@@ -129,6 +136,7 @@ class RendelRemoteConfig {
         parallelReads: map['parallel_reads'] != false,
         capture: RendelCapture.parse(map['capture']),
         supportTeam: _supportTeam(map['support']),
+        publishedLanguages: _languages(map['languages']),
       );
     } catch (_) {
       return null;
@@ -144,6 +152,7 @@ class RendelRemoteConfig {
         if (!parallelReads) 'parallel_reads': false,
         if (!capture.isDefault) 'capture': capture.toJson(),
         if (supportTeam != null) 'support': {'enabled': true, 'team': supportTeam},
+        if (publishedLanguages.isNotEmpty) 'languages': publishedLanguages,
         'config': {
           if (theme.isNotEmpty) 'theme': theme,
           if (themeDark.isNotEmpty) 'themeDark': themeDark,
@@ -157,6 +166,9 @@ class RendelRemoteConfig {
     final team = value['team'];
     return team is String && team.trim().isNotEmpty ? team.trim() : null;
   }
+
+  static List<String> _languages(Object? value) =>
+      value is List ? [for (final tag in value) if (tag is String && tag.isNotEmpty) tag] : const [];
 
   static Map<String, dynamic> _submap(Object? value) =>
       value is Map ? value.cast<String, dynamic>() : const <String, dynamic>{};

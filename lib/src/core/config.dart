@@ -283,7 +283,9 @@ class RendelConfig {
   ///
   /// The device still decides which of them is used: a Russian phone gets
   /// Russian with nothing else configured. A device speaking none of them gets
-  /// the **first** in the list, so the order is a decision.
+  /// the **first** in the list, so the order is a decision. The SDK's own
+  /// words follow the device into one of them too, and are English on a
+  /// device speaking none (see [strings]).
   ///
   /// Empty hands the decision to the list published from the console, and
   /// absent that the assistant answers in whatever it is addressed in — which is
@@ -499,7 +501,8 @@ class RendelConfig {
   /// bar.
   ///
   /// Null is not "English" — it is "use the language you are answering in".
-  /// The SDK reads [locale] (or the device's) and takes the words from
+  /// The SDK reads [locale] (without one, the device's language when the
+  /// assistant answers in it, else English) and takes the words from
   /// [RendelStrings.forLocale], which is why a Turkish app no longer offers
   /// "Confirm" under a Turkish sentence. A language the SDK does not carry
   /// falls back to English, as it always did.

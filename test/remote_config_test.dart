@@ -403,6 +403,17 @@ void main() {
       expect(restored.applyToConfig(code).launcherLabel, 'Help');
     });
 
+    // The persona's languages (Tuna, 2026-11-14): kept, so a relaunch draws
+    // the SDK's own words in the right one before the network answers.
+    test('the languages the persona answers in come back too', () {
+      final fetched = RendelRemoteConfig.tryParse('{"channel":"published","languages":["tr","en",3,""],"config":{}}')!;
+      expect(fetched.publishedLanguages, ['tr', 'en']);
+      expect(fetched.isEmpty, isTrue);
+      expect(RendelRemoteConfig.tryParse(fetched.toCache())!.publishedLanguages, ['tr', 'en']);
+      expect(RendelRemoteConfig.tryParse('{"config":{}}')!.publishedLanguages, isEmpty);
+      expect(RendelRemoteConfig.tryParse('{"languages":"tr","config":{}}')!.publishedLanguages, isEmpty);
+    });
+
     test('the in-memory store is a store', () async {
       final store = RendelMemoryConfigStore();
       expect(await store.read(), isNull);

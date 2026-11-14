@@ -1,6 +1,9 @@
+import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:rendel/rendel.dart';
 import 'package:rendel/src/core/locale.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
@@ -205,28 +208,77 @@ void main() {
   });
 }
 
-/// The language the SDK's own words come out in, once an app has named the
-/// ones it is willing to speak.
-///
-/// It used to come straight off the device, which put a Turkish composer
-/// prompt and an English empty state on the same screen: two languages, and no
-/// way for the reader to tell which was the mistake.
+/// The language the SDK's own words come out in (Tuna, 2026-11-14): the
+/// app's locale when it gives one; else the phone's language when the
+/// assistant answers in it; else English.
 void _spoken() {
   group('resolveSpokenLocale', () {
-    test('leaves the device alone when no languages are named', () {
-      expect(resolveSpokenLocale('de-DE', const []), 'de-DE');
+    tearDown(() => rendelPublishedLanguages = const []);
+
+    test('is the app\'s locale when it gives one, whatever the lists say', () {
+      expect(resolveSpokenLocale('th-TH', const ['tr', 'en'], device: 'de-DE'), 'th-TH');
+      expect(resolveSpokenLocale('tr-TR', const [], published: const ['en'], device: 'de-DE'), 'tr-TR');
     });
 
-    test('keeps the device language when it is one of them', () {
-      expect(resolveSpokenLocale('ru-RU', const ['tr', 'ru']), 'ru-RU');
+    test('is the phone\'s language when the persona published it', () {
+      expect(resolveSpokenLocale(null, const [], published: const ['tr', 'ru'], device: 'ru-RU'), 'ru-RU');
+      // The published list the config applied, read when none is passed.
+      rendelPublishedLanguages = const ['tr'];
+      expect(resolveSpokenLocale(null, const [], device: 'tr-TR'), 'tr-TR');
+      expect(resolveSpokenLocale('', const [], device: 'tr-TR'), 'tr-TR');
     });
 
-    test('falls to the first named one otherwise', () {
-      expect(resolveSpokenLocale('th-TH', const ['tr', 'en']), 'tr');
+    test('is English when the persona did not publish the phone\'s language', () {
+      expect(resolveSpokenLocale(null, const [], published: const ['tr'], device: 'de-DE'), 'en');
+      rendelPublishedLanguages = const ['tr', 'ru'];
+      expect(resolveSpokenLocale(null, const [], device: 'th-TH'), 'en');
+    });
+
+    test('takes the app\'s own languages over the published ones', () {
+      expect(resolveSpokenLocale(null, const ['de'], published: const ['tr'], device: 'de-DE'), 'de-DE');
+      expect(resolveSpokenLocale(null, const ['tr', 'en'], published: const ['de'], device: 'de-DE'), 'en');
+    });
+
+    test('leaves the phone alone when no languages are named anywhere', () {
+      expect(resolveSpokenLocale(null, const [], published: const [], device: 'de-DE'), 'de-DE');
     });
 
     test('matches on the subtag, so a region does not miss the list', () {
-      expect(resolveSpokenLocale('pt-BR', const ['pt']), 'pt-BR');
+      expect(resolveSpokenLocale(null, const [], published: const ['pt'], device: 'pt-BR'), 'pt-BR');
+    });
+  });
+
+  group('the published languages', () {
+    tearDown(Rendel.resetForTest);
+
+    Future<void> start(WidgetTester tester, {List<String> languages = const []}) async {
+      final client = MockClient((request) async => http.Response(
+            request.url.path.endsWith('/v1/apps/config')
+                ? jsonEncode({'channel': 'published', 'version': 1, 'config': <String, Object>{}, 'languages': ['tr']})
+                : '{}',
+            200,
+            headers: {'content-type': 'application/json'},
+          ));
+      await tester.runAsync(() async {
+        await Rendel.init(
+          appKey: 'nc_pk_test_example_000000000000000000000000',
+          config: RendelConfig(httpClient: client, languages: languages),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+    }
+
+    testWidgets('come from the app config', (tester) async {
+      await start(tester);
+      expect(rendelPublishedLanguages, ['tr']);
+      // The test device speaks English, which this persona did not publish.
+      expect(Rendel.strings.composerHint, RendelStrings.forLocale('en').composerHint);
+    });
+
+    testWidgets('give way to the app\'s own, and a phone outside them gets English, not the first', (tester) async {
+      await start(tester, languages: const ['tr']);
+      expect(Rendel.strings.composerHint, RendelStrings.forLocale('en').composerHint);
+      expect(Rendel.strings.composerHint, isNot(RendelStrings.forLocale('tr').composerHint));
     });
   });
 }

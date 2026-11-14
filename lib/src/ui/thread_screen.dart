@@ -1746,7 +1746,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                       : 30;
         }
 
-        // What was asked, as a faint line over its answer (Tuna, 2026-10-11:
+        // What was asked, as a small line over its answer (Tuna, 2026-10-11:
         // the question stays as a small line, not a bubble). Not over a
         // card's detail, which opens under the card's own head.
         final at = answers.isEmpty ? -1 : controller.messages.indexOf(answers.first);
@@ -1998,9 +1998,11 @@ class _Helpful extends StatelessWidget {
   }
 }
 
-/// The question an answer page answers, over it: one faint line, cut with an
+/// The question an answer page answers, over it: one line, cut with an
 /// ellipsis, and the picture sent with it as a small thumbnail. Read as a
 /// caption, not as something said, so it is never a bubble (design/PAGES.md).
+/// 12pt in the soft ink rather than the faint one, so it is read rather than
+/// squinted at (Tuna, 2026-11-14); `.rd-asked` on the web.
 class _AskedLine extends StatelessWidget {
   const _AskedLine({required this.text, this.image});
 
@@ -2025,7 +2027,7 @@ class _AskedLine extends StatelessWidget {
             text.replaceAll(RegExp(r'\s+'), ' '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.text.caption.copyWith(color: theme.colors.onSurfaceFaint),
+            style: theme.text.captionSoft.copyWith(fontSize: 12),
           ),
         ),
       ],

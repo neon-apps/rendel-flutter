@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart' show ValueListenable, defaultTargetPlatform;
+import 'package:flutter/foundation.dart' show ValueListenable, defaultTargetPlatform, listEquals;
 import 'package:flutter/material.dart';
 
 import '../engine/conversation_controller.dart';
@@ -1381,6 +1381,7 @@ class Rendel {
     // Support is off until a config says otherwise, and the thread was made with the last client.
     _supportTeam = null;
     _support = null;
+    rendelPublishedLanguages = const [];
     _store = RendelMemoryConfigStore();
     _theme = RendelTheme.paper();
     _codeTheme = _theme;
@@ -1541,6 +1542,12 @@ class Rendel {
     } else {
       supportUnread.value = 0;
     }
+    // The languages the persona answers in, which the SDK's own words follow
+    // the phone into (`resolveSpokenLocale`): the launcher redraws in them.
+    if (!listEquals(rendelPublishedLanguages, remote.publishedLanguages)) {
+      rendelPublishedLanguages = remote.publishedLanguages;
+      configRevision.value++;
+    }
     if (remote.isEmpty) return;
     // Compared by PAYLOAD, not by object identity. `copyWith` always
     // allocates, so an identity check never held and the launcher rebuilt on
@@ -1629,12 +1636,8 @@ class Rendel {
   /// The host's set wins whole. Null means it never said, and the SDK answers
   /// with the language it is already answering in — the same tag the handshake
   /// sends, so "Confirm" and the sentence above it cannot disagree.
-  /// The SDK's own words, in the language the copilot is going to answer in.
-  ///
-  /// Through `languages` rather than straight off the device: the reply
-  /// language already goes through that list on the server, and chrome that
-  /// ignored it produced a thread prompting in Turkish and empty-stating in
-  /// English on the same screen.
+  /// The SDK's own words, in the app's locale, else the phone's language when
+  /// the assistant answers in it, else English ([resolveSpokenLocale]).
   /// The words the SDK is drawing in: the host's [RendelConfig.strings], or
   /// the shipped set for the language it answers in. The launcher sits in
   /// the host's tree, outside the thread's scope, and reads them here.

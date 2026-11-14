@@ -23,21 +23,31 @@ String resolveLocale(String? hostLocale) {
   return PlatformDispatcher.instance.locale.toLanguageTag();
 }
 
-/// The language the copilot will actually speak, once the app has said which
-/// ones it is willing to speak.
+/// The languages the persona answers in, as published in the console
+/// (`languages` on the app config): set when a config is applied
+/// (`Rendel._apply`), empty until then and for a persona that names none.
+List<String> rendelPublishedLanguages = const [];
+
+/// The language of the SDK's own words (Tuna, 2026-11-14): the app's locale
+/// when it gives one; else the phone's language, when it is one the
+/// assistant answers in; else English.
 ///
-/// The same rule the server applies to the answer, applied here to the SDK's
-/// own words — because a thread whose prompt is Turkish and whose empty state
-/// is English is one screen speaking two languages, and the user cannot tell
-/// which of them is the mistake.
-///
-/// The device decides among the named languages; a device speaking none of
-/// them gets the first, which is the app's own default. An empty list leaves
-/// [resolveLocale] alone, which is what every build had before `languages`
-/// existed.
-String resolveSpokenLocale(String? hostLocale, List<String> languages) {
-  final resolved = resolveLocale(hostLocale);
-  if (languages.isEmpty) return resolved;
-  final spoken = resolved.toLowerCase().replaceAll('_', '-').split('-').first;
-  return languages.contains(spoken) ? resolved : languages.first;
+/// Those are the app's `languages` when it names some, else the persona's
+/// [published] ones ([rendelPublishedLanguages]). Named nowhere, every
+/// language is answered and the phone's stands, which is what every build
+/// had before `languages` existed. [device] stands in for the phone's own
+/// tag in a test, where `PlatformDispatcher.instance` cannot be set.
+String resolveSpokenLocale(
+  String? hostLocale,
+  List<String> languages, {
+  List<String>? published,
+  String? device,
+}) {
+  final tag = hostLocale?.trim();
+  if (tag != null && tag.isNotEmpty) return tag;
+  final phone = device ?? resolveLocale(null);
+  final answered = languages.isNotEmpty ? languages : (published ?? rendelPublishedLanguages);
+  if (answered.isEmpty) return phone;
+  final spoken = phone.toLowerCase().replaceAll('_', '-').split('-').first;
+  return answered.contains(spoken) ? phone : 'en';
 }
