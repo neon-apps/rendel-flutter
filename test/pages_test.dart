@@ -927,7 +927,7 @@ void main() {
         }
       }
     }
-    expect(RendelStrings.forLocale('tr').statusAction, 'Uygulamanda bakılıyor…');
+    expect(RendelStrings.forLocale('tr').statusAction, 'Uygulamanız kontrol ediliyor…');
     expect(RendelStrings.forLocale('tr').statusComposing, 'Sayfa hazırlanıyor…');
   });
 }

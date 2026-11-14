@@ -49,6 +49,7 @@ class RendelStrings {
     this.cardLess = 'Fewer',
     this.cardMore = 'More',
     this.composerHint = 'Ask anything',
+    this.launcher = 'Ask',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
     this.readAloud = 'Answers play by themselves',
@@ -329,6 +330,11 @@ class RendelStrings {
   final String cardMore;
 
   final String composerHint;
+
+  /// The launcher's word when neither the code nor the console wrote one:
+  /// a Turkish app's launcher said "Ask" (pair 3, 14 November). The web
+  /// SDK's `launcher`, word for word.
+  final String launcher;
 
   /// Screen-reader labels for the two controls with no visible text.
   final String sendMessage;
@@ -876,6 +882,7 @@ class RendelStrings {
     String? cardLess,
     String? cardMore,
     String? composerHint,
+    String? launcher,
     String? sendMessage,
     String? newConversation,
     String? readAloud,
@@ -1109,6 +1116,7 @@ class RendelStrings {
       cardLess: cardLess ?? this.cardLess,
       cardMore: cardMore ?? this.cardMore,
       composerHint: composerHint ?? this.composerHint,
+      launcher: launcher ?? this.launcher,
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
       readAloud: readAloud ?? this.readAloud,
@@ -1355,12 +1363,13 @@ const Map<String, RendelStrings> _byLocale = {
     goBack: 'Geri',
     irreversible: 'Bu işlem geri alınamaz',
     composerHint: 'Ne isterseniz sorun',
+    launcher: 'Sor',
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
     readAloud: 'Yanıtlar kendiliğinden okunur',
     autoRead: 'Sesli yanıt',
     listen: 'Dinle',
-    readAloudThis: 'Bu cevabı dinle',
+    readAloudThis: 'Bu yanıtı dinle',
     stopReading: 'Okumayı durdur',
     retry: 'Tekrar dene',
     streamDropped: 'Bağlantı, yanıt tamamlanmadan koptu.',
@@ -1427,7 +1436,7 @@ const Map<String, RendelStrings> _byLocale = {
     files: 'Dosyalar',
     listening: 'Dinliyorum',
     statusThinking: 'Düşünüyor…',
-    statusAction: 'Uygulamanda bakılıyor…',
+    statusAction: 'Uygulamanız kontrol ediliyor…',
     statusComposing: 'Sayfa hazırlanıyor…',
     previousPage: 'Önceki sayfa',
     nextPage: 'Sonraki sayfa',
@@ -1462,7 +1471,7 @@ const Map<String, RendelStrings> _byLocale = {
     fieldAtMost: '{max} veya daha azını girin.',
     fieldOnOrAfter: '{date} veya sonrasını seçin.',
     fieldOnOrBefore: '{date} veya öncesini seçin.',
-    ratingThanks: 'Bildirdiğin için teşekkürler',
+    ratingThanks: 'Bildirdiğiniz için teşekkürler',
     ratingStars: '5 üzerinden {n}',
     ratingFrom: '{count} değerlendirmeye göre 5 üzerinden {n}',
     numberLocale: 'tr',
@@ -1592,6 +1601,7 @@ const Map<String, RendelStrings> _byLocale = {
     goBack: 'Zurück',
     irreversible: 'Das kann nicht rückgängig gemacht werden',
     composerHint: 'Stellen Sie Ihre Frage',
+    launcher: 'Fragen',
     sendMessage: 'Nachricht senden',
     newConversation: 'Neue Unterhaltung beginnen',
     readAloud: 'Antworten werden von selbst vorgelesen',
@@ -1831,6 +1841,7 @@ const Map<String, RendelStrings> _byLocale = {
     goBack: 'Retour',
     irreversible: 'Cette action est irréversible',
     composerHint: 'Posez votre question',
+    launcher: 'Demander',
     sendMessage: 'Envoyer le message',
     newConversation: 'Démarrer une nouvelle conversation',
     readAloud: 'Les réponses se lisent d’elles-mêmes',
@@ -2069,6 +2080,7 @@ const Map<String, RendelStrings> _byLocale = {
     goBack: 'Volver',
     irreversible: 'Esto no se puede deshacer',
     composerHint: 'Pregunta lo que quieras',
+    launcher: 'Preguntar',
     sendMessage: 'Enviar mensaje',
     newConversation: 'Iniciar una conversación nueva',
     readAloud: 'Las respuestas se leen solas',
@@ -2306,6 +2318,7 @@ const Map<String, RendelStrings> _byLocale = {
     goBack: 'رجوع',
     irreversible: 'لا يمكن التراجع عن هذا',
     composerHint: 'اسأل عن أي شيء',
+    launcher: 'اسأل',
     sendMessage: 'إرسال الرسالة',
     newConversation: 'بدء محادثة جديدة',
     readAloud: 'تُقرأ الإجابات تلقائيًا',

@@ -178,6 +178,35 @@ void main() {
       expect(find.bySemanticsLabel(Rendel.strings.openCopilot), findsOneWidget);
     });
 
+    // Pair 3, 14 November: a Turkish app that wrote no label said "Ask".
+    testWidgets("no label written: the SDK's own word, in the language the assistant answers in", (tester) async {
+      await tester.runAsync(() => Rendel.init(
+            appKey: _key,
+            config: RendelConfig(
+              remoteConfig: false,
+              httpClient: MockClient((request) async => http.Response('{}', 200)),
+              languages: const ['tr'],
+            ),
+          ));
+      await tester.pumpWidget(_fab());
+      expect(find.text('Sor'), findsOneWidget);
+      expect(find.text('Ask'), findsNothing);
+    });
+
+    testWidgets('a label the code wrote stays, in any language', (tester) async {
+      await tester.runAsync(() => Rendel.init(
+            appKey: _key,
+            config: RendelConfig(
+              remoteConfig: false,
+              httpClient: MockClient((request) async => http.Response('{}', 200)),
+              languages: const ['tr'],
+              launcherLabel: 'Asistan',
+            ),
+          ));
+      await tester.pumpWidget(_fab());
+      expect(find.text('Asistan'), findsOneWidget);
+    });
+
     testWidgets('icon: round, as tall as the label, and says the word', (tester) async {
       await _start(tester);
       await tester.pumpWidget(_fab());

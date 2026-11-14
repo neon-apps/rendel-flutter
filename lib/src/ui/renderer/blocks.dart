@@ -13746,8 +13746,11 @@ List<String> _productChips(Map item) => [
     ];
 
 /// Short facts under a card's title ("3+1", "120 m²"): hairline pills on one
-/// line. What does not fit is clipped at the card's edge rather than wrapped
-/// onto a second line, so the cards in a rail keep one height.
+/// line, so the cards in a rail keep one height. A pill that does not fit
+/// whole is left off with the ones after it, rather than cut at the card's
+/// edge mid-word ("Min. 1", "Teslin": Tabak, 2026-11-14), and a single pill
+/// wider than the card is shortened with an ellipsis. `.rd-product-chips` on
+/// the web.
 class _FactChips extends StatelessWidget {
   const _FactChips(this.chips);
 
@@ -13757,28 +13760,37 @@ class _FactChips extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final style = theme.text.captionSoft.copyWith(fontWeight: FontWeight.w600);
-    return ClipRect(
-      // The row is laid out at its own width, past the card if it must be,
-      // and the clip is what keeps it to the card.
-      child: OverflowBox(
-        maxWidth: double.infinity,
-        alignment: AlignmentDirectional.centerStart,
-        fit: OverflowBoxFit.deferToChild,
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            for (final (i, chip) in chips.indexed) ...[
-              if (i > 0) SizedBox(width: theme.space.xs),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: theme.space.sm, vertical: theme.space.hair),
-                decoration: BoxDecoration(
-                  border: Border.all(color: theme.hairline),
-                  borderRadius: BorderRadius.circular(theme.radius.control),
+    // One pill's height: a line of its text, its padding and its hairline.
+    final line = TextPainter(
+      text: TextSpan(text: chips.first, style: style),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final height = line.height + theme.space.hair * 2 + 2;
+    line.dispose();
+    return SizedBox(
+      height: height + 0.5,
+      child: ClipRect(
+        // The pills wrap at the card's width and only their first line shows.
+        child: OverflowBox(
+          maxHeight: double.infinity,
+          alignment: AlignmentDirectional.topStart,
+          child: Wrap(
+            spacing: theme.space.xs,
+            runSpacing: theme.space.xs,
+            children: [
+              for (final chip in chips)
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: theme.space.sm, vertical: theme.space.hair),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: theme.hairline),
+                    borderRadius: BorderRadius.circular(theme.radius.control),
+                  ),
+                  child: Text(chip, maxLines: 1, softWrap: false, overflow: TextOverflow.ellipsis, style: style),
                 ),
-                child: Text(chip, maxLines: 1, softWrap: false, style: style),
-              ),
             ],
-          ],
+          ),
         ),
       ),
     );

@@ -363,8 +363,17 @@ class _RendelLauncherState extends State<RendelLauncher> {
     if (!Rendel.isInitialized || !(Rendel.isEnabled || Rendel.supportOpen)) {
       return const SizedBox.shrink();
     }
-    return _button(theme, widget.label ?? Rendel.config.launcherLabel, () => _tap(context), widget.builder);
+    return _button(theme, _launcherWord(widget.label), () => _tap(context), widget.builder);
   }
+}
+
+/// The launcher's word: this placement's own, else the code's or the
+/// console's, else the SDK's own in the language the assistant answers in.
+/// [RendelConfig.launcherLabel] defaults to 'Ask', so 'Ask' is read as not
+/// written: a Turkish app's launcher said "Ask" (pair 3, 14 November).
+String _launcherWord(String? own) {
+  final configured = Rendel.config.launcherLabel;
+  return own ?? (configured == 'Ask' ? Rendel.strings.launcher : configured);
 }
 
 /// A tap on the launcher: the thread, or the team's page while a conversation with them is open.
@@ -931,7 +940,7 @@ class _FloatingLauncherState extends State<_FloatingLauncher> with SingleTickerP
           link: _Floating.link,
           child: KeyedSubtree(
             key: _key,
-            child: _button(theme, host.widget.label ?? Rendel.config.launcherLabel, () {
+            child: _button(theme, _launcherWord(host.widget.label), () {
               if (!_moved) _tap(host.context);
             }, host.widget.builder),
           ),

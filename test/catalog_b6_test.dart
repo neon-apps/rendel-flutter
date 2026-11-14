@@ -78,6 +78,21 @@ final _flats = _wire('product_cards', {
   ],
 });
 
+// Tabak, 2026-11-14: a restaurant card whose second and third facts did not fit and were cut mid-word.
+final _restaurant = _wire('product_cards', {
+  'items': [
+    {
+      'title': 'Taş Fırın Karadeniz Pidecisi',
+      'subtitle': 'Üsküdar · 10:00–02:00',
+      'chips': ['25-35 dk', 'Min. 150 ₺', 'Teslimat ücretsiz'],
+    },
+    {
+      'title': 'Uzun',
+      'chips': ['En az 150 ₺ siparişte tüm İstanbul içi teslimat ücretsizdir'],
+    },
+  ],
+});
+
 final _colours = _wire('variant_picker', {
   'label': 'Colour',
   'style': 'swatches',
@@ -310,21 +325,30 @@ void main() {
   });
 
   group('product_cards chips', () {
-    testWidgets('under the title, on one line, clipped at the card, named in its label', (tester) async {
+    testWidgets('under the title, on one line, named in its label; a pill that does not fit whole is left off', (tester) async {
       await pump(tester, [_flats]);
       final chips = ['3+1', '120 m²', '2 baths', 'Sea view'];
       double top(String text) => tester.getRect(find.text(text)).top;
       for (final chip in chips) {
         expect(find.text(chip), findsOneWidget);
-        expect(top(chip), top(chips.first), reason: 'one line');
       }
       expect(top('3+1'), greaterThan(tester.getRect(find.text('Kadıköy')).bottom));
       expect(top('3+1'), lessThan(top('₺4.2M')));
-      // The row is clipped to the card's width rather than wrapped or
-      // overflowing it.
+      // One line within the card: every pill is either whole inside the clip
+      // or wholly under it, never cut at the card's edge (Tabak, 2026-11-14).
       final clip = tester.getRect(find.ancestor(of: find.text('3+1'), matching: find.byType(ClipRect)).first);
       expect(clip.width, lessThanOrEqualTo(theme.size.cardWidth - 2 * theme.space.plate + 0.01));
-      expect(tester.getRect(find.text('Sea view')).left, greaterThan(clip.right), reason: 'clipped, not wrapped');
+      for (final chip in chips) {
+        final rect = tester.getRect(find.text(chip));
+        final shown = rect.top < clip.bottom;
+        if (shown) {
+          expect(rect.top, top(chips.first), reason: '$chip on the one line');
+          expect(rect.right, lessThanOrEqualTo(clip.right + 0.01), reason: '$chip whole');
+        } else {
+          expect(rect.top, greaterThanOrEqualTo(clip.bottom), reason: '$chip left off whole');
+        }
+      }
+      expect(top('Sea view'), greaterThanOrEqualTo(clip.bottom), reason: 'does not fit, left off rather than cut');
       expect(tester.takeException(), isNull);
       expect(find.bySemanticsLabel(RegExp(r'^Moda flat, Kadıköy, 3\+1, 120 m², 2 baths, Sea view, ₺4\.2M$')), findsOneWidget);
       // A pill with the hairline and no fill.
@@ -335,6 +359,20 @@ void main() {
       expect(tester.widget<Text>(find.text('3+1')).style?.fontWeight, FontWeight.w600);
       // A card without chips draws none.
       expect(find.byWidgetPredicate((w) => w is ClipRect && w.child is OverflowBox), findsOneWidget);
+    });
+
+    testWidgets('a restaurant card shows its facts whole, and one too long for the card ends in an ellipsis', (tester) async {
+      await pump(tester, [_restaurant]);
+      for (final first in ['25-35 dk', 'En az 150 ₺ siparişte tüm İstanbul içi teslimat ücretsizdir']) {
+        final clip = tester.getRect(find.ancestor(of: find.text(first), matching: find.byType(ClipRect)).first);
+        for (final chip in tester.widgetList<Text>(find.descendant(of: find.ancestor(of: find.text(first), matching: find.byType(Wrap)).first, matching: find.byType(Text)))) {
+          final rect = tester.getRect(find.byWidget(chip));
+          if (rect.top < clip.bottom) expect(rect.right, lessThanOrEqualTo(clip.right + 0.01), reason: '${chip.data} whole or shortened');
+        }
+      }
+      final long = tester.renderObject<RenderParagraph>(find.text('En az 150 ₺ siparişte tüm İstanbul içi teslimat ücretsizdir'));
+      expect(long.didExceedMaxLines, isTrue, reason: 'shortened with an ellipsis');
+      expect(tester.takeException(), isNull);
     });
   });
 

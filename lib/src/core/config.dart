@@ -283,9 +283,8 @@ class RendelConfig {
   ///
   /// The device still decides which of them is used: a Russian phone gets
   /// Russian with nothing else configured. A device speaking none of them gets
-  /// the **first** in the list, so the order is a decision. The SDK's own
-  /// words follow the device into one of them too; on a device speaking none
-  /// they are English when the list has it, else the first (see [strings]).
+  /// English when the list has it, else the **first**, so the order is a
+  /// decision. The SDK's own words follow the same rule (see [strings]).
   ///
   /// Empty hands the decision to the list published from the console, and
   /// absent that the assistant answers in whatever it is addressed in — which is
@@ -403,6 +402,8 @@ class RendelConfig {
   final Duration streamIdleTimeout;
 
   /// The word on the launcher. Name what the user gets, in their words.
+  /// Left at 'Ask', the launcher says the SDK's own word in the language
+  /// the assistant answers in ([RendelStrings.launcher]: "Sor" in Turkish).
   final String launcherLabel;
 
   /// The launcher with its word, or as a round button with its icon alone.

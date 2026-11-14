@@ -29,6 +29,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'cardLess': (s) => s.cardLess,
   'cardMore': (s) => s.cardMore,
   'composerHint': (s) => s.composerHint,
+  'launcher': (s) => s.launcher,
   'sendMessage': (s) => s.sendMessage,
   'newConversation': (s) => s.newConversation,
   'readAloud': (s) => s.readAloud,

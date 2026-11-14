@@ -5,6 +5,25 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.92.1
+
+**Changed**
+
+- A launcher whose label neither the code nor the console wrote says the
+  SDK's own word in the language the assistant answers in, as the web SDK
+  does: "Sor" in a Turkish-only app, where it said "Ask".
+  `RendelStrings.launcher` holds the word, in every language the SDK ships.
+
+**Fixed**
+
+- A card's short facts ("25-35 dk", "Min. 150 ₺") are no longer cut
+  mid-word at its edge: a fact that does not fit whole is left off, with
+  the ones after it, and a single one wider than the card ends in an
+  ellipsis.
+- In Turkish, the SDK's own words say "siz", as the assistant does by
+  default, where "Checking your app…" and "Thanks for telling us" said
+  "sen"; "Listen to this answer" says "yanıt", not "cevap".
+
 ## 0.92.0
 
 **Changed**

@@ -639,7 +639,7 @@ void main() {
     expect(english.expand, 'Show');
     expect(english.collapse, 'Hide');
     final turkish = RendelStrings.forLocale('tr');
-    expect(turkish.ratingThanks, 'Bildirdiğin için teşekkürler');
+    expect(turkish.ratingThanks, 'Bildirdiğiniz için teşekkürler');
     expect(turkish.ratingStarsOf(4), '5 üzerinden 4');
     expect(turkish.thumbsUp, 'İyi');
     expect(turkish.thumbsDown, 'İyi değil');
