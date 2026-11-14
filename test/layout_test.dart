@@ -177,6 +177,29 @@ void main() {
     });
   });
 
+  // Vitalo, 13 November: two products compared in a table read
+  // "Whey Protein 90…" and "Whey Isolate 90…" over their columns.
+  testWidgets('a table gives a long column name two lines, and a short one stays one', (tester) async {
+    await pump(tester, 'table', {
+      'columns': ['', 'Whey Protein 900 g', 'Whey Isolate 900 g'],
+      'rows': [
+        ['Price', '1.249 ₺', '1.749 ₺'],
+        ['Allergens', 'Milk, soy', 'Milk'],
+      ],
+    }, scale: 1.0);
+    for (final name in ['Whey Protein 900 g', 'Whey Isolate 900 g']) {
+      final paragraph = tester.renderObject<RenderParagraph>(find.text(name));
+      expect(paragraph.didExceedMaxLines, isFalse, reason: '$name was cut');
+    }
+    await pump(tester, 'table', {
+      'columns': ['Item', 'Qty'],
+      'rows': [
+        ['Runner 27', '2'],
+      ],
+    }, scale: 1.0);
+    expect(tester.getSize(find.text('Qty')).height, lessThan(30));
+  });
+
   group('table keeps a readable scrolling half at every OS font scale', () {
     // The sticky column scales with the reader's text size so its cells do not
     // clip. The screen does not scale with it. Unclamped, 132pt * 2.0 took 264

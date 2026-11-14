@@ -5,6 +5,13 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.90.0
+
+**Changed**
+
+- A table gives a long column name up to three lines instead of cutting it
+  to one ("Whey Protein 90…").
+
 ## 0.89.0
 
 **Changed**

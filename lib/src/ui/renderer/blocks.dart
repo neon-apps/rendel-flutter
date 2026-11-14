@@ -4524,8 +4524,12 @@ Widget buildTable(BuildContext context, WireBlock block, RendelDispatcher dispat
   // as fixed: at the largest OS font scale a two-line cell needs more than
   // 48pt and would otherwise clip.
   final scaler = MediaQuery.textScalerOf(context);
-  final headerHeight =
+  final oneLineHead =
       math.max(38.0, scaler.scale(theme.type.overline) * 1.2 + theme.space.md);
+  // Up to three lines for the head when a column's name needs them, measured
+  // once the columns' widths are known (below): "Whey Protein 90…" told the
+  // person nothing about which product the column was (Vitalo, 13 November).
+  var headerHeight = oneLineHead;
   final rowHeight = math.max(
       _minTarget, scaler.scale(theme.type.caption) * 1.35 * 2 + theme.space.md);
 
@@ -4561,9 +4565,9 @@ Widget buildTable(BuildContext context, WireBlock block, RendelDispatcher dispat
         padding: EdgeInsets.symmetric(horizontal: theme.space.md),
         child: Text(
           value,
-          // Two lines then an ellipsis: a cell that grows to six lines
-          // destroys the table it belongs to.
-          maxLines: header ? 1 : 2,
+          // Two lines then an ellipsis (three for a column's name): a cell
+          // that grows to six lines destroys the table it belongs to.
+          maxLines: header ? 3 : 2,
           overflow: TextOverflow.ellipsis,
           textAlign: figure ? TextAlign.end : TextAlign.start,
           style: header
@@ -4634,11 +4638,25 @@ Widget buildTable(BuildContext context, WireBlock block, RendelDispatcher dispat
         final room = constraints.maxWidth - stickyWidth;
         final least = theme.size.column * columnScale;
         final fits = rest * least <= room;
+        final otherWidth = fits ? room / rest : least;
+        int lines(int c) {
+          final painter = TextPainter(
+            text: TextSpan(text: columns[c], style: headStyle),
+            maxLines: 3,
+            textScaler: scaler,
+            textDirection: Directionality.of(context),
+          )..layout(maxWidth: math.max(0, (c == 0 ? stickyWidth : otherWidth) - theme.space.md * 2));
+          final count = painter.computeLineMetrics().length;
+          painter.dispose();
+          return count;
+        }
+        final most = [for (var c = 0; c < columns.length; c++) lines(c)].fold(1, math.max);
+        headerHeight = oneLineHead + (most - 1) * scaler.scale(theme.type.overline) * 1.25;
         final others = Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var c = 1; c < columns.length; c++)
-              column(c, sticky: false, width: fits ? room / rest : least),
+              column(c, sticky: false, width: otherWidth),
           ],
         );
         // No divider after the pinned column: the first column's weight
