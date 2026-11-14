@@ -68,6 +68,33 @@ void main() {
     expect(controller.canRetry, isTrue);
   });
 
+  test('a manifest the server lost is sent again, and the turn tried once more by itself', () async {
+    final unknown = ('error', <String, dynamic>{'code': 'manifest_unknown', 'message': 'Reconnect.', 'retryable': false});
+    final (controller, bodies) = setup([
+      sse([start, unknown, end('error')]),
+      sse([start, ...answer, end('completed')]),
+    ]);
+    var resent = 0;
+    controller.onManifestUnknown = () async => resent++;
+    await controller.send('selam');
+    expect(resent, 1);
+    expect(bodies, hasLength(2));
+    expect(bodies[1]['turn_id'], bodies[0]['turn_id']);
+    expect(controller.errorCode, isNull);
+  });
+
+  test('a second manifest_unknown is shown as usual', () async {
+    final unknown = ('error', <String, dynamic>{'code': 'manifest_unknown', 'message': 'Reconnect.', 'retryable': false});
+    final (controller, bodies) = setup([
+      sse([start, unknown, end('error')]),
+      sse([start, unknown, end('error')]),
+    ]);
+    controller.onManifestUnknown = () async {};
+    await controller.send('selam');
+    expect(bodies, hasLength(2));
+    expect(controller.errorCode, 'manifest_unknown');
+  });
+
   test('other errors are not tried again by themselves', () async {
     final (controller, bodies) = setup([sse([start, internal, end('error')])]);
     await controller.send('selam');

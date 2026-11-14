@@ -1190,6 +1190,14 @@ class ConversationController extends ChangeNotifier {
   /// opens on the thread. Null where Support is not wired: nothing opens.
   void Function(String threadId)? onSupportHandoff;
 
+  /// The server does not know this build's actions (`manifest_unknown`):
+  /// sends them again, whatever this install remembers sending. The turn
+  /// is then tried once more by itself. Without it the error's advice,
+  /// "close and reopen", did nothing for a day: the install kept a sent
+  /// manifest that long and never sent it again (a demo copy that started
+  /// over, 2026-11-14).
+  Future<void> Function()? onManifestUnknown;
+
   /// The person took the team offered under an answer they rated down: the
   /// support page opens. Null where Support is not wired: no offer is drawn.
   void Function()? onOpenTeam;
@@ -1746,6 +1754,23 @@ class ConversationController extends ChangeNotifier {
       final jitter = autoRetryDelay == Duration.zero ? 0 : Random().nextInt(2000);
       await Future<void>.delayed(autoRetryDelay + Duration(milliseconds: jitter));
       try {
+        if (generation == _generation) await _run(busyPayload, inherited);
+      } finally {
+        _retryingByItself = false;
+      }
+      return;
+    }
+
+    // The server lost this build's actions: they go again, and so does the
+    // turn, once, by itself. A second `manifest_unknown` shows as usual.
+    final resend = onManifestUnknown;
+    if (errorCode == 'manifest_unknown' && !produced && !_retryingByItself && busyPayload != null && resend != null) {
+      _retryingByItself = true;
+      errorText = null;
+      errorCode = null;
+      _notify();
+      try {
+        await resend();
         if (generation == _generation) await _run(busyPayload, inherited);
       } finally {
         _retryingByItself = false;

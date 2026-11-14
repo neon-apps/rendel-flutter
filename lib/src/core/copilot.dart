@@ -854,6 +854,7 @@ class Rendel {
         ..manifestHash = _currentManifestHash()
         ..onConversation = _rememberConversation
         ..onSupportHandoff = _onSupportHandoff
+        ..onManifestUnknown = _resendManifest
         ..onOpenTeam = _onOpenTeam;
 
   /// The thread on screen, in its sheet or in the bubble. Null when the
@@ -1720,6 +1721,18 @@ class Rendel {
           'manifest sync failed; it is retried the next time open() runs',
           error: err);
     }
+  }
+
+  /// Sends the manifest again although this install remembers sending it:
+  /// the server said it does not know it (`manifest_unknown`).
+  static Future<void> _resendManifest() async {
+    try {
+      await _manifestSent.write('{}').timeout(RendelDeviceId.storeTimeout);
+    } catch (_) {
+      // A store that cannot be written is read as empty next time anyway.
+    }
+    _manifestSynced = false;
+    await _syncManifest();
   }
 
   /// The manifests this install sent in the last day ("key sdk hash" → when).

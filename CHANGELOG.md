@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.92.3
+
+**Fixed**
+
+- When Rendel's server no longer knows the actions this build registered
+  (`manifest_unknown`), the SDK sends them again and tries the turn once
+  more by itself. Before, every turn failed with "close and reopen the app"
+  until the SDK sent its actions again, at most once a day, since it
+  remembered having sent them.
+
 ## 0.92.2
 
 **Fixed**
