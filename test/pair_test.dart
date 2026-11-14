@@ -39,9 +39,9 @@ void main() {
       expect(request.headers['X-Rendel-Key'], 'nc_pk_test_x');
       expect(request.headers['X-Rendel-Device'], 'd' * 32);
       // The SDK's own language: the test device speaks English, which is not
-      // one of the app's `languages`, so English rather than the first of
-      // them (Tuna, 2026-11-14).
-      expect(request.headers['Accept-Language'], 'en');
+      // one of the app's `languages`, and neither is English, so the first
+      // of them (Tuna, 2026-11-14).
+      expect(request.headers['Accept-Language'], 'tr');
       expect(request.headers['Content-Type'], startsWith('application/json'));
     });
 

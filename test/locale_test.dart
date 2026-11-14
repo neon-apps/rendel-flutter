@@ -210,7 +210,8 @@ void main() {
 
 /// The language the SDK's own words come out in (Tuna, 2026-11-14): the
 /// app's locale when it gives one; else the phone's language when the
-/// assistant answers in it; else English.
+/// assistant answers in it; else English when it answers in English; else
+/// its first language, so the screen never speaks two languages at once.
 void _spoken() {
   group('resolveSpokenLocale', () {
     tearDown(() => rendelPublishedLanguages = const []);
@@ -228,15 +229,22 @@ void _spoken() {
       expect(resolveSpokenLocale('', const [], device: 'tr-TR'), 'tr-TR');
     });
 
-    test('is English when the persona did not publish the phone\'s language', () {
-      expect(resolveSpokenLocale(null, const [], published: const ['tr'], device: 'de-DE'), 'en');
-      rendelPublishedLanguages = const ['tr', 'ru'];
+    test('is English when the persona answers in English but not in the phone\'s language', () {
+      expect(resolveSpokenLocale(null, const [], published: const ['tr', 'en'], device: 'de-DE'), 'en');
+      rendelPublishedLanguages = const ['ru', 'en'];
       expect(resolveSpokenLocale(null, const [], device: 'th-TH'), 'en');
+    });
+
+    test('is the persona\'s first language when it answers in neither', () {
+      expect(resolveSpokenLocale(null, const [], published: const ['tr'], device: 'de-DE'), 'tr');
+      rendelPublishedLanguages = const ['ru', 'tr'];
+      expect(resolveSpokenLocale(null, const [], device: 'th-TH'), 'ru');
     });
 
     test('takes the app\'s own languages over the published ones', () {
       expect(resolveSpokenLocale(null, const ['de'], published: const ['tr'], device: 'de-DE'), 'de-DE');
       expect(resolveSpokenLocale(null, const ['tr', 'en'], published: const ['de'], device: 'de-DE'), 'en');
+      expect(resolveSpokenLocale(null, const ['tr'], published: const ['en'], device: 'de-DE'), 'tr');
     });
 
     test('leaves the phone alone when no languages are named anywhere', () {
@@ -271,14 +279,14 @@ void _spoken() {
     testWidgets('come from the app config', (tester) async {
       await start(tester);
       expect(rendelPublishedLanguages, ['tr']);
-      // The test device speaks English, which this persona did not publish.
-      expect(Rendel.strings.composerHint, RendelStrings.forLocale('en').composerHint);
+      // The test device speaks English, which this Turkish-only persona does
+      // not: its words open in Turkish, as its welcome does.
+      expect(Rendel.strings.composerHint, RendelStrings.forLocale('tr').composerHint);
     });
 
-    testWidgets('give way to the app\'s own, and a phone outside them gets English, not the first', (tester) async {
-      await start(tester, languages: const ['tr']);
+    testWidgets('give way to the app\'s own', (tester) async {
+      await start(tester, languages: const ['en', 'tr']);
       expect(Rendel.strings.composerHint, RendelStrings.forLocale('en').composerHint);
-      expect(Rendel.strings.composerHint, isNot(RendelStrings.forLocale('tr').composerHint));
     });
   });
 }

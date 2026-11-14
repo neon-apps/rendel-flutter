@@ -1637,7 +1637,8 @@ class Rendel {
   /// with the language it is already answering in — the same tag the handshake
   /// sends, so "Confirm" and the sentence above it cannot disagree.
   /// The SDK's own words, in the app's locale, else the phone's language when
-  /// the assistant answers in it, else English ([resolveSpokenLocale]).
+  /// the assistant answers in it, else English when it answers in English,
+  /// else its first language ([resolveSpokenLocale]).
   /// The words the SDK is drawing in: the host's [RendelConfig.strings], or
   /// the shipped set for the language it answers in. The launcher sits in
   /// the host's tree, outside the thread's scope, and reads them here.

@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.92.0
+
+**Changed**
+
+- Without a `locale`, on a phone whose language your assistant does not
+  answer in, the SDK's own words are English only when the assistant
+  answers in English, else in its first language: a Turkish-only assistant
+  on a German phone opens in Turkish, as its welcome does (0.91.0 opened it
+  in English).
+
 ## 0.91.0
 
 **Changed**

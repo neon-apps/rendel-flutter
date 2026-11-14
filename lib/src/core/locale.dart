@@ -30,7 +30,9 @@ List<String> rendelPublishedLanguages = const [];
 
 /// The language of the SDK's own words (Tuna, 2026-11-14): the app's locale
 /// when it gives one; else the phone's language, when it is one the
-/// assistant answers in; else English.
+/// assistant answers in; else English, when the assistant answers in
+/// English; else the first language it answers in, so the screen never
+/// speaks two languages before an answer says which.
 ///
 /// Those are the app's `languages` when it names some, else the persona's
 /// [published] ones ([rendelPublishedLanguages]). Named nowhere, every
@@ -49,5 +51,6 @@ String resolveSpokenLocale(
   final answered = languages.isNotEmpty ? languages : (published ?? rendelPublishedLanguages);
   if (answered.isEmpty) return phone;
   final spoken = phone.toLowerCase().replaceAll('_', '-').split('-').first;
-  return answered.contains(spoken) ? phone : 'en';
+  if (answered.contains(spoken)) return phone;
+  return answered.contains('en') ? 'en' : answered.first;
 }
