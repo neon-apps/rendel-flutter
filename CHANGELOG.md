@@ -5,6 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.92.2
+
+**Fixed**
+
+- The Turkish line shown while an action runs reads whole in its pill on
+  a phone: 0.92.1's "Uygulamanız kontrol ediliyor…" was cut to "…ediliy…"
+  on a 402-pt iPhone. It now says "Uygulamaya bakılıyor…".
+- The French status lines fit the pill too ("Vérification de l'app…",
+  "Lecture des détails…", where they ran to 28 and 25 characters), and the
+  German, French and Spanish lines now read the same in the mobile and
+  web SDKs.
+
 ## 0.92.1
 
 **Changed**

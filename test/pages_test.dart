@@ -927,7 +927,24 @@ void main() {
         }
       }
     }
-    expect(RendelStrings.forLocale('tr').statusAction, 'Uygulamanız kontrol ediliyor…');
+    expect(RendelStrings.forLocale('tr').statusAction, 'Uygulamaya bakılıyor…');
     expect(RendelStrings.forLocale('tr').statusComposing, 'Sayfa hazırlanıyor…');
+  });
+
+  // The pill in the microphone's place cut 0.92.1's Turkish wait line on a
+  // 402-pt iPhone, where 26 characters and the ellipsis showed, and the
+  // French lines before it. 24 leaves room on a 375-pt phone.
+  test('the status lines fit the pill on a phone in all six languages', () {
+    final long = [
+      for (final language in ['en', 'tr', 'de', 'fr', 'es', 'ar'])
+        for (final line in [
+          RendelStrings.forLocale(language).statusThinking,
+          RendelStrings.forLocale(language).statusAction,
+          RendelStrings.forLocale(language).statusComposing,
+          RendelStrings.forLocale(language).statusDetail,
+        ])
+          if (line.runes.length > 24) '$language: $line',
+    ];
+    expect(long, isEmpty);
   });
 }
