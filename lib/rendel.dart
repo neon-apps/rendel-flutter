@@ -65,6 +65,7 @@ export 'src/ui/renderer/blocks.dart'
         RendelPressable,
         RendelPulse,
         RendelSwap;
+export 'src/ui/lab/lab.dart' show RendelLook, RendelSuggestionCard;
 export 'src/ui/theme.dart'
     show
         RendelTheme,

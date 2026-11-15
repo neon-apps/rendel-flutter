@@ -953,6 +953,7 @@ class Rendel {
         return false;
       }
     }
+    final camera = _config.onPickAttachment == null && await RendelPlatform.cameraReady();
     if (!context.mounted) return false;
     final controller = _ensureController(api);
     final exit = await showRendelSupport(
@@ -968,6 +969,14 @@ class Rendel {
         null => pickFrom,
       },
       onUpload: (file) => api.upload(file.bytes, file.mediaType, fileName: file.name),
+      // The same sources as the assistant's +.
+      sources: _config.onPickAttachment != null
+          ? const [RendelAttachSource.files]
+          : [
+              RendelAttachSource.photos,
+              if (camera) RendelAttachSource.camera,
+              RendelAttachSource.files,
+            ],
       theme: themeOf(context),
       strings: strings,
     );

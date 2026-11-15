@@ -7,6 +7,7 @@ import 'package:rendel/rendel.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
+import 'package:rendel/src/ui/lab/lab.dart' show LabGlass;
 
 /// The opening screen as the console's Appearance preview draws it (Tuna,
 /// 2026-10-28, Grove on a phone beside the preview): the welcome at the top,
@@ -43,15 +44,15 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('the welcome opens at the top of the panel, not mid-screen', (tester) async {
+  testWidgets('the welcome is centred, a little above the middle (sdk-look-a §4)', (tester) async {
     await pump(tester, RendelTheme.paper());
-    final title = tester.getTopLeft(find.text('How can I help with your shop?'));
-    // Only the panel's own padding above it; the panel's header and padding put it at 104; centred, it sat at 189.
-    expect(title.dy, lessThan(140));
+    final screen = tester.getSize(find.byType(Scaffold));
+    final title = tester.getCenter(find.text('How can I help with your shop?'));
+    expect(title.dx, closeTo(screen.width / 2, 1));
+    expect(title.dy, lessThan(screen.height / 2));
   });
 
-  testWidgets('the suggestions card is the raised surface, as on the web', (tester) async {
-    // Grove's own tokens: on paper the raised and high surfaces are one white.
+  testWidgets('each suggestion is a glass card, in the theme\'s own colours', (tester) async {
     final theme = RendelTheme.fromTokens(
       surface: const Color(0xFFF7FBF1),
       onSurface: const Color(0xFF191D17),
@@ -62,11 +63,12 @@ void main() {
     );
     await pump(tester, theme);
     final card = tester
-        .widgetList<DecoratedBox>(find.ancestor(of: find.text('Where is my order?'), matching: find.byType(DecoratedBox)))
+        .widgetList<Container>(find.ancestor(of: find.text('Where is my order?'), matching: find.byType(Container)))
         .map((box) => box.decoration)
         .whereType<BoxDecoration>()
         .firstWhere((decoration) => decoration.border != null);
-    expect(card.color, theme.colors.surfaceRaised);
+    expect(card.border, Border.all(color: LabGlass.lineOf(theme), width: 0.8));
+    expect(card.gradient, isNotNull, reason: 'the glass tint');
   });
 
   testWidgets("a Material 3 host's letter spacing does not reach the panel's words", (tester) async {

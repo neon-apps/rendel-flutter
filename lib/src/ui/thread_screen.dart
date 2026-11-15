@@ -38,6 +38,9 @@ import '../core/strings.dart';
 import 'followup_card.dart';
 import 'support_list.dart';
 import 'theme.dart';
+import 'lab/lab.dart';
+
+part 'thread_screen_lab.dart';
 
 /// How long the thread takes no taps after Send (QA R4-2): longer than a
 /// quick second tap and the keyboard going down, shorter than anyone waits
@@ -281,6 +284,13 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   @override
   void initState() {
     super.initState();
+    // Lab screenshots: a question asked as the thread opens.
+    final asked = RendelLab.takeAutoAsk();
+    if (asked != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _send(asked);
+      });
+    }
     _supportBeat = Timer.periodic(const Duration(minutes: 1), (_) {
       final support = widget.support;
       if (support != null && support.open) unawaited(support.refreshUnread());
@@ -861,11 +871,16 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   // middle of the screen.
                   Positioned.fill(
                     child: _Wash(
-                      on: _asked != null,
+                      // Lab · look A: its own soft light instead, below.
+                      on: _asked != null && RendelLab.of('look') != 'a',
                       ground: theme.colors.surface,
                       backdrop: theme.backdrop,
                     ),
                   ),
+                  // Lab · look A: on the opening only, the page's colour warmed and cooled at its sides.
+                  // Lab · look A: the same soft light on every page and while a question is asked,
+                  // never the busy wash: the glass needs a little colour behind it.
+                  if (RendelLab.of('look') == 'a') Positioned.fill(child: LabWash(ground: theme.colors.surface, accent: theme.colors.accent, faint: controller.messages.isNotEmpty)),
                   // A page draws its own opening screen, which only dissolves
                   // when the first question is asked.
                   Positioned.fill(child: _pageBody(theme, controller)),
@@ -1004,6 +1019,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                           // Under a notice the composer rests: its place says
                           // when the assistant is back, and there is nothing to
                           // press until then.
+                          // Lab · look A: the suggestions as cards over the message card.
+                          if (RendelLab.of('look') == 'a' && controller.messages.isEmpty && widget.suggestions.isNotEmpty && !controller.busy)
+                            _LabCards(suggestions: widget.suggestions, onPick: _send),
                           if (controller.resting)
                             _Resting(hint: controller.notice!.hint)
                           else
@@ -1381,7 +1399,24 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
         right: 0,
         child: _SizeReporter(
           onHeight: (height) => _head.value = height,
-          child: _Header(
+          child: RendelLab.of('look') == 'a'
+              ? _LabTop(
+                  title: widget.title,
+                  logoUrl: widget.logoUrl,
+                  logoHeaders: widget.logoHeaders,
+                  sandbox: controller.sandbox,
+                  fresh: controller.messages.isEmpty,
+                  team: widget.support != null && widget.supportTeam != null && widget.support!.open && controller.messages.isNotEmpty
+                      ? (_strings.supportTeamOf(widget.supportTeam!), () => widget.onSupportOpen?.call())
+                      : null,
+                  onReset: idle && controller.messages.isNotEmpty ? controller.reset : null,
+                  // The steps come with the second page, as they always did.
+                  paged: controller.pages.length > 1,
+                  onBack: idle && controller.page > -1 ? () => _step(-1) : null,
+                  onForward: idle && controller.page < controller.pages.length - 1 ? () => _step(1) : null,
+                  voice: widget.voice,
+                )
+              : _Header(
             title: widget.title,
             logoUrl: widget.logoUrl,
             logoHeaders: widget.logoHeaders,
@@ -1402,7 +1437,11 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           listenable: Listenable.merge([widget.followups, widget.support?.value]),
           builder: (context, _) {
             final all = widget.followups?.value ?? const <RendelFollowup>[];
-            final row = _supportRow(theme);
+            // Lab · look A: the team's row on the opening only, and not while the
+            // keyboard is up (the screen is short then); on a page it is in the menu.
+            final lab = RendelLab.of('look') == 'a';
+            final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
+            final row = lab && (controller.messages.isNotEmpty || typing) ? null : _supportRow(theme);
             // A task notice about the conversation on screen is moot over it: not drawn, and put away.
             final onScreen = controller.conversationId;
             final waiting = [for (final card in all) if (onScreen == null || card.conversationId != onScreen) card];
@@ -1501,7 +1540,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       return RendelPressable(
         semanticLabel: '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}',
         onTap: () => widget.onSupportOpen?.call(),
-        child: Container(
+        child: _labOr(
+          theme,
+          radius: 999,
           padding: const EdgeInsets.fromLTRB(7, 7, 8, 7),
           decoration: BoxDecoration(
             color: theme.colors.surfaceRaised,
@@ -1550,7 +1591,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     return RendelPressable(
       semanticLabel: unread > 0 ? '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}' : title,
       onTap: () => widget.onSupportOpen?.call(),
-      child: Container(
+      child: _labOr(
+        theme,
+        radius: 18,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: theme.colors.surfaceRaised,
@@ -1637,9 +1680,11 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                 ? const SizedBox.shrink()
                 : Align(
                     key: ObjectKey(_question),
-                    alignment: Alignment.bottomCenter,
+                    // The panel's look: a typed question waits where its answer will
+                    // be, at the top; a spoken one stays where it was heard.
+                    alignment: RendelLab.of('look') == 'a' && !_askedWhole ? Alignment.topCenter : Alignment.bottomCenter,
                     child: Padding(
-                      padding: _askedPadding(dock),
+                      padding: RendelLab.of('look') == 'a' && !_askedWhole ? EdgeInsets.fromLTRB(24, _head.value + _cards.value + 36, 24, 0) : _askedPadding(dock),
                       child: _Asked(text: _asked!, whole: _askedWhole),
                     ),
                   ),
@@ -1679,7 +1724,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           // The opening screen keeps what it has always had; only the
           // dissolve is new to it.
           child: shown == null
-              ? _EmptyState(
+              ? RendelLab.of('look') == 'a'
+                  ? _LabOpening(headline: widget.headline, subtitle: widget.subtitle, onOpen: (url) => controller.tapAction(OpenUrlAction(url)), recent: _recent())
+                  : _EmptyState(
                   headline: widget.headline,
                   subtitle: widget.subtitle,
                   suggestions: widget.suggestions,
@@ -2482,6 +2529,8 @@ class _ErrorSlot extends StatelessWidget {
       stateKey: message ?? 'none',
       child: message == null
           ? const SizedBox(width: double.infinity)
+          : RendelLab.of('look') == 'a'
+          ? _LabNotice(message: message!, retryLabel: retryLabel, onRetry: onRetry)
           : _ErrorBar(
               message: message!,
               retryLabel: retryLabel,
@@ -2639,10 +2688,11 @@ final _links = RegExp(
 /// Plain words with only their links live: the opening screen's subtitle
 /// (QA 2026-10-24). Only https opens; anything else stays words.
 class _LinkedText extends StatefulWidget {
-  const _LinkedText(this.text, {required this.style, required this.onOpen});
+  const _LinkedText(this.text, {required this.style, required this.onOpen, this.textAlign = TextAlign.start});
 
   final String text;
   final TextStyle style;
+  final TextAlign textAlign;
   final void Function(String url) onOpen;
 
   @override
@@ -2689,7 +2739,7 @@ class _LinkedTextState extends State<_LinkedText> {
       at = m.end;
     }
     if (at < widget.text.length) spans.add(TextSpan(text: widget.text.substring(at)));
-    return Text.rich(TextSpan(children: spans), style: widget.style);
+    return Text.rich(TextSpan(children: spans), style: widget.style, textAlign: widget.textAlign);
   }
 }
 
@@ -2858,6 +2908,14 @@ class _Dock extends StatelessWidget {
     final rest = math.max(MediaQuery.viewPaddingOf(context).bottom, 12.0);
     final lift = math.max(0.0, keyboard + theme.space.sm - rest);
     final ground = theme.colors.surface;
+    // Lab · look A: no band behind the dock; the page runs under the glass
+    // cards and on below them, and only the cards blur it.
+    if (RendelLab.of('look') == 'a') {
+      return Padding(
+        padding: EdgeInsets.only(bottom: lift + rest),
+        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
+      );
+    }
     // The keyboard's part is outside the blur: blurring a band the keyboard
     // covers, a keyboard tall, cost frames on every step of its animation.
     return Padding(
@@ -3103,6 +3161,26 @@ class _ComposerState extends State<_Composer> {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
+    // Lab · look A: the menu opens over the card, not in its place, so
+    // nothing above it jumps as it opens and closes.
+    if (RendelLab.of('look') == 'a') {
+      final shown = _shown;
+      return TapRegion(
+        groupId: this,
+        onTapOutside: (_) => _away(),
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(12, theme.space.lg, 12, 0),
+          child: LabPopover(
+            groupId: this,
+            // The mode, not what is shown: with no microphone the box is
+            // always open, and + still opens the sources over it.
+            open: _mode == _Mode.menu,
+            popover: _menu(theme),
+            child: shown == _Mode.text ? _box(theme) : labRest(theme),
+          ),
+        ),
+      );
+    }
     return TapRegion(
       onTapOutside: (_) => _away(),
       child: Padding(
@@ -3226,14 +3304,17 @@ class _ComposerState extends State<_Composer> {
                    covers, which the composer never has to do. */
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(26),
-                  boxShadow: [
-                    BoxShadow(
-                      color: theme.colors.shadow.withValues(alpha: 0.3),
-                      offset: const Offset(0, 22),
-                      blurRadius: 44,
-                      spreadRadius: -18,
-                    ),
-                  ],
+                  // Lab · look A: the glass casts its own shadow, outside it only.
+                  boxShadow: RendelLab.of('look') == 'a'
+                      ? null
+                      : [
+                          BoxShadow(
+                            color: theme.colors.shadow.withValues(alpha: 0.3),
+                            offset: const Offset(0, 22),
+                            blurRadius: 44,
+                            spreadRadius: -18,
+                          ),
+                        ],
                 ),
                 child: _Glass(
                   radius: 26,
@@ -3351,7 +3432,7 @@ class _ComposerState extends State<_Composer> {
                 ),
               ),
             Padding(
-              padding: EdgeInsets.fromLTRB(
+              padding: RendelLab.of('look') == 'a' ? const EdgeInsets.fromLTRB(15, 4, 15, 0) : EdgeInsets.fromLTRB(
                 theme.space.md + 2,
                 theme.space.sm,
                 theme.space.md,
@@ -3370,7 +3451,7 @@ class _ComposerState extends State<_Composer> {
                     // can be typed, and Send waits for the answer.
                     // Two lines before anything is written: room to see a
                     // question taking shape, not a single-line search box.
-                    minLines: 2,
+                    minLines: RendelLab.of('look') == 'a' ? 1 : 2,
                     maxLines: 5,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _sendTyped(),
@@ -3408,13 +3489,13 @@ class _ComposerState extends State<_Composer> {
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(
+              padding: RendelLab.of('look') == 'a' ? EdgeInsets.zero : EdgeInsets.fromLTRB(
                 theme.space.xs,
                 0,
                 theme.space.xs,
                 theme.space.xs,
               ),
-              child: Row(
+              child: RendelLab.of('look') == 'a' ? labBoxRow(theme) : Row(
                 children: [
                   if (_attach)
                     for (final source in widget.sources)
@@ -3455,20 +3536,22 @@ class _ComposerState extends State<_Composer> {
                               duration:
                                   still ? Duration.zero : theme.motion.swap,
                               curve: theme.motion.curve,
-                              width: 38,
-                              height: 38,
+                              width: RendelLab.of('look') == 'a' ? 40 : 38,
+                              height: RendelLab.of('look') == 'a' ? 40 : 38,
                               decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(theme.radius.control),
+                                borderRadius: BorderRadius.circular(RendelLab.of('look') == 'a' ? 999 : theme.radius.control),
                                 // Nothing to send: a ghost ring, never a
                                 // grey filled disc (QA 2026-10-24).
-                                color: enabled
+                                color: RendelLab.of('look') == 'a'
+                                    ? theme.colors.onSurface.withValues(alpha: enabled ? 1 : 0.18)
+                                    : enabled
                                     ? theme.colors.accent
                                     : Colors.transparent,
                                 // The rim every accent fill in the catalog
                                 // carries: an icon-only button is identified
                                 // by its fill alone, which is what WCAG
                                 // 1.4.11 asks 3:1 of.
-                                border: Border.all(
+                                border: RendelLab.of('look') == 'a' ? null : Border.all(
                                   width: enabled ? 1 : 1.5,
                                   color: enabled
                                       ? theme.accentEdge
@@ -3491,7 +3574,9 @@ class _ComposerState extends State<_Composer> {
                                     still ? Duration.zero : theme.motion.swap,
                                 curve: theme.motion.curve,
                                 tween: ColorTween(
-                                  end: enabled
+                                  end: RendelLab.of('look') == 'a'
+                                      ? theme.colors.surfaceRaised
+                                      : enabled
                                       ? theme.colors.onAccent
                                       : theme.onComposerFaint
                                           .withValues(alpha: 0.6),
@@ -3838,12 +3923,16 @@ class _ArriveState extends State<_Arrive> with SingleTickerProviderStateMixin {
       alwaysIncludeSemantics: true,
       child: AnimatedBuilder(
         animation: _curve,
-        builder: (context, child) => Transform.translate(
-          offset: Offset(0, 8 * (1 - _curve.value)),
-          child: Transform.scale(
-            scale: 0.96 + 0.04 * _curve.value,
-            alignment: widget.alignment,
-            child: child,
+        // Lab · look A: its glass skips the blur while it moves.
+        builder: (context, child) => LabMoving(
+          moving: _controller.value < 1,
+          child: Transform.translate(
+            offset: Offset(0, 8 * (1 - _curve.value)),
+            child: Transform.scale(
+              scale: 0.96 + 0.04 * _curve.value,
+              alignment: widget.alignment,
+              child: child,
+            ),
           ),
         ),
         child: widget.child,
@@ -4491,6 +4580,8 @@ class _Glass extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final shape = BorderRadius.circular(radius);
+    // Lab · look A: the box and the attach menu are the same glass as the rest.
+    if (RendelLab.of('look') == 'a') return Padding(padding: const EdgeInsets.symmetric(horizontal: 3), child: LabGlass(radius: 24, child: child));
     /* No drop shadow. Flutter paints a box's shadow under the whole box, not
        only outside it as CSS does, and through glass that shows as a grey
        smudge in the middle of the composer. The edge carries the shape. */
@@ -4610,10 +4701,13 @@ BoxDecoration _litPill(RendelTheme theme) {
 /// A card's first action beside the microphone while its detail is open, or
 /// the page's first screen of the app.
 class _LitAction extends StatelessWidget {
-  const _LitAction({required this.label, required this.onTap, this.go = false});
+  const _LitAction({required this.label, required this.onTap, this.go = false, this.compact = false});
 
   final String label;
   final VoidCallback onTap;
+
+  /// In the message card's row (the panel's look): 32 high, beside the +.
+  final bool compact;
 
   /// Opens a screen of the app: the ↗ the screen's card ends with follows
   /// the label.
@@ -4626,10 +4720,10 @@ class _LitAction extends StatelessWidget {
       semanticLabel: label,
       onTap: onTap,
       child: Container(
-        height: 46,
+        height: compact ? 32 : 46,
         // The web's widths (Web 0.23.0): with the microphone a circle beside
         // it, ~14 letters fit at a 360pt screen.
-        padding: EdgeInsets.symmetric(horizontal: go ? 14 : 18),
+        padding: EdgeInsets.symmetric(horizontal: compact ? 12 : (go ? 14 : 18)),
         decoration: _litPill(theme),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -4639,7 +4733,7 @@ class _LitAction extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.text.labelStrong.copyWith(fontSize: go ? 14.5 : 15),
+                style: theme.text.labelStrong.copyWith(fontSize: compact ? 14 : (go ? 14.5 : 15)),
               ),
             ),
             if (go) ...[

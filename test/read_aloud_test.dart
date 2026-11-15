@@ -17,6 +17,8 @@ import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'menu_helper.dart';
+
 /// Each answer's opening read aloud, in the answer's own language (Tuna
 /// 2026-10-23, after Monogram).
 class _Api extends RendelApiClient {
@@ -567,12 +569,13 @@ void main() {
         final name = tester.renderObject<RenderParagraph>(find.text('Shieldwell24'));
         expect(name.didExceedMaxLines, isFalse, reason: 'the name whole at $width');
         // One page: back and forward are not drawn yet.
+        await openMenu(tester);
         expect(find.bySemanticsLabel('Previous page'), findsNothing);
         await tester.pumpWidget(const SizedBox());
       }
     });
 
-    testWidgets('the name is whole on the first page, and the steps come with the second, each 36 across and 44 high to the finger (QA 2026-10-24, Özlem 2026-10-27)',
+    testWidgets('the name is whole on the first page, and the steps come with the second, in the menu, each row 44 high to the finger (QA 2026-10-24, sdk-look-a §3)',
         (tester) async {
       addTearDown(tester.view.reset);
       for (final width in [390.0, 360.0, 700.0]) {
@@ -585,27 +588,33 @@ void main() {
           expect(tester.renderObject<RenderParagraph>(find.text(title)).didExceedMaxLines, isFalse,
               reason: '$title whole on the first page at $width');
           await type(tester, c, 'And Friday?');
+          await openMenu(tester);
           expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
           expect(tester.takeException(), isNull);
-          expect(tester.getSize(find.bySemanticsLabel('Previous page')), const Size(36, 44));
+          await openMenu(tester);
+          // A row of the menu: the whole row to the finger, at least 44 high.
+          expect(tester.getSize(find.bySemanticsLabel('Previous page')).height, greaterThanOrEqualTo(44));
           await tester.pumpWidget(const SizedBox());
         }
       }
     });
 
-    testWidgets('Voice replies, start over and close share one capsule in that order, each 44 high (Özlem 2026-10-26)',
+    testWidgets('Voice replies and close share one capsule, side by side; start over is in the menu (sdk-look-a §3)',
         (tester) async {
       final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
       await type(tester, c, 'Weather?');
       final voice = tester.getRect(find.bySemanticsLabel('Voice replies'));
-      final reset = tester.getRect(find.bySemanticsLabel('Start a new conversation'));
       final close = tester.getRect(find.bySemanticsLabel('Close the assistant'));
-      expect(voice.right, lessThanOrEqualTo(reset.left));
-      expect(reset.right, lessThanOrEqualTo(close.left));
-      expect(close.left - voice.right, lessThan(44 + 3), reason: 'side by side, a hairline apart');
-      for (final r in [voice, reset, close]) {
-        expect(r.height, 44);
+      expect(voice.right, lessThanOrEqualTo(close.left));
+      expect(close.left - voice.right, lessThan(1), reason: 'one capsule');
+      for (final r in [voice, close]) {
+        // Inside the 40-high capsule and its 0.8 line.
+        expect(r.height, closeTo(38.4, 0.01));
+        expect(r.width, 44);
       }
+      expect(find.bySemanticsLabel('Start a new conversation'), findsNothing, reason: 'not in the bar');
+      await openMenu(tester);
+      expect(find.bySemanticsLabel('Start a new conversation'), findsOneWidget);
     });
 
     testWidgets('a long name at 320 is set smaller to fit on one line, and cut short only past 65% (Tuna 2026-10-24)', (tester) async {
@@ -620,6 +629,7 @@ void main() {
         final name = find.text(title);
         await type(tester, c, 'Weather?');
         await type(tester, c, 'And Friday?');
+        await openMenu(tester);
         expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
         expect(tester.takeException(), isNull);
         expect(tester.renderObject<RenderParagraph>(name).didExceedMaxLines, cut, reason: '$title: cut short only past 65%');
@@ -670,8 +680,10 @@ void main() {
     testWidgets('back and forward come with the second page', (tester) async {
       final (c, _) = await open(tester, answer('Tomorrow is clear.', lang: 'en'));
       await type(tester, c, 'Weather?');
+      await openMenu(tester);
       expect(find.bySemanticsLabel('Previous page'), findsNothing);
       await type(tester, c, 'And Friday?');
+      await openMenu(tester);
       expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
     });
 

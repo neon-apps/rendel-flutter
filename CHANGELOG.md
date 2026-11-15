@@ -5,6 +5,34 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.93.0
+
+**Changed**
+
+- The panel has a new look, in light and dark themes: frosted glass controls,
+  a soft light behind the panel in your app's colours, a round menu button at
+  the top left, read aloud and close in one capsule at the top right, a centred
+  opening, suggestions as cards, and an 80-point message card. The + opens its
+  sources over the message card, so nothing on the page moves. Start a new
+  conversation and the page steps are in the menu. Everything the panel did
+  before still works: your assistant's name and logo, the test-mode badge, the
+  send, attach and voice glyphs you chose, an answer's first action lit
+  beside the +, links in the opening's subtitle, your team's recent
+  conversations, your arrows and card style, and every text size. Nothing to
+  change in your code.
+
+**Added**
+
+- `RendelLook.groundLight`: the two colours of the light behind the panel,
+  left then right, drawn as pale pastels. Unset, both are your theme's
+  accent.
+- `RendelLook.suggestionCards` (`RendelSuggestionCard`): a short title, the
+  line under it and an image (an asset path or an https URL) for a
+  suggestion, keyed by its text. A suggestion without one is drawn with its
+  own words. The same names as the web SDK's `groundLight` and
+  `suggestionCards`.
+- The string `menu`, the menu button's label, in all six languages.
+
 ## 0.92.4
 
 **Fixed**

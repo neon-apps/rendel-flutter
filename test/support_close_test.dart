@@ -99,7 +99,8 @@ void main() {
 
   testWidgets('✕ on the team page closes all of Rendel, as on the web', (tester) async {
     await _openBoth(tester);
-    await tester.tap(find.byIcon(Icons.close_rounded));
+    // The team's ✕: Rendel's own, under the sheet, is the same glyph now.
+    await tester.tap(find.descendant(of: find.byType(RendelSupportSheet), matching: find.byIcon(Icons.close_rounded)));
     await _settle(tester);
     expect(find.byType(RendelSupportSheet), findsNothing);
     expect(find.byType(ThreadScreen), findsNothing);

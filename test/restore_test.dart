@@ -15,6 +15,8 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:rendel/rendel.dart';
 
+import 'menu_helper.dart';
+
 const _key = 'nc_pk_test_example_000000000000000000000000';
 const _answer = 'Bondi Junction is closest, and opens at 9.';
 
@@ -170,6 +172,7 @@ void main() {
     await _launch(tester, server);
     await _open(tester);
     expect(server.read, 1);
+    await openMenu(tester);
     await tester.tap(find.bySemanticsLabel('Start a new conversation'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     await tester.pumpAndSettle();

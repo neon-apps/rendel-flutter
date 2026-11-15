@@ -54,6 +54,7 @@ class RendelStrings {
     this.newConversation = 'Start a new conversation',
     this.readAloud = 'Answers play by themselves',
     this.autoRead = 'Voice replies',
+    this.menu = 'Menu',
     this.listen = 'Listen',
     this.readAloudThis = 'Listen to this answer',
     this.stopReading = 'Stop reading',
@@ -347,6 +348,10 @@ class RendelStrings {
   /// The header's switch, in its own words: answers read by themselves, on
   /// or off. A switch, so a screen reader says which.
   final String autoRead;
+
+  /// The round button at the top left that opens the panel's menu (talk to
+  /// the team, start over, previous and next page).
+  final String menu;
 
   /// Unused since 0.59.9, which reads every answer by itself; kept so an app
   /// that sets it still builds.
@@ -887,6 +892,7 @@ class RendelStrings {
     String? newConversation,
     String? readAloud,
     String? autoRead,
+    String? menu,
     String? listen,
     String? readAloudThis,
     String? stopReading,
@@ -1121,6 +1127,7 @@ class RendelStrings {
       newConversation: newConversation ?? this.newConversation,
       readAloud: readAloud ?? this.readAloud,
       autoRead: autoRead ?? this.autoRead,
+      menu: menu ?? this.menu,
       listen: listen ?? this.listen,
       readAloudThis: readAloudThis ?? this.readAloudThis,
       stopReading: stopReading ?? this.stopReading,
@@ -1368,6 +1375,7 @@ const Map<String, RendelStrings> _byLocale = {
     newConversation: 'Yeni bir sohbet başlat',
     readAloud: 'Yanıtlar kendiliğinden okunur',
     autoRead: 'Sesli yanıt',
+    menu: 'Menü',
     listen: 'Dinle',
     readAloudThis: 'Bu yanıtı dinle',
     stopReading: 'Okumayı durdur',
@@ -1606,6 +1614,7 @@ const Map<String, RendelStrings> _byLocale = {
     newConversation: 'Neue Unterhaltung beginnen',
     readAloud: 'Antworten werden von selbst vorgelesen',
     autoRead: 'Sprachantworten',
+    menu: 'Menü',
     listen: 'Anhören',
     readAloudThis: 'Diese Antwort anhören',
     stopReading: 'Vorlesen beenden',
@@ -1846,6 +1855,7 @@ const Map<String, RendelStrings> _byLocale = {
     newConversation: 'Démarrer une nouvelle conversation',
     readAloud: 'Les réponses se lisent d’elles-mêmes',
     autoRead: 'Réponses vocales',
+    menu: 'Menu',
     listen: 'Écouter',
     readAloudThis: 'Écouter cette réponse',
     stopReading: 'Arrêter la lecture',
@@ -2085,6 +2095,7 @@ const Map<String, RendelStrings> _byLocale = {
     newConversation: 'Iniciar una conversación nueva',
     readAloud: 'Las respuestas se leen solas',
     autoRead: 'Respuestas por voz',
+    menu: 'Menú',
     listen: 'Escuchar',
     readAloudThis: 'Escuchar esta respuesta',
     stopReading: 'Dejar de leer',
@@ -2323,6 +2334,7 @@ const Map<String, RendelStrings> _byLocale = {
     newConversation: 'بدء محادثة جديدة',
     readAloud: 'تُقرأ الإجابات تلقائيًا',
     autoRead: 'ردود صوتية',
+    menu: 'القائمة',
     listen: 'استمع',
     readAloudThis: 'استمع إلى هذه الإجابة',
     stopReading: 'أوقف القراءة',

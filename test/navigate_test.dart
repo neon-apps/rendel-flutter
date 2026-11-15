@@ -12,6 +12,8 @@ import 'package:rendel/src/protocol/protocol.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
 
+import 'menu_helper.dart';
+
 /// A server that records what it was sent and never answers.
 class _Silent extends RendelApiClient {
   _Silent() : super(appKey: 'nc_pk_test_x', deviceId: 'd', config: const RendelConfig());
@@ -336,7 +338,8 @@ void main() {
       expect(find.descendant(of: _lit, matching: find.byIcon(Icons.north_east_rounded)), findsOneWidget);
       final mic = tester.getRect(find.bySemanticsLabel('Speak instead of typing'));
       final lit = tester.getRect(_lit);
-      expect(mic.width, 46);
+      // In the message card's row, beside the + (sdk-look-a §6): the mic is 36 across.
+      expect(mic.width, 36);
       expect(lit.right, lessThan(mic.left));
       expect(lit.center.dy, closeTo(mic.center.dy, 1));
 
@@ -586,6 +589,7 @@ void main() {
       // `host` has already asked and been answered. On the opening screen
       // there is nothing to start over from (Tuna, 2026-10-10).
       await host(tester);
+      await openMenu(tester);
       final reset = find.bySemanticsLabel('Start a new conversation');
       expect(reset, findsOneWidget);
       await tester.tap(reset);

@@ -11,6 +11,8 @@ import 'package:rendel/src/ui/thread_screen.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
+import 'menu_helper.dart';
+
 /// Records the URLs handed to the system, as in `catalog_b2_test.dart`.
 class _Dialler extends UrlLauncherPlatform {
   final List<String> launched = [];
@@ -429,13 +431,16 @@ void main() {
         _block('t', 'text', {'markdown': 'The Trail Circuit.'}),
       ]);
       expect(c.pages, hasLength(2));
+      await openMenu(tester);
       await tester.tap(find.bySemanticsLabel('Previous page'));
       await tester.pump();
       expect(find.text('Three to choose from.'), findsOneWidget);
       expect(_sheet, findsNothing);
+      await openMenu(tester);
       await tester.tap(find.bySemanticsLabel('Next page'));
       await tester.pump();
       expect(find.text('The Trail Circuit.'), findsOneWidget);
+      await openMenu(tester);
       expect(
         tester.getSemantics(find.bySemanticsLabel('Next page')),
         isSemantics(isEnabled: false),

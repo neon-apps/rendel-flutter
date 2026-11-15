@@ -287,17 +287,21 @@ void main() {
       await pump(tester);
       // At rest: the "+", the place to type and the microphone.
       expect(find.byIcon(Icons.add_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.mic_none_rounded), findsOneWidget);
       expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
 
-      // The field opens the box: the three sources and send.
+      // The card opens the box: the same + and send under the field, and the
+      // + still opens the three sources (sdk-look-a §6).
       await tester.tap(find.bySemanticsLabel('Type a message'));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsOneWidget);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
+      await tester.tap(find.bySemanticsLabel('Attach a file'));
+      await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Photos'), findsOneWidget);
       expect(find.bySemanticsLabel('Camera'), findsOneWidget);
       expect(find.bySemanticsLabel('Files'), findsOneWidget);
-      expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
     });
 
     testWidgets('the "+" opens Photos, Camera and Files', (tester) async {
@@ -357,7 +361,7 @@ void main() {
       expect(find.byType(TextField), findsOneWidget);
       expect(find.byIcon(Icons.add_rounded), findsNothing);
       expect(find.bySemanticsLabel('Photos'), findsNothing);
-      expect(find.byIcon(Icons.mic_rounded), findsNothing);
+      expect(find.byIcon(Icons.mic_none_rounded), findsNothing);
       // Send survives: it is the one thing the composer is for.
       expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
     });
@@ -368,7 +372,7 @@ void main() {
       await pump(tester, wired: false);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.bySemanticsLabel('Photos'), findsNothing);
-      expect(find.byIcon(Icons.mic_rounded), findsNothing);
+      expect(find.byIcon(Icons.mic_none_rounded), findsNothing);
       expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
     });
 
@@ -1090,7 +1094,9 @@ void main() {
         ),
       );
       await tester.pump();
-      // No microphone here, so the box is open and Files is in it.
+      // No microphone here, so the box is open; Files is behind its +.
+      await tester.tap(find.bySemanticsLabel('Attach a file'));
+      await tester.pumpAndSettle();
       await tester.tap(find.bySemanticsLabel('Files'));
       await tester.pumpAndSettle();
 

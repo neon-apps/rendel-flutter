@@ -17,6 +17,8 @@ import 'package:rendel/src/protocol/protocol.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
 
+import 'menu_helper.dart';
+
 /// A server the test answers by hand, one event at a time.
 class _LiveApi extends RendelApiClient {
   _LiveApi()
@@ -372,6 +374,7 @@ void main() {
       await api.answer(tester, [_text('t2', 'The Aero Glide 2.')]);
       await settle(tester);
 
+      await openMenu(tester);
       await tester.tap(find.bySemanticsLabel('Previous page'));
       await settle(tester);
       // The question over what was picked, read-only.

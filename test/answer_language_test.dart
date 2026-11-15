@@ -11,6 +11,8 @@ import 'package:rendel/src/protocol/protocol.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
 
+import 'menu_helper.dart';
+
 /// The SDK's own words follow the language the conversation is answered in.
 ///
 /// Found in Grove (2026-10-29): an app configured `languages: ['en']`, a
@@ -213,11 +215,15 @@ void main() {
     await tester.runAsync(() => c.send('siparişim nerede'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(c.pages.map((p) => p.lang), ['en', 'tr']);
+    await openMenu(tester, menu: 'Menü', row: 'Yeni bir sohbet başlat');
     expect(find.bySemanticsLabel('Önceki sayfa'), findsOneWidget);
 
+    await openMenu(tester, menu: 'Menü', row: 'Yeni bir sohbet başlat');
     await tester.tap(find.bySemanticsLabel('Önceki sayfa'));
     await tester.pump(const Duration(milliseconds: 400));
     expect(c.page, 0);
+    // Back on the English page, its menu speaks English.
+    await openMenu(tester);
     expect(find.bySemanticsLabel('Previous page'), findsOneWidget);
     expect(find.bySemanticsLabel('Önceki sayfa'), findsNothing);
   });

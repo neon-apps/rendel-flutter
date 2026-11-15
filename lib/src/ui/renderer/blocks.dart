@@ -20,6 +20,7 @@ import '../../core/config.dart' show RendelAttachment, RendelAttachSource;
 import '../../core/templates.dart';
 import '../../transport/api_client.dart' show RendelUploadFailure;
 import '../theme.dart';
+import '../lab/lab.dart';
 import 'map_engine.dart';
 import 'registry.dart';
 
@@ -639,7 +640,8 @@ class _WayOn extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        // Out through the page's padding to both edges.
+        // Out through the page's padding to both edges. Lab · look A: none.
+        if (RendelLab.of('look') != 'a')
         Positioned(
           left: -inset,
           right: -inset,
@@ -690,10 +692,11 @@ class _WayOnCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final glyph = _iconFor(icon);
+    final lab = RendelLab.of('look') == 'a';
     final card = Container(
-      constraints: const BoxConstraints(minHeight: 72),
+      constraints: BoxConstraints(minHeight: lab ? 56 : 72),
       padding: const EdgeInsetsDirectional.fromSTEB(16, 12, 14, 12),
-      decoration: BoxDecoration(
+      decoration: lab ? _labCard(theme) : BoxDecoration(
         color: theme.colors.surfaceRaised,
         border: Border.all(color: theme.hairline),
         borderRadius: BorderRadius.circular(20),
@@ -711,7 +714,7 @@ class _WayOnCard extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: theme.text.label.copyWith(fontSize: 14.5, height: 1.35),
+              style: theme.text.label.copyWith(fontSize: lab ? 15 : 14.5, height: 1.35, fontWeight: lab ? FontWeight.w500 : null),
             ),
           ),
           if (icon != null && icon!.isNotEmpty) ...[
@@ -1239,7 +1242,10 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
   final style = theme.style.product;
   // v6: the card is the plate's glass at a card's corner, with the plate's
   // hairline and a shorter shadow under the default build.
-  final decoration = BoxDecoration(
+  // Lab · look A: the same glass as the opening's cards.
+  final decoration = RendelLab.of('look') == 'a'
+      ? _labCard(theme)
+      : BoxDecoration(
     color: theme.glass,
     border: _cardEdge(theme, Border.all(color: theme.hairline)),
     borderRadius: BorderRadius.circular(theme.cardRadius),
@@ -8070,8 +8076,11 @@ class _Rail extends StatelessWidget {
       ],
     );
     final rtl = Directionality.of(context) == TextDirection.rtl;
+    // Lab · look A: room under the cards inside the rail, so their soft
+    // shadow is not cut off at its edge.
+    final under = RendelLab.of('look') == 'a' ? 20.0 : 0.0;
     final rail = SizedBox(
-      height: height,
+      height: height == null ? null : height! + under,
       // A rail that scrolls says so: its trailing 28pt fades out, so the last
       // card visibly runs on past the edge.
       child: ShaderMask(
@@ -8092,7 +8101,7 @@ class _Rail extends StatelessWidget {
           // as its own, and settles on a card's leading edge: the first card
           // lines up with the text, and so does any card it stops on
           // (`design/PAGES.md`).
-          padding: EdgeInsets.symmetric(horizontal: inset),
+          padding: EdgeInsets.fromLTRB(inset, 0, inset, under),
           physics: _SnapPhysics(extent: itemWidth + theme.space.sm),
           child: height == null ? IntrinsicHeight(child: row) : row,
         ),
@@ -8368,6 +8377,16 @@ class _Plate extends StatelessWidget {
 
 /// The edge a plate or a card takes under `theme.style.card`, given the one it
 /// draws when raised.
+/// The panel's look: a card on the page in the same glass as the floating
+/// ones, with the edge and shadow of the customer's card style.
+BoxDecoration _labCard(RendelTheme theme) {
+  final glass = LabGlass.decorationOf(theme, 18);
+  return glass.copyWith(
+    border: _cardEdge(theme, glass.border),
+    boxShadow: _cardShadow(theme, glass.boxShadow ?? const <BoxShadow>[]),
+  );
+}
+
 BoxBorder? _cardEdge(RendelTheme theme, BoxBorder? raised) =>
     switch (theme.style.card) {
       RendelCardStyle.raised => raised,

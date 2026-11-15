@@ -34,6 +34,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'newConversation': (s) => s.newConversation,
   'readAloud': (s) => s.readAloud,
   'autoRead': (s) => s.autoRead,
+  'menu': (s) => s.menu,
   'listen': (s) => s.listen,
   'readAloudThis': (s) => s.readAloudThis,
   'stopReading': (s) => s.stopReading,

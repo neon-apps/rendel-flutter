@@ -13,6 +13,8 @@ import 'package:rendel/src/ui/thread_screen.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
+import 'menu_helper.dart';
+
 /// The browser a link in the prose opens in: what it was handed.
 class _Browser extends UrlLauncherPlatform {
   final List<String> opened = [];
@@ -401,11 +403,13 @@ void main() {
       await ask(tester, c, api, 'Second?', [_text('b', 'Second answer.')]);
       expect(find.text('Second answer.'), findsOneWidget);
       expect(find.text('First answer.'), findsNothing);
+      await openMenu(tester);
       expect(
         tester.getSemantics(find.bySemanticsLabel('Next page')),
         isSemantics(isButton: true, isEnabled: false),
       );
 
+      await openMenu(tester);
       await tester.tap(find.bySemanticsLabel('Previous page'));
       await tester.pump();
       // Instantly, from memory.
@@ -413,6 +417,7 @@ void main() {
       expect(find.text('Second answer.'), findsNothing);
       expect(api.sent, hasLength(2));
 
+      await openMenu(tester);
       await tester.tap(find.bySemanticsLabel('Next page'));
       await tester.pump();
       expect(find.text('Second answer.'), findsOneWidget);
@@ -428,16 +433,19 @@ void main() {
 
       await ask(tester, c, api, 'First?', [_text('a', 'First answer.')]);
       await ask(tester, c, api, 'Second?', [_text('b', 'Second answer.')]);
+      await openMenu(tester);
       await tester.tap(find.bySemanticsLabel('Previous page'));
       await tester.pump();
 
       await ask(tester, c, api, 'Third?', [_text('c', 'Third answer.')]);
       expect(find.text('Third answer.'), findsOneWidget);
+      await openMenu(tester);
       expect(
         tester.getSemantics(find.bySemanticsLabel('Next page')),
         isSemantics(isEnabled: false),
       );
 
+      await openMenu(tester);
       await tester.tap(find.bySemanticsLabel('Previous page'));
       await tester.pump();
       expect(find.text('First answer.'), findsOneWidget,
@@ -486,9 +494,11 @@ void main() {
         expect(find.text('Second answer.'), findsOneWidget);
         expect(find.text('Second?'), findsOneWidget, reason: 'its question over it');
         expect(c.pages, hasLength(2));
+        await openMenu(tester);
         await tester.tap(find.bySemanticsLabel('Previous page'));
         await tester.pump();
         expect(find.text('First answer.'), findsOneWidget);
+        await openMenu(tester);
         expect(
           tester.getSemantics(find.bySemanticsLabel('Next page')),
           isSemantics(isButton: true, isEnabled: true),
@@ -575,6 +585,7 @@ void main() {
       expect(c.pages, isEmpty);
       expect(c.page, -1);
       // No second page, so back and forward are not drawn (QA 2026-10-24).
+      await openMenu(tester);
       expect(find.bySemanticsLabel('Previous page'), findsNothing);
     });
   });

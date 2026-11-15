@@ -57,7 +57,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byIcon(Icons.mic_rounded));
+    await tester.tap(find.byIcon(Icons.mic_none_rounded));
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(listened, [phoneId]);

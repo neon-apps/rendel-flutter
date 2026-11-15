@@ -2,7 +2,7 @@ name: rendel
 description: >-
   A Generative UI SDK for mobile and web apps: turns what users say, type and
   tap into native screens in your app, while your team controls every action.
-version: 0.92.4
+version: 0.93.0
 homepage: https://rendel.ai
 repository: https://github.com/neon-apps/rendel-flutter
 
@@ -49,6 +49,9 @@ dev_dependencies:
 # permissions, and the iOS check that hides the microphone when Info.plist
 # lacks its usage strings instead of letting iOS close the app.
 flutter:
+  # The light on the panel's glass (design/plans/sdk-look-a.md §1.1).
+  shaders:
+    - shaders/lab_glass.frag
   plugin:
     platforms:
       android:

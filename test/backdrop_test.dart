@@ -11,6 +11,8 @@ import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/thread_screen.dart';
 
+import 'menu_helper.dart';
+
 const _palette = {
   'surface': '#FFFFFF',
   'onSurface': '#1D1D1B',
@@ -159,11 +161,13 @@ void main() {
         .whereType<LinearGradient>()
         .where((gradient) => gradient.colors.first == const Color(0xFFE8E2D2));
     expect(grounds, isNotEmpty);
+    // The page steps are in the menu (sdk-look-a §3), in the app's arrows.
+    await openMenu(tester);
     expect(find.byKey(const ValueKey('rendel-glyph-iosBack')), findsOneWidget);
     expect(find.byKey(const ValueKey('rendel-glyph-chevronBack')), findsNothing);
   });
 
-  testWidgets('the page steps match the capsule beside them: its height, the size of its glyphs', (tester) async {
+  testWidgets('the page steps are menu rows, their arrows at start over\'s size', (tester) async {
     final api = RendelApiClient(appKey: 'rd_pk_test_x', deviceId: 'd', config: const RendelConfig());
     final controller = ConversationController(
       api: api,
@@ -190,18 +194,15 @@ void main() {
       ),
     ));
     await tester.pump(const Duration(seconds: 1));
-    // Özlem 2026-10-27: one height for both pills, the arrows at start over's size.
-    final pills = find.byWidgetPredicate((widget) => widget.runtimeType.toString() == '_StepsGlass');
-    expect(pills, findsNWidgets(2));
-    expect(tester.getSize(pills.first).height, 38);
-    expect(tester.getSize(pills.last).height, 38);
+    // In the menu, the arrows at start over's size, in the family the app named.
+    await openMenu(tester);
     final reset = tester.getSize(find.byKey(const ValueKey('rendel-glyph-reset')));
     expect(tester.getSize(find.byKey(const ValueKey('rendel-glyph-arrowBack'))), reset);
     expect(tester.getSize(find.byKey(const ValueKey('rendel-glyph-arrowForward'))), reset);
-    // Özlem 2026-10-27: the two glyphs 28 apart, in a pill 72 wide that hugs them.
-    final back = tester.getCenter(find.byKey(const ValueKey('rendel-glyph-arrowBack')));
-    final forward = tester.getCenter(find.byKey(const ValueKey('rendel-glyph-arrowForward')));
-    expect(forward.dx - back.dx, 28);
-    expect(tester.getSize(pills.first).width, 72);
+    // One row each, under start over, at least 44 to the finger.
+    final back = tester.getRect(find.bySemanticsLabel('Previous page'));
+    final forward = tester.getRect(find.bySemanticsLabel('Next page'));
+    expect(back.height, greaterThanOrEqualTo(44));
+    expect(forward.top, greaterThanOrEqualTo(back.bottom));
   });
 }

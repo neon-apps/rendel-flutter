@@ -8,6 +8,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:rendel/rendel.dart';
+import 'package:rendel/src/ui/lab/lab.dart' show LabGlass;
 
 RendelTheme _styled(Map<String, String> style) => RendelRemoteConfig.tryParse(
       jsonEncode({
@@ -264,8 +265,8 @@ void main() {
           .widgetList<Container>(find.byType(Container))
           .map((c) => c.decoration)
           .whereType<BoxDecoration>()
-          // v6: a product card is the plate's glass, not the bare plate.
-          .where((d) => d.color == theme.glass);
+          // The panel's look: a product card is the glass of the floating cards.
+          .where((d) => d.color == LabGlass.fillOf(theme));
       expect(cards, hasLength(3));
       for (final card in cards) {
         expect(card.border, Border.all(color: theme.colors.lineStrong));

@@ -10,6 +10,9 @@ import '../protocol/protocol.dart' show CancelAction, ConfirmAction, NavigateAct
 import 'renderer/blocks.dart' show RendelActionButton, RendelPressable;
 import 'renderer/registry.dart';
 import 'theme.dart';
+import 'lab/lab.dart';
+
+part 'support_sheet_lab.dart';
 
 /// Opens the person's thread with the app's own team (human support, design/
 /// plans/human-support.md §3.3) as a sheet over what is on screen, drawn as
@@ -36,6 +39,7 @@ Future<SupportExit?> showRendelSupport(
   String? Function(String route)? routeTitle,
   Future<RendelAttachment?> Function(RendelAttachSource source)? onPick,
   Future<String> Function(RendelAttachment file)? onUpload,
+  List<RendelAttachSource> sources = const [RendelAttachSource.photos, RendelAttachSource.files],
   RendelTheme? theme,
   RendelStrings? strings,
 }) {
@@ -66,6 +70,7 @@ Future<SupportExit?> showRendelSupport(
             routeTitle: routeTitle,
             onPick: onPick,
             onUpload: onUpload,
+            sources: sources,
           ),
         ),
       ),
@@ -87,6 +92,7 @@ class RendelSupportSheet extends StatefulWidget {
     this.routeTitle,
     this.onPick,
     this.onUpload,
+    this.sources = const [RendelAttachSource.photos, RendelAttachSource.files],
   });
 
   final RendelSupport support;
@@ -101,6 +107,10 @@ class RendelSupportSheet extends StatefulWidget {
   /// Picks a photo or a file, and uploads it; without them the page takes text only.
   final Future<RendelAttachment?> Function(RendelAttachSource source)? onPick;
   final Future<String> Function(RendelAttachment file)? onUpload;
+
+  /// What + offers, as the assistant's own +: photos, the camera when the
+  /// phone has one ready, files; one entry opens it at once.
+  final List<RendelAttachSource> sources;
 
   @override
   State<RendelSupportSheet> createState() => _RendelSupportSheetState();
@@ -404,17 +414,23 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
         ),
     ];
 
-    return SafeArea(
+    final ground = Color.alphaBlend(theme.colors.onSurface.withValues(alpha: 0.015), theme.colors.surfaceRaised);
+    final lab = RendelLab.of('look') == 'a';
+    // Lab · look A: the assistant's light, faint as on its pages, down to the sheet's very foot.
+    return Stack(children: [
+      if (lab) Positioned.fill(child: ColoredBox(color: ground, child: LabWash(ground: ground, accent: theme.colors.accent, faint: true))),
+      SafeArea(
       top: false,
       child: SizedBox(
         height: math.max(MediaQuery.sizeOf(context).height * 0.88 - MediaQuery.viewInsetsOf(context).bottom, 200),
         child: ColoredBox(
-          color: Color.alphaBlend(theme.colors.onSurface.withValues(alpha: 0.015), theme.colors.surfaceRaised),
-          child: Column(
+          color: lab ? const Color(0x00000000) : ground,
+          child: Stack(children: [
+            Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _head(context, theme, strings, resolved: resolved),
-              Container(height: 1, color: theme.colors.onSurface.withValues(alpha: 0.06)),
+              RendelLab.of('look') == 'a' ? labHead(context, theme, strings, resolved: resolved) : _head(context, theme, strings, resolved: resolved),
+              if (RendelLab.of('look') != 'a') Container(height: 1, color: theme.colors.onSurface.withValues(alpha: 0.06)),
               Expanded(
                 child: Stack(
                   alignment: Alignment.bottomCenter,
@@ -438,7 +454,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                 ),
               ),
               Padding(
-                padding: EdgeInsets.fromLTRB(12, 8, 12, theme.space.md),
+                padding: EdgeInsets.fromLTRB(RendelLab.of('look') == 'a' ? 15 : 12, 8, RendelLab.of('look') == 'a' ? 15 : 12, theme.space.md),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
@@ -449,7 +465,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                         child: Semantics(liveRegion: true, child: Text(note, style: theme.text.caption)),
                       ),
                     // "I'm sorted" while the conversation is open; before the team has written, the way back (K4).
-                    if (!resolved)
+                    // The panel's look: not while the keyboard is up, when the page is short.
+                    if (!resolved && !(lab && MediaQuery.viewInsetsOf(context).bottom > 0))
                       Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Padding(
@@ -473,15 +490,18 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     // Sorted, while another of theirs is open: that one is where they write.
                     if (v.otherOpen case final other?) _otherOpen(theme, strings, other),
                     // Closed is not the end: a line reopens the thread, in place (plan §4.2).
-                    if (!needsContact && v.otherOpen == null) _composer(theme, strings, resolved: resolved),
+                    if (!needsContact && v.otherOpen == null)
+                      RendelLab.of('look') == 'a' ? labComposer(theme, strings, resolved: resolved) : _composer(theme, strings, resolved: resolved),
                   ],
                 ),
               ),
             ],
           ),
+          ]),
         ),
       ),
-    );
+    ),
+    ]);
   }
 
   /// Back to the assistant, the team with who is helping and when they answer, and a way out: close, or the tick of a sorted conversation.
@@ -920,15 +940,19 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     return Container(
       padding: picture ? const EdgeInsets.all(4) : const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
       decoration: BoxDecoration(
+        // Lab · look A: the team's bubbles are the same glass as the cards.
+        border: !mine && RendelLab.of('look') == 'a' ? Border.all(color: LabGlass.lineOf(theme), width: 0.8) : null,
         color: mine
             ? theme.colors.accent
+            : RendelLab.of('look') == 'a'
+            ? LabGlass.fillOf(theme)
             : auto
                 ? Color.alphaBlend(theme.colors.accent.withValues(alpha: 0.09), theme.colors.surfaceRaised)
                 : theme.colors.surfaceRaised,
         borderRadius: mine
             ? BorderRadiusDirectional.only(topStart: round, topEnd: round, bottomStart: round, bottomEnd: last ? tail : round)
             : BorderRadiusDirectional.only(topStart: round, topEnd: round, bottomEnd: round, bottomStart: last ? tail : round),
-        boxShadow: mine || auto
+        boxShadow: mine || auto || RendelLab.of('look') == 'a'
             ? null
             : [
                 BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.05), offset: const Offset(0, 1), blurRadius: 1),
@@ -961,18 +985,43 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       );
 
   /// A small chip above the box: "I'm sorted", or the way back to the assistant before the team has written.
-  Widget _chip(RendelTheme theme, {required String label, required VoidCallback onTap}) => RendelPressable(
+  Widget _chip(RendelTheme theme, {required String label, required VoidCallback onTap}) => RendelLab.of('look') == 'a'
+      // Lab · look A: a 36-point glass pill in a 44-point target, the words at 15;
+      // faded in place while + is open over it.
+      ? ValueListenableBuilder<bool>(
+          valueListenable: LabPopover.anyOpen,
+          builder: (context, menu, pill) => IgnorePointer(
+            ignoring: menu,
+            child: AnimatedOpacity(opacity: menu ? 0 : 1, duration: const Duration(milliseconds: 160), child: pill),
+          ),
+          child: RendelPressable(
+          semanticLabel: label,
+          onTap: onTap,
+          child: SizedBox(
+            height: 44,
+            child: Center(
+              widthFactor: 1,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8.5),
+                decoration: LabGlass.decorationOf(theme, 18),
+                child: Text(label, style: theme.text.body.copyWith(fontSize: 15, fontWeight: FontWeight.w500, height: 1.2, color: theme.colors.onSurface)),
+              ),
+            ),
+          ),
+        ),
+        )
+      : RendelPressable(
         semanticLabel: label,
         onTap: onTap,
         child: Container(
           constraints: const BoxConstraints(minHeight: 32),
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: BoxDecoration(
+          decoration: RendelLab.of('look') == 'a' ? LabGlass.decorationOf(theme, 999) : BoxDecoration(
             color: theme.colors.surfaceRaised,
             borderRadius: BorderRadius.circular(999),
             boxShadow: [BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.08), spreadRadius: 1)],
           ),
-          child: Text(label, style: theme.text.caption.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: theme.accentText)),
+          child: Text(label, style: theme.text.caption.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: RendelLab.of('look') == 'a' ? theme.colors.onSurface : theme.accentText)),
         ),
       );
 
