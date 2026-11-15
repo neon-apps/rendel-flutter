@@ -5,6 +5,23 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.92.4
+
+**Fixed**
+
+- An `identify` that does not land on a busy server (408, 429, 5xx) or a
+  dropped network is tried again after 2 s, 10 s, 30 s and 2 min, while the
+  same person is signed in. Before, one failed call lost the person's traits
+  for good, and the console showed them by their id. A refusal (a `userHmac`
+  that does not match, an id that is no id, a key the server does not know)
+  is not tried again: it is logged once as `identify_refused` with the
+  server's code and message. A sign-in still waits for the first try only.
+- A product card's title on a rail keeps its words whole at large text
+  sizes: when its widest word would not fit the card's line, the title is
+  drawn only as much smaller as that word needs, and never below its size at
+  1.0. Before, Flutter broke the word across two lines ("Ke / bapçısı" at the
+  largest accessibility text).
+
 ## 0.92.3
 
 **Fixed**

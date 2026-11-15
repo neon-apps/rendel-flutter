@@ -38,6 +38,8 @@ class RendelLogRecord {
   /// * `manifest_sync_failed` — the server rejected the manifest; the message
   ///   carries the field and the reason
   /// * `transport_failed` — a network call failed
+  /// * `identify_refused` — the server refused `identify` (a `userHmac` that
+  ///   does not match, an id that is no id, an unknown key); not tried again
   /// * `config_unreadable` — a published config could not be parsed, or was
   ///   not legible on this device
   /// * `config_cache_write_failed` — the config store threw on write

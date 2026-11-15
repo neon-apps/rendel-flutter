@@ -592,14 +592,51 @@ class Rendel {
   static bool _notAnId(String userId) =>
       RegExp(r'^(?:|null|undefined|none|nil|nan|\[object object\])$').hasMatch(userId.trim().toLowerCase());
 
+  /// The waits before each further try of an identify that did not land: a
+  /// network that dropped or a server that was busy, never a refusal. Without
+  /// them one failed call lost the person's name and email for good, and the
+  /// console showed them by id (P3-020, Tabak, 14 November).
+  @visibleForTesting
+  static List<Duration> identifyRetry = const [
+    Duration(seconds: 2),
+    Duration(seconds: 10),
+    Duration(seconds: 30),
+    Duration(minutes: 2),
+  ];
+
   /// The traits, and the anonymous history this phone had before the sign-in.
   /// The turns carry the user themselves, so a failure here costs neither.
-  static Future<void> _sendIdentity(Map<String, dynamic> identity) async {
+  /// The first try is awaited and the rest are not: a sign-in never waits for
+  /// a retry.
+  static Future<void> _sendIdentity(Map<String, dynamic> identity, [int attempt = 0]) async {
+    final api = _api;
+    // Another identify, or a reset, since: this one is no longer who is signed in.
+    if (api == null || !identical(_identity, identity)) return;
+    RendelIdentifyFailure? failure;
+    Object? error;
     try {
-      await _api?.identify(identity);
+      failure = await api.identify(identity);
     } catch (err) {
-      RendelLog.warn('transport_failed', 'identify did not reach the server', error: err);
+      error = err;
+      failure = (status: 0, retry: true, code: null, message: null);
     }
+    if (failure == null) return;
+    final what = [
+      failure.status == 0 ? 'no answer' : '${failure.status}',
+      if (failure.code != null) failure.code!,
+    ].join(' ');
+    final said = failure.message == null ? '' : ': ${failure.message}';
+    if (!failure.retry) {
+      RendelLog.error('identify_refused', 'identify was refused ($what)$said');
+      return;
+    }
+    if (attempt >= identifyRetry.length) {
+      RendelLog.warn('transport_failed', 'identify did not reach the server after ${attempt + 1} tries ($what)$said', error: error);
+      return;
+    }
+    final wait = identifyRetry[attempt];
+    RendelLog.warn('transport_failed', 'identify did not reach the server ($what)$said; trying again in ${wait.inSeconds} s', error: error);
+    Timer(wait, () => unawaited(_sendIdentity(identity, attempt + 1)));
   }
 
   /// Pairs this device with the console: pass the code the console shows

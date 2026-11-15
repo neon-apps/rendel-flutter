@@ -1248,7 +1248,9 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
 
   // The words on a card, the same three ways round. A row ends its line with
   // the price instead, and sets its lines a step closer.
-  List<Widget> details(Map item, {required double gap, bool price = true}) {
+  List<Widget> details(Map item, {required double gap, bool price = true, double? titleWidth}) {
+    final title = _str(item['title']) ?? '';
+    final titleStyle = theme.part('title', theme.text.label);
     final badge = _str(item['badge']);
     final subtitle = _str(item['subtitle']);
     final amount = price ? _str(item['price']) : null;
@@ -1263,12 +1265,13 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
         SizedBox(height: gap),
       ],
       Text(
-        _str(item['title']) ?? '',
+        title,
         // Three lines: a brand-first name ("INNER GOODNESS Regular Soy Milk
         // 1L") lost the product itself at two (Grove report).
         maxLines: 3,
         overflow: TextOverflow.ellipsis,
-        style: theme.part('title', theme.text.label),
+        style: titleStyle,
+        textScaler: titleWidth == null ? null : _keepingWordsWhole(context, title, titleStyle, titleWidth),
       ),
       if (subtitle != null) ...[
         SizedBox(height: theme.space.hair),
@@ -1313,7 +1316,10 @@ Widget buildProductCards(BuildContext context, WireBlock block, RendelDispatcher
                   ),
                   SizedBox(height: theme.space.sm),
                 ],
-                ...details(item, gap: theme.space.xs),
+                // The card is a fixed width, so its line is known here: a
+                // LayoutBuilder could not stand inside the rail's
+                // IntrinsicHeight.
+                ...details(item, gap: theme.space.xs, titleWidth: theme.size.cardWidth - theme.space.plate * 2),
               ],
             ),
           ),
@@ -7760,6 +7766,35 @@ class RendelOverline extends StatelessWidget {
           ),
     );
   }
+}
+
+/// The scale [text] is drawn at on a line [width] wide: the reader's own,
+/// unless its widest word would not fit at it. Flutter breaks such a word
+/// wherever the line ends ("Ke / bapçısı" on a rail card, Tabak at the
+/// largest accessibility text, 14 November). Here the size comes down only as
+/// far as that word needs, and never below the size it has at 1.0; the words
+/// still wrap between them.
+TextScaler _keepingWordsWhole(BuildContext context, String text, TextStyle style, double width) {
+  final scaler = MediaQuery.textScalerOf(context);
+  final drawn = DefaultTextStyle.of(context).style.merge(style);
+  final size = drawn.fontSize ?? 14;
+  if (scaler.scale(size) <= size || width <= 0) return scaler;
+  var widest = 0.0;
+  for (final word in text.split(RegExp(r'\s+'))) {
+    if (word.isEmpty) continue;
+    final painter = TextPainter(
+      text: TextSpan(text: word, style: drawn),
+      textDirection: Directionality.of(context),
+      textScaler: scaler,
+      maxLines: 1,
+    )..layout();
+    if (painter.width > widest) widest = painter.width;
+    painter.dispose();
+  }
+  if (widest <= width) return scaler;
+  // A hair under: a word's width does not shrink in exact step with its size.
+  final fit = scaler.scale(size) * width / widest * 0.98 / size;
+  return TextScaler.linear(fit < 1 ? 1 : fit);
 }
 
 /// The optional heading a data block opens with, plus the gap after it. Kept

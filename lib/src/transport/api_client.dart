@@ -56,6 +56,10 @@ const Duration rendelConfigTimeout = Duration(seconds: 8);
 String rendelPlatformName() =>
     kIsWeb ? 'web' : defaultTargetPlatform.name.toLowerCase();
 
+/// Why an identify did not land: its HTTP status (0 when no answer came), the
+/// server's error code and message, and whether trying again can help.
+typedef RendelIdentifyFailure = ({int status, bool retry, String? code, String? message});
+
 /// Hand-rolled SSE over POST — deliberately no extra dependency. The server
 /// closes the stream whenever it needs client input (continuation-POST model),
 /// so a "connection" here is one turn, not a held socket.
@@ -674,14 +678,33 @@ class RendelApiClient {
         if (user?['hmac'] case final hmac?) 'X-Rendel-User-Hmac': hmac,
       };
 
-  Future<void> identify(Map<String, dynamic> body) async {
-    await _http
+  /// POST /v1/identify. Null when it landed; otherwise its status, the
+  /// server's code and message, and whether trying again can help. A busy or
+  /// unreachable server can; a refusal (a wrong `user_hmac`, an id that is no
+  /// id, the wrong key) cannot. Throws when no answer came at all.
+  Future<RendelIdentifyFailure?> identify(Map<String, dynamic> body) async {
+    final response = await _http
         .post(
           Uri.parse('${config.apiBaseUrl}/v1/identify'),
           headers: _headers,
           body: jsonEncode(body),
         )
         .timeout(config.requestTimeout);
+    final status = response.statusCode;
+    if (status >= 200 && status < 300) return null;
+    String? code;
+    String? message;
+    try {
+      final error = jsonDecode(response.body);
+      if (error is Map && error['error'] is Map) {
+        final e = error['error'] as Map;
+        if (e['code'] is String) code = e['code'] as String;
+        if (e['message'] is String) message = e['message'] as String;
+      }
+    } catch (_) {
+      // Not the JSON the API answers with: the status says enough.
+    }
+    return (status: status, retry: status == 408 || status == 429 || status >= 500, code: code, message: message);
   }
 
   /// POST /v1/identify/reset: this device is nobody's until the next
