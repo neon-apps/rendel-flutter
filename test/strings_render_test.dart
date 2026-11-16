@@ -127,9 +127,7 @@ void main() {
     await tester.tap(find.bySemanticsLabel('Mesaj yaz'));
     await tester.pumpAndSettle();
     expect(find.bySemanticsLabel('Mesajı gönder'), findsOneWidget);
-    // The sources are behind the box's + (sdk-look-a §6).
-    await tester.tap(find.bySemanticsLabel('Dosya ekle'));
-    await tester.pumpAndSettle();
+    // The box lays the sources out under the words, each its own button.
     expect(find.bySemanticsLabel('Fotoğraflar'), findsOneWidget);
     expect(find.bySemanticsLabel('Kamera'), findsOneWidget);
     expect(find.bySemanticsLabel('Dosyalar'), findsOneWidget);

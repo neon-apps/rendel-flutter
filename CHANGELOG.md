@@ -5,6 +5,27 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.95.0
+
+**Changed**
+
+- The composer leads with the microphone again (`RendelConfig.voiceFirst`,
+  true by default): at rest a glass "+", the microphone wide in the middle,
+  held to speak, and a glass keyboard that opens the box. With `voiceFirst:
+  false`, or Typing first in the console's Appearance, the place to type leads
+  and the microphone is a circle after it. Both are drawn in the panel's
+  glass, with no outlines; the box lays Photos, Camera and Files out under the
+  words again, beside a round send.
+- Voice mode rises more slowly (0.65 s) and the held microphone swells an
+  eighth, easing out. Typing first, the microphone swells where it is and the
+  frosted circle grows from it; the heard words show once it is under them.
+- Pressing the microphone puts away a keyboard left up from typing.
+
+**Added**
+
+- `RendelConfig.voiceFirst`, and the published `copilot.voiceFirst` the
+  console's Appearance writes.
+
 ## 0.94.0
 
 **Added**

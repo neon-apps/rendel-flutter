@@ -705,6 +705,8 @@ class RendelRemoteConfig {
       feedback: copilot['feedback'] is bool ? copilot['feedback'] as bool : null,
       // The console's voice switch (Settings › Voice), laid over the config by the API.
       readAloud: copilot['readAloud'] is bool ? copilot['readAloud'] as bool : null,
+      // Appearance's choice: false leads with the place to type.
+      voiceFirst: copilot['voiceFirst'] is bool ? copilot['voiceFirst'] as bool : null,
     );
   }
 

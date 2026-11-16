@@ -70,6 +70,7 @@ class ThreadScreen extends StatefulWidget {
     this.attachIcon = RendelAttachIcon.plus,
     this.voiceIcon = RendelVoiceIcon.microphone,
     this.sendIcon = RendelSendIcon.arrowUp,
+    this.voiceFirst = true,
     this.feedback = false,
     this.onPickAttachment,
     this.attachSources = RendelAttachSource.values,
@@ -135,6 +136,9 @@ class ThreadScreen extends StatefulWidget {
   final RendelAttachIcon attachIcon;
   final RendelVoiceIcon voiceIcon;
   final RendelSendIcon sendIcon;
+
+  /// The microphone leads the composer at rest (`RendelConfig.voiceFirst`).
+  final bool voiceFirst;
 
   /// "Helpful?" thumbs at the foot of each finished answer (T1).
   final bool feedback;
@@ -617,6 +621,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     if (dictate == null || widget.controller.busy) return;
     // The voice stops for the one who is about to speak.
     widget.voice?.stop();
+    // A keyboard left up from typing goes: the question is spoken now.
+    FocusManager.instance.primaryFocus?.unfocus();
 
     final started = widget.dictationStarted;
     void opened() {
@@ -929,6 +935,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                               listening: _listening,
                               level: widget.dictationLevel,
                               voiceIcon: widget.voiceIcon,
+                              wide: widget.voiceFirst,
                               onStop: widget.onStopDictating,
                               onCancel: _cancelVoice,
                             ),
@@ -951,15 +958,13 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                       ignoring: _voice,
                       child: ExcludeSemantics(
                       excluding: _voice,
-                      child: AnimatedOpacity(
-                        opacity: _voice ? 0 : 1,
-                        // Gone at once under the finger, so the microphone is
-                        // never seen twice; back with a fade.
-                        duration: _voice || _dockAtOnce ? Duration.zero : theme.motion.swap,
-                        // There for a screen reader from the frame voice mode
-                        // closes; whether it is at all is the exclusion's
-                        // business above.
-                        alwaysIncludeSemantics: true,
+                      // Fades under the finger while voice mode's microphone
+                      // swells over its own, in the same place; back with a
+                      // fade. Its glass skips the blur while it fades: a blur
+                      // redrawn every frame of a fade is what stuttered.
+                      child: LabFade(
+                        visible: !_voice,
+                        duration: _dockAtOnce ? const Duration(milliseconds: 1) : theme.motion.swap,
                         child: _SizeReporter(
                       onHeight: (height) => _dock.value = height,
                       child: _Dock(
@@ -1036,6 +1041,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                             attachIcon: widget.attachIcon,
                             voiceIcon: widget.voiceIcon,
                             sendIcon: widget.sendIcon,
+                            voiceFirst: widget.voiceFirst,
                             attachments: _attachments,
                             attaching: _attaching,
                             onRemoveAttachment: (index) =>
@@ -3012,6 +3018,7 @@ class _Composer extends StatefulWidget {
     required this.attachIcon,
     required this.voiceIcon,
     required this.sendIcon,
+    this.voiceFirst = true,
     required this.attachments,
     required this.attaching,
     required this.sources,
@@ -3062,6 +3069,7 @@ class _Composer extends StatefulWidget {
   final RendelAttachIcon attachIcon;
   final RendelVoiceIcon voiceIcon;
   final RendelSendIcon sendIcon;
+  final bool voiceFirst;
 
   @override
   State<_Composer> createState() => _ComposerState();
@@ -3161,8 +3169,8 @@ class _ComposerState extends State<_Composer> {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
-    // Lab · look A: the menu opens over the card, not in its place, so
-    // nothing above it jumps as it opens and closes.
+    // The panel's look: the sources open over the row, not in its place, so
+    // nothing above it jumps as they open and close.
     if (RendelLab.of('look') == 'a') {
       final shown = _shown;
       return TapRegion(
@@ -3176,7 +3184,7 @@ class _ComposerState extends State<_Composer> {
             // always open, and + still opens the sources over it.
             open: _mode == _Mode.menu,
             popover: _menu(theme),
-            child: shown == _Mode.text ? _box(theme) : labRest(theme),
+            child: shown == _Mode.text ? _box(theme) : _rest(theme),
           ),
         ),
       );
@@ -3201,6 +3209,7 @@ class _ComposerState extends State<_Composer> {
       };
 
   Widget _rest(RendelTheme theme) {
+    if (widget.voiceFirst && _voice) return _restVoice(theme);
     final strings = RendelStringsScope.of(context);
     final status = widget.status;
     final primary = widget.primary;
@@ -3279,6 +3288,86 @@ class _ComposerState extends State<_Composer> {
               onUp: widget.onHoldEnd,
             ),
           ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Voice first (`RendelConfig.voiceFirst`): the + on one side, the
+  /// keyboard on the other, and between them the microphone, wide and held
+  /// to speak, as the composer was before 0.85.0. A lit action sits beside
+  /// it as a circle, and a turn's pill takes its place.
+  Widget _restVoice(RendelTheme theme) {
+    final strings = RendelStringsScope.of(context);
+    final status = widget.status;
+    final primary = widget.primary;
+    final still = MediaQuery.disableAnimationsOf(context);
+    return _Arrive(
+      key: const ValueKey(_Mode.rest),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(2, 2, 2, 4),
+        child: SizedBox(
+          height: 52,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (_attach)
+                _Round(
+                  icon: _attachGlyph,
+                  label: strings.attachFile,
+                  onTap: widget.busy ? null : _plus,
+                )
+              else
+                const SizedBox(width: _Round.side),
+              const SizedBox(width: 8),
+              Flexible(
+                child: AnimatedSwitcher(
+                  duration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
+                  reverseDuration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    alwaysIncludeSemantics: true,
+                    child: child,
+                  ),
+                  child: status != null
+                      ? _StatusPill(key: const ValueKey('status'), label: status)
+                      : Row(
+                          key: const ValueKey('mic'),
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _MicPill(
+                              icon: switch (widget.voiceIcon) {
+                                RendelVoiceIcon.waveform => Icons.graphic_eq_rounded,
+                                _ => Icons.mic_rounded,
+                              },
+                              label: strings.speak,
+                              onTap: widget.busy ? null : _listen,
+                              onDown: widget.busy ? null : widget.onHoldStart,
+                              onUp: widget.onHoldEnd,
+                              // A circle beside a lit action, so its label reads whole.
+                              width: primary == null ? 128 : _MicPill.side,
+                            ),
+                            if (primary != null) ...[
+                              const SizedBox(width: 8),
+                              Flexible(
+                                child: _Arrive(
+                                  key: ValueKey(primary.label),
+                                  child: _LitAction(label: primary.label, onTap: primary.onTap, go: primary.go),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              _Round(
+                icon: Icons.keyboard_outlined,
+                label: strings.typeMessage,
+                onTap: status != null ? null : _type,
+              ),
+            ],
           ),
         ),
       ),
@@ -3432,7 +3521,7 @@ class _ComposerState extends State<_Composer> {
                 ),
               ),
             Padding(
-              padding: RendelLab.of('look') == 'a' ? const EdgeInsets.fromLTRB(15, 4, 15, 0) : EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 theme.space.md + 2,
                 theme.space.sm,
                 theme.space.md,
@@ -3451,7 +3540,7 @@ class _ComposerState extends State<_Composer> {
                     // can be typed, and Send waits for the answer.
                     // Two lines before anything is written: room to see a
                     // question taking shape, not a single-line search box.
-                    minLines: RendelLab.of('look') == 'a' ? 1 : 2,
+                    minLines: 2,
                     maxLines: 5,
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _sendTyped(),
@@ -3489,13 +3578,13 @@ class _ComposerState extends State<_Composer> {
               ),
             ),
             Padding(
-              padding: RendelLab.of('look') == 'a' ? EdgeInsets.zero : EdgeInsets.fromLTRB(
+              padding: EdgeInsets.fromLTRB(
                 theme.space.xs,
                 0,
                 theme.space.xs,
                 theme.space.xs,
               ),
-              child: RendelLab.of('look') == 'a' ? labBoxRow(theme) : Row(
+              child: Row(
                 children: [
                   if (_attach)
                     for (final source in widget.sources)
@@ -3621,6 +3710,26 @@ class _AskField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
+    final words = Text(
+      hint,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: theme.text.label.copyWith(color: theme.onComposerFaint),
+    );
+    // The panel's look: the same glass as its other controls, no outline.
+    if (RendelLab.of('look') == 'a') {
+      return RendelPressable(
+        semanticLabel: label,
+        onTap: onTap,
+        child: LabGlass(
+          radius: _Round.side / 2,
+          height: _Round.side,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          alignment: AlignmentDirectional.centerStart,
+          child: words,
+        ),
+      );
+    }
     return RendelPressable(
       semanticLabel: label,
       onTap: onTap,
@@ -3633,12 +3742,7 @@ class _AskField extends StatelessWidget {
           color: theme.colors.composer.withValues(alpha: 0.7),
           border: Border.all(color: theme.composerEdge),
         ),
-        child: Text(
-          hint,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: theme.text.label.copyWith(color: theme.onComposerFaint),
-        ),
+        child: words,
       ),
     );
   }
@@ -3658,6 +3762,19 @@ class _Round extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
+    final glyph = Icon(
+      icon,
+      size: 22,
+      color: onTap == null ? theme.onComposerFaint : theme.colors.onComposer,
+    );
+    // The panel's look: a glass circle, as the top bar's buttons are.
+    if (RendelLab.of('look') == 'a') {
+      return RendelPressable(
+        semanticLabel: label,
+        onTap: onTap,
+        child: LabGlass(circle: true, width: side, height: side, alignment: Alignment.center, child: glyph),
+      );
+    }
     return RendelPressable(
       semanticLabel: label,
       onTap: onTap,
@@ -3677,11 +3794,7 @@ class _Round extends StatelessWidget {
             ),
           ],
         ),
-        child: Icon(
-          icon,
-          size: 22,
-          color: onTap == null ? theme.onComposerFaint : theme.colors.onComposer,
-        ),
+        child: glyph,
       ),
     );
   }
@@ -3787,7 +3900,7 @@ class _HeaderGlyphPainter extends CustomPainter {
 /// With [onDown] it is held to speak: the press starts voice mode and letting
 /// go ([onUp]) ends it, and [onTap] is left to a screen reader, which cannot
 /// hold. [held] draws it as it is under the finger, as Monogram's is: in
-/// 150ms the pill swells a fifth, overshooting a little, in its own colour.
+/// 260ms the pill swells an eighth, easing out, in its own colour.
 class _MicPill extends StatelessWidget {
   const _MicPill({
     super.key,
@@ -3797,9 +3910,13 @@ class _MicPill extends StatelessWidget {
     this.onDown,
     this.onUp,
     this.held = false,
+    this.width = side,
   });
 
   static const double side = 46;
+
+  /// [side] for a circle; wider, a pill (voice first: 128).
+  final double width;
 
   final IconData icon;
   final String label;
@@ -3808,24 +3925,27 @@ class _MicPill extends StatelessWidget {
   final VoidCallback? onUp;
   final bool held;
 
-  static BoxDecoration _decoration(RendelTheme theme) => BoxDecoration(
-        color: theme.colors.accent,
-        borderRadius: BorderRadius.circular(theme.radius.control),
-      );
+  // The panel's look: a filled ink circle, as its send is.
+  static BoxDecoration _decoration(RendelTheme theme) => RendelLab.of('look') == 'a'
+      ? BoxDecoration(color: theme.colors.onSurface, borderRadius: BorderRadius.circular(side / 2))
+      : BoxDecoration(
+          color: theme.colors.accent,
+          borderRadius: BorderRadius.circular(theme.radius.control),
+        );
 
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final still = MediaQuery.disableAnimationsOf(context);
-    final glyph = Icon(icon, size: 24, color: theme.colors.onAccent);
+    final glyph = Icon(icon, size: 24, color: RendelLab.of('look') == 'a' ? theme.colors.surfaceRaised : theme.colors.onAccent);
     if (held) {
       return TweenAnimationBuilder<double>(
         tween: Tween(begin: still ? 1 : 0, end: 1),
-        duration: const Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 260),
         builder: (context, t, child) => Transform.scale(
-          scale: 1 + 0.2 * Curves.easeOutBack.transform(t),
+          scale: 1 + 0.12 * Curves.easeOutCubic.transform(t),
           child: Container(
-            width: side,
+            width: width,
             height: side,
             decoration: _decoration(theme),
             child: child,
@@ -3842,7 +3962,7 @@ class _MicPill extends StatelessWidget {
     final pill = AnimatedContainer(
       duration: still ? Duration.zero : theme.motion.settle,
       curve: theme.motion.curve,
-      width: side,
+      width: width,
       height: side,
       decoration: _decoration(theme),
       child: glyph,
@@ -3962,6 +4082,7 @@ class _VoiceMode extends StatefulWidget {
     required this.listening,
     required this.level,
     required this.voiceIcon,
+    this.wide = false,
     required this.onStop,
     required this.onCancel,
   });
@@ -3987,6 +4108,9 @@ class _VoiceMode extends StatefulWidget {
   final ValueListenable<double>? level;
   final RendelVoiceIcon voiceIcon;
 
+  /// The microphone is the wide pill it was in the composer (voice first).
+  final bool wide;
+
   /// Stops listening and sends. Null when the recogniser cannot be stopped.
   final VoidCallback? onStop;
   final VoidCallback onCancel;
@@ -3997,24 +4121,30 @@ class _VoiceMode extends StatefulWidget {
 
 class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
   /// How long the sphere takes to fall away.
-  static const fall = Duration(milliseconds: 460);
+  static const fall = Duration(milliseconds: 540);
 
   // The sphere's rise, run backwards to fall.
   late final AnimationController _rise = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 360),
+    duration: const Duration(milliseconds: 650),
     reverseDuration: fall,
   );
   late final CurvedAnimation _risen = CurvedAnimation(
     parent: _rise,
-    curve: Curves.easeOutCubic,
-    reverseCurve: Curves.easeInCubic,
+    curve: Curves.easeOutQuart,
+    reverseCurve: Curves.easeInOutCubic,
   );
   // The veil is there before the sphere is up, and goes after it has fallen.
+  // Typing first, the heard words show once the circle from the corner is
+  // under them, never floating on the page before it.
+  late final CurvedAnimation _wordsIn = CurvedAnimation(
+    parent: _rise,
+    curve: const Interval(0.55, 1, curve: Curves.easeOut),
+  );
   late final CurvedAnimation _veiled = CurvedAnimation(
     parent: _rise,
-    curve: const Interval(0, 0.5, curve: Curves.easeOut),
-    reverseCurve: const Interval(0, 0.6, curve: Curves.easeIn),
+    curve: const Interval(0, 0.6, curve: Curves.easeOut),
+    reverseCurve: const Interval(0, 0.7, curve: Curves.easeInOut),
   );
 
   // The slow climb after the rise, for as long as it is held.
@@ -4085,6 +4215,7 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
     widget.falls.removeListener(_fall);
     _risen.dispose();
     _veiled.dispose();
+    _wordsIn.dispose();
     _crept.dispose();
     _rise.dispose();
     _creep.dispose();
@@ -4144,15 +4275,29 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
               // The sphere: its crown at 55% of the screen a third of a
               // second after the press, and 47% by the end of the first
               // second, where it stays while it is held.
+              // Typing first, the microphone is in the row's corner: the
+              // sphere grows from it, a circle centred on it (Tuna
+              // 2026-11-16), and falls back into it.
               AnimatedBuilder(
                 animation: Listenable.merge([_risen, _crept]),
-                builder: (context, child) => Positioned(
-                  left: (width - sphere) / 2,
-                  width: sphere,
-                  height: sphere,
-                  top: height * (1.02 - 0.50 * _risen.value - 0.10 * _crept.value),
-                  child: child!,
-                ),
+                builder: (context, child) {
+                  if (!widget.wide) {
+                    final rtl = Directionality.of(context) == TextDirection.rtl;
+                    final cx = rtl ? 14 + _MicPill.side / 2 : width - 14 - _MicPill.side / 2;
+                    final cy = height - math.max(MediaQuery.paddingOf(context).bottom, 18) - 30;
+                    // From inside the microphone, easing in, then on over the
+                    // next second while it is held: small first, then large.
+                    final r = 18 + height * 0.52 * Curves.easeInOutCubic.transform(_rise.value) + height * 0.10 * _crept.value;
+                    return Positioned(left: cx - r, top: cy - r, width: r * 2, height: r * 2, child: child!);
+                  }
+                  return Positioned(
+                    left: (width - sphere) / 2,
+                    width: sphere,
+                    height: sphere,
+                    top: height * (1.02 - 0.50 * _risen.value - 0.10 * _crept.value),
+                    child: child!,
+                  );
+                },
                 child: AnimatedBuilder(
                   animation: _pulse,
                   builder: (context, child) {
@@ -4163,7 +4308,7 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                         : 1 - Curves.easeInOut.transform((t - 0.3) / 0.7);
                     return Transform.scale(
                       scale: 1 + 0.08 * swell,
-                      alignment: Alignment.bottomCenter,
+                      alignment: widget.wide ? Alignment.bottomCenter : Alignment.center,
                       child: child,
                     );
                   },
@@ -4174,7 +4319,7 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                       duration: const Duration(milliseconds: 160),
                       builder: (context, swell, child) => Transform.scale(
                         scale: swell,
-                        alignment: Alignment.bottomCenter,
+                        alignment: widget.wide ? Alignment.bottomCenter : Alignment.center,
                         child: child,
                       ),
                       child: child,
@@ -4244,6 +4389,8 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
               // so it takes their place without a move. Gone the moment it is.
               if (!sent && (widget.listening || widget.heard.isNotEmpty))
                 Positioned.fill(
+                  child: FadeTransition(
+                  opacity: widget.wide ? kAlwaysCompleteAnimation : _wordsIn,
                   child: ValueListenableBuilder<double>(
                     valueListenable: widget.dock,
                     builder: (context, dock, _) => Align(
@@ -4281,6 +4428,7 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                     ),
                   ),
                 ),
+                ),
               if (!sent)
               Positioned.fill(
                 // Keyed: the words above arrive when listening starts, and
@@ -4295,7 +4443,12 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                       ),
                       child: SizedBox(
                         height: 60,
-                        child: Center(
+                        // Where the composer's microphone was: in the middle
+                        // voice first, else at the row's end (12 + 2 in), so it
+                        // swells in place rather than jumping to the middle.
+                        child: Container(
+                          alignment: widget.wide ? Alignment.center : AlignmentDirectional.centerEnd,
+                          padding: EdgeInsetsDirectional.only(end: widget.wide ? 0 : 14),
                           // Let go with words heard, it thinks, as the pill
                           // in the composer will once they are sent.
                           child: ValueListenableBuilder<bool>(
@@ -4327,6 +4480,7 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                                       label: strings.stopListening,
                                       onTap: widget.onStop,
                                       held: true,
+                                      width: widget.wide ? 128 : _MicPill.side,
                                     ),
                             ),
                           ),
@@ -4701,13 +4855,10 @@ BoxDecoration _litPill(RendelTheme theme) {
 /// A card's first action beside the microphone while its detail is open, or
 /// the page's first screen of the app.
 class _LitAction extends StatelessWidget {
-  const _LitAction({required this.label, required this.onTap, this.go = false, this.compact = false});
+  const _LitAction({required this.label, required this.onTap, this.go = false});
 
   final String label;
   final VoidCallback onTap;
-
-  /// In the message card's row (the panel's look): 32 high, beside the +.
-  final bool compact;
 
   /// Opens a screen of the app: the ↗ the screen's card ends with follows
   /// the label.
@@ -4720,10 +4871,10 @@ class _LitAction extends StatelessWidget {
       semanticLabel: label,
       onTap: onTap,
       child: Container(
-        height: compact ? 32 : 46,
+        height: 46,
         // The web's widths (Web 0.23.0): with the microphone a circle beside
         // it, ~14 letters fit at a 360pt screen.
-        padding: EdgeInsets.symmetric(horizontal: compact ? 12 : (go ? 14 : 18)),
+        padding: EdgeInsets.symmetric(horizontal: go ? 14 : 18),
         decoration: _litPill(theme),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -4733,7 +4884,7 @@ class _LitAction extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.text.labelStrong.copyWith(fontSize: compact ? 14 : (go ? 14.5 : 15)),
+                style: theme.text.labelStrong.copyWith(fontSize: go ? 14.5 : 15),
               ),
             ),
             if (go) ...[

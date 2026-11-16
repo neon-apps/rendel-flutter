@@ -155,6 +155,7 @@ class RendelConfig {
     this.attachIcon = RendelAttachIcon.plus,
     this.voiceIcon = RendelVoiceIcon.microphone,
     this.sendIcon = RendelSendIcon.arrowUp,
+    this.voiceFirst = true,
     this.feedback = false,
     this.readAloud = true,
     this.enabled = true,
@@ -472,6 +473,13 @@ class RendelConfig {
   final RendelVoiceIcon voiceIcon;
   final RendelSendIcon sendIcon;
 
+  /// Which way of asking the composer leads with at rest. True (the
+  /// default): the microphone, wide in the middle, held to speak, with a
+  /// keyboard beside it. False: the place to type, with the microphone after
+  /// it. The console's Appearance sets it for every build; without a
+  /// microphone the place to type leads either way.
+  final bool voiceFirst;
+
   /// "Helpful?" with a thumb up and down at the foot of each answer, sent
   /// to `POST /v1/feedback` (analytics-roi T1). Off unless true; usually
   /// switched on from the console rather than here.
@@ -560,6 +568,7 @@ class RendelConfig {
     RendelAttachIcon? attachIcon,
     RendelVoiceIcon? voiceIcon,
     RendelSendIcon? sendIcon,
+    bool? voiceFirst,
     bool? feedback,
     bool? readAloud,
   }) {
@@ -595,6 +604,7 @@ class RendelConfig {
       attachIcon: attachIcon ?? this.attachIcon,
       voiceIcon: voiceIcon ?? this.voiceIcon,
       sendIcon: sendIcon ?? this.sendIcon,
+      voiceFirst: voiceFirst ?? this.voiceFirst,
       feedback: feedback ?? this.feedback,
       // Off in code or off in the console: either is the floor, as for [enabled].
       readAloud: readAloud == null ? this.readAloud : (this.readAloud && readAloud),

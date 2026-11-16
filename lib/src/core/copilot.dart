@@ -798,6 +798,7 @@ class Rendel {
           attachIcon: _config.attachIcon,
           voiceIcon: _config.voiceIcon,
           sendIcon: _config.sendIcon,
+          voiceFirst: _config.voiceFirst,
           feedback: _config.feedback,
           // The host's own picker and recogniser when it has them, the SDK's
           // when it does not — see `batteries.dart`. The stop control belongs

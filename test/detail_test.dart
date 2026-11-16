@@ -447,7 +447,7 @@ void main() {
       );
     });
 
-    testWidgets('its first action is lit in the place to type, before the microphone', (tester) async {
+    testWidgets('its first action is lit beside the microphone, voice first', (tester) async {
       final (c, api) = await shoes(tester);
       await open(tester, 'Aero Glide 2');
       expect(_lit, findsNothing, reason: 'not before the block is there');
@@ -458,7 +458,7 @@ void main() {
       expect(find.descendant(of: _lit, matching: find.text('Add to cart')), findsOneWidget);
       final mic = tester.getRect(find.bySemanticsLabel('Speak instead of typing'));
       final lit = tester.getRect(_lit);
-      expect(lit.right, lessThan(mic.left));
+      expect(lit.left, greaterThan(mic.right));
       expect(lit.center.dy, closeTo(mic.center.dy, 1));
     });
 

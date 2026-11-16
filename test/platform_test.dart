@@ -97,10 +97,8 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    // No microphone leaves nothing for the middle, so the box is open; its +
-    // opens the three sources (sdk-look-a §6).
-    await tester.tap(find.bySemanticsLabel('Attach a file'));
-    await tester.pumpAndSettle();
+    // No microphone leaves nothing for the middle, so the box is open, with
+    // the three sources under the words.
     expect(find.bySemanticsLabel('Photos'), findsOneWidget);
     expect(find.bySemanticsLabel('Camera'), findsOneWidget);
     expect(find.bySemanticsLabel('Files'), findsOneWidget);

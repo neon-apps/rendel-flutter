@@ -258,6 +258,7 @@ void main() {
       RendelVoiceIcon voice = RendelVoiceIcon.microphone,
       RendelSendIcon send = RendelSendIcon.arrowUp,
       bool wired = true,
+      bool voiceFirst = true,
     }) async {
       final c = controller();
       addTearDown(c.dispose);
@@ -271,6 +272,7 @@ void main() {
                 attachIcon: attach,
                 voiceIcon: voice,
                 sendIcon: send,
+                voiceFirst: voiceFirst,
                 // A host that wired both. The icon a customer chose is only a
                 // question once there is something behind it.
                 onPickAttachment: wired ? (_) async => null : null,
@@ -283,22 +285,37 @@ void main() {
       await tester.pump();
     }
 
+    testWidgets('leads with the place to type when the console says typing first', (tester) async {
+      await pump(tester, voiceFirst: false);
+      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.keyboard_outlined), findsNothing);
+      expect(find.text('Ask anything'), findsOneWidget);
+      // The microphone is a circle at the row's end, not the wide pill.
+      final mic = tester.getRect(find.bySemanticsLabel('Speak instead of typing'));
+      expect(mic.width, lessThan(60));
+      expect(mic.right, greaterThan(tester.getRect(find.text('Ask anything')).right));
+    });
+
+    test('voice first is the default, and the console can turn it off', () {
+      expect(const RendelConfig().voiceFirst, isTrue);
+      final remote = RendelRemoteConfig.tryParse(
+          '{"channel":"published","version":1,"config":{"copilot":{"voiceFirst":false}}}')!;
+      expect(remote.applyToConfig(const RendelConfig()).voiceFirst, isFalse);
+    });
+
     testWidgets('draws the defaults', (tester) async {
       await pump(tester);
-      // At rest: the "+", the place to type and the microphone.
+      // At rest, voice first: the "+", the microphone and a keyboard.
       expect(find.byIcon(Icons.add_rounded), findsOneWidget);
-      expect(find.byIcon(Icons.mic_none_rounded), findsOneWidget);
-      expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
+      expect(find.byIcon(Icons.mic_rounded), findsOneWidget);
+      expect(find.byIcon(Icons.keyboard_outlined), findsOneWidget);
 
-      // The card opens the box: the same + and send under the field, and the
-      // + still opens the three sources (sdk-look-a §6).
+      // The keyboard opens the box: the sources under the words, and send.
       await tester.tap(find.bySemanticsLabel('Type a message'));
       await tester.pumpAndSettle();
       expect(find.byType(TextField), findsOneWidget);
-      expect(find.byIcon(Icons.add_rounded), findsOneWidget);
       expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
-      await tester.tap(find.bySemanticsLabel('Attach a file'));
-      await tester.pumpAndSettle();
       expect(find.bySemanticsLabel('Photos'), findsOneWidget);
       expect(find.bySemanticsLabel('Camera'), findsOneWidget);
       expect(find.bySemanticsLabel('Files'), findsOneWidget);
@@ -361,7 +378,7 @@ void main() {
       expect(find.byType(TextField), findsOneWidget);
       expect(find.byIcon(Icons.add_rounded), findsNothing);
       expect(find.bySemanticsLabel('Photos'), findsNothing);
-      expect(find.byIcon(Icons.mic_none_rounded), findsNothing);
+      expect(find.byIcon(Icons.mic_rounded), findsNothing);
       // Send survives: it is the one thing the composer is for.
       expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
     });
@@ -372,7 +389,7 @@ void main() {
       await pump(tester, wired: false);
       expect(find.byType(TextField), findsOneWidget);
       expect(find.bySemanticsLabel('Photos'), findsNothing);
-      expect(find.byIcon(Icons.mic_none_rounded), findsNothing);
+      expect(find.byIcon(Icons.mic_rounded), findsNothing);
       expect(find.byIcon(Icons.arrow_upward_rounded), findsOneWidget);
     });
 
@@ -1094,9 +1111,7 @@ void main() {
         ),
       );
       await tester.pump();
-      // No microphone here, so the box is open; Files is behind its +.
-      await tester.tap(find.bySemanticsLabel('Attach a file'));
-      await tester.pumpAndSettle();
+      // No microphone here, so the box is open, Files under its words.
       await tester.tap(find.bySemanticsLabel('Files'));
       await tester.pumpAndSettle();
 
