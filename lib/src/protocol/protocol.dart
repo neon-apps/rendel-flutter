@@ -83,6 +83,10 @@ const List<String> supportedComponents = [
 /// control empty and cannot be confirmed until a redraw carries the value.
 /// The server only lets the model propose such a card to a build that says so.
 ///
+/// `card_pictures`: a `confirm_card` row's `images` (the photos attached for
+/// a file parameter) are drawn as photos. Without it the server puts the first
+/// photo beside the card's question instead.
+///
 /// `support`: the build has the support page (human support). Where the app
 /// has Support on, a person who asks plainly for someone is handed to the
 /// team (`support.handoff`) instead of answered.
@@ -93,6 +97,7 @@ const List<String> clientCapabilities = [
   'detail_pages',
   'notices',
   'card_fill',
+  'card_pictures',
   'support',
 ];
 

@@ -152,6 +152,30 @@ void main() {
       expect(find.text('Go back'), findsOneWidget);
     });
 
+    // inSepo, 13 November: "image_picker_97102057-….jpg · JPEG · 737 KB"
+    // where the photo belonged. Parity with the web SDK's confirm.test.ts.
+    testWidgets('a file parameter\'s photos are drawn in its row, never its name (card_pictures)',
+        (tester) async {
+      const photo = 'https://storage.example/sign/a.jpg?token=t';
+      final props = card()
+        ..['params_display'] = [
+          {'label': 'Photos or videos', 'value': '', 'param': 'files', 'images': [photo]},
+          {'label': 'Caption', 'value': 'rendel test', 'param': 'caption'},
+        ];
+      await pump(tester, props);
+      expect(tester.takeException(), isNull);
+      final image = find.byWidgetPredicate((w) {
+        if (w is! Image) return false;
+        final provider = w.image;
+        final inner = provider is ResizeImage ? provider.imageProvider : provider;
+        return inner is NetworkImage && inner.url == photo;
+      });
+      expect(image, findsOneWidget);
+      expect(tester.getSize(image), const Size(64, 64));
+      expect(find.text('Photos or videos'), findsOneWidget);
+      expect(find.text('rendel test'), findsOneWidget);
+    });
+
     testWidgets('no picture, no thumbnail', (tester) async {
       await pump(tester, card());
       expect(find.byType(Image), findsNothing);

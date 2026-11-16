@@ -2119,6 +2119,10 @@ Widget _confirmCard(
             for (final row in display) ...[
               if (controls[_str(row['param'])] case final control?)
                 _EditRow(control: control, edits: edits!)
+              // The photos attached for a file parameter, as photos (`card_pictures`).
+              else if (_list(row['images']).map(_str).whereType<String>().toList() case final images
+                  when images.isNotEmpty)
+                _PicturesRow(label: _str(row['label']) ?? '', images: images, value: _str(row['value']) ?? '')
               // A support message or an address is read whole, from the left,
               // not squeezed into the value column.
               else if ((_str(row['value']) ?? '').length > 40)
@@ -2275,6 +2279,50 @@ class _StackedRow extends StatelessWidget {
             Text(value, style: _asPart(theme, part, theme.text.captionSoftTabular)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A file parameter's row on a confirmation card: its label, the photos the
+/// person attached, and the names of any other files. inSepo's new post read
+/// "image_picker_….jpg · JPEG · 737 KB" where the photo belonged.
+class _PicturesRow extends StatelessWidget {
+  const _PicturesRow({required this.label, required this.images, required this.value});
+
+  final String label;
+  final List<String> images;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: theme.space.xs),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: _asPart(theme, 'details', theme.text.caption)),
+          SizedBox(height: theme.space.xs),
+          Wrap(
+            spacing: theme.space.xs,
+            runSpacing: theme.space.xs,
+            children: [
+              for (final url in images)
+                _Thumbnail(
+                  url: url,
+                  alt: label,
+                  width: theme.size.cardRowImage,
+                  height: theme.size.cardRowImage,
+                  radius: theme.radius.sm,
+                ),
+            ],
+          ),
+          if (value.isNotEmpty) ...[
+            SizedBox(height: theme.space.xs),
+            Text(value, style: _asPart(theme, 'details', theme.text.captionSoftTabular)),
+          ],
+        ],
       ),
     );
   }

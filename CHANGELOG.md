@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.94.0
+
+**Added**
+
+- A confirmation card draws a file parameter's photos (`params_display[].images`)
+  in its row, at the card's row picture size, instead of the file's name. The
+  build declares `card_pictures`; without it the server puts the first photo
+  beside the card's question.
+
 ## 0.93.0
 
 **Changed**
