@@ -200,8 +200,12 @@ class _LabTopState extends State<_LabTop> {
 
 /// The opening, centred: the day, then the greeting.
 class _LabOpening extends StatelessWidget {
-  const _LabOpening({required this.headline, required this.subtitle, required this.onOpen, this.recent});
+  const _LabOpening({required this.headline, required this.subtitle, required this.onOpen, this.recent, this.suggestions = const [], this.onPick});
   final String? headline;
+
+  /// Suggestions with no picture, drawn as a list under the words (`_LabList`); empty draws none.
+  final List<String> suggestions;
+  final void Function(String)? onPick;
 
   /// The person's sorted conversations with the team, under the words.
   final Widget? recent;
@@ -244,6 +248,10 @@ class _LabOpening extends StatelessWidget {
               onOpen: onOpen,
             ),
           ],
+          if (suggestions.isNotEmpty && onPick != null) ...[
+            const SizedBox(height: 26),
+            _LabList(suggestions: suggestions, onPick: onPick!),
+          ],
           if (recent case final recent?) ...[
             const SizedBox(height: 24),
             recent,
@@ -251,6 +259,71 @@ class _LabOpening extends StatelessWidget {
         ]),
       ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// True when no suggestion has a picture from the app: then they are a list
+/// under the greeting (`_LabList`), not the row over the message card.
+bool _noPictures(List<String> suggestions) => suggestions.every((s) => RendelLook.suggestionCards[s]?.image == null);
+
+/// Suggestions with no picture (Tuna, 2026-11-17, B5 of the suggestions lab):
+/// one glass card under the greeting, 22 round, a row 70 tall for each, the
+/// title (17) over its line, a hairline between rows and a 32 round arrow at
+/// the end. The web panel draws the same (`.rd-cards[data-list]`).
+class _LabList extends StatelessWidget {
+  const _LabList({required this.suggestions, required this.onPick});
+  final List<String> suggestions;
+  final void Function(String) onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final line = LabGlass.lineOf(theme);
+    return SizedBox(
+      width: double.infinity,
+      child: LabGlass(
+        radius: 22,
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          for (var i = 0; i < suggestions.length; i++) ...[
+            if (i > 0) Container(height: 0.5, color: line),
+            _row(theme, suggestions[i]),
+          ],
+        ]),
+      ),
+    );
+  }
+
+  Widget _row(RendelTheme theme, String s) {
+    final card = RendelLook.suggestionCards[s];
+    return RendelPressable(
+      semanticLabel: s,
+      onTap: () => onPick(s),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 70),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 14, 12),
+          child: Row(children: [
+            Expanded(
+              child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(card?.title ?? s, maxLines: card == null ? 2 : 1, overflow: TextOverflow.ellipsis, style: theme.text.label.copyWith(fontSize: 17, fontWeight: FontWeight.w600, height: 1.2)),
+                if (card?.line case final line?) ...[
+                  const SizedBox(height: 2),
+                  Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.text.body.copyWith(fontSize: 15, color: theme.colors.onSurfaceSoft, height: 1.2)),
+                ],
+              ]),
+            ),
+            const SizedBox(width: 12),
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(shape: BoxShape.circle, color: theme.colors.onSurface.withValues(alpha: 0.06)),
+              child: Icon(Icons.chevron_right_rounded, size: 18, color: theme.colors.onSurfaceSoft),
+            ),
+          ]),
         ),
       ),
     );

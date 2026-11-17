@@ -155,7 +155,7 @@ class RendelConfig {
     this.attachIcon = RendelAttachIcon.plus,
     this.voiceIcon = RendelVoiceIcon.microphone,
     this.sendIcon = RendelSendIcon.arrowUp,
-    this.voiceFirst = true,
+    this.voiceFirst = false,
     this.feedback = false,
     this.readAloud = true,
     this.enabled = true,
@@ -473,9 +473,9 @@ class RendelConfig {
   final RendelVoiceIcon voiceIcon;
   final RendelSendIcon sendIcon;
 
-  /// Which way of asking the composer leads with at rest. True (the
-  /// default): the microphone, wide in the middle, held to speak, with a
-  /// keyboard beside it. False: the place to type, with the microphone after
+  /// Which way of asking the composer leads with at rest. False (the
+  /// default): the place to type, with the microphone after it. True: the
+  /// microphone, wide in the middle, held to speak, with a keyboard beside
   /// it. The console's Appearance sets it for every build; without a
   /// microphone the place to type leads either way.
   final bool voiceFirst;

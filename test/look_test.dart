@@ -94,15 +94,18 @@ void main() {
     expect(find.text('Return an item'), findsOneWidget);
   });
 
-  testWidgets('a suggestion with no picture from the app has no place for one (§5)', (tester) async {
+  testWidgets('suggestions with no picture are a list under the greeting, an arrow on each row (Tuna, 2026-11-17, B5)', (tester) async {
     await pump(tester, RendelTheme.paper());
     final words = find.text('Return an item');
     expect(words, findsOneWidget);
     expect(find.byIcon(Icons.auto_awesome_rounded), findsNothing);
-    // The words start after the card's line and padding (0.8 + 14), not after
-    // a 32-point picture's place.
-    final card = find.ancestor(of: words, matching: find.byType(LabGlass)).first;
-    expect(tester.getRect(words).left - tester.getRect(card).left, closeTo(14.8, 0.5));
+    // One glass card for the two, under the greeting, a round arrow at each row's end.
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNWidgets(2));
+    final list = find.ancestor(of: words, matching: find.byType(LabGlass)).first;
+    expect(find.descendant(of: list, matching: find.text('Where is my order?')), findsOneWidget);
+    expect(tester.getRect(list).top, greaterThan(tester.getRect(find.text('What can I do for you?')).bottom));
+    // The words start after the row's padding (20), with no picture's place.
+    expect(tester.getRect(words).left - tester.getRect(list).left, closeTo(20, 1.5));
   });
 
   testWidgets("the ground's light takes the app's two colours when it names them (§2)", (tester) async {

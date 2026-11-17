@@ -70,7 +70,7 @@ class ThreadScreen extends StatefulWidget {
     this.attachIcon = RendelAttachIcon.plus,
     this.voiceIcon = RendelVoiceIcon.microphone,
     this.sendIcon = RendelSendIcon.arrowUp,
-    this.voiceFirst = true,
+    this.voiceFirst = false,
     this.feedback = false,
     this.onPickAttachment,
     this.attachSources = RendelAttachSource.values,
@@ -1025,7 +1025,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                           // when the assistant is back, and there is nothing to
                           // press until then.
                           // Lab · look A: the suggestions as cards over the message card.
-                          if (RendelLab.of('look') == 'a' && controller.messages.isEmpty && widget.suggestions.isNotEmpty && !controller.busy)
+                          if (RendelLab.of('look') == 'a' && controller.messages.isEmpty && widget.suggestions.isNotEmpty && !controller.busy && !_noPictures(widget.suggestions))
                             _LabCards(suggestions: widget.suggestions, onPick: _send),
                           if (controller.resting)
                             _Resting(hint: controller.notice!.hint)
@@ -1731,7 +1731,15 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           // dissolve is new to it.
           child: shown == null
               ? RendelLab.of('look') == 'a'
-                  ? _LabOpening(headline: widget.headline, subtitle: widget.subtitle, onOpen: (url) => controller.tapAction(OpenUrlAction(url)), recent: _recent())
+                  ? _LabOpening(
+                      headline: widget.headline,
+                      subtitle: widget.subtitle,
+                      onOpen: (url) => controller.tapAction(OpenUrlAction(url)),
+                      recent: _recent(),
+                      // With no picture, the suggestions are a list under the greeting.
+                      suggestions: !controller.busy && _noPictures(widget.suggestions) ? widget.suggestions : const [],
+                      onPick: _send,
+                    )
                   : _EmptyState(
                   headline: widget.headline,
                   subtitle: widget.subtitle,
@@ -3018,7 +3026,7 @@ class _Composer extends StatefulWidget {
     required this.attachIcon,
     required this.voiceIcon,
     required this.sendIcon,
-    this.voiceFirst = true,
+    this.voiceFirst = false,
     required this.attachments,
     required this.attaching,
     required this.sources,

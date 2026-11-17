@@ -150,6 +150,8 @@ void main() {
           child: Scaffold(
             body: ThreadScreen(
               controller: c,
+              // Voice first, as these tests were written (typing first is the default from 0.96.0).
+              voiceFirst: true,
               // A recogniser, so the microphone is drawn.
               onDictate: (_) => Completer<String?>().future,
               onStopDictating: () {},

@@ -5,6 +5,20 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.96.0
+
+**Changed**
+
+- The composer leads with the place to type by default: a "+", the place
+  to type, and the microphone as a round button after it.
+  `RendelConfig.voiceFirst` now defaults to `false`; set it to `true`, or
+  choose Voice first in the console's Appearance, for the wide microphone in
+  the middle with a keyboard beside it.
+- Suggestions with no picture are a list under the greeting: one glass
+  card, a row for each with its title over its line and a round arrow at
+  the end. With pictures (`RendelLook.suggestionCards`) they stay the row of
+  cards over the composer.
+
 ## 0.95.1
 
 **Changed**

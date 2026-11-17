@@ -297,11 +297,11 @@ void main() {
       expect(mic.right, greaterThan(tester.getRect(find.text('Ask anything')).right));
     });
 
-    test('voice first is the default, and the console can turn it off', () {
-      expect(const RendelConfig().voiceFirst, isTrue);
+    test('typing first is the default, and the console can turn voice first on (Tuna, 2026-11-17)', () {
+      expect(const RendelConfig().voiceFirst, isFalse);
       final remote = RendelRemoteConfig.tryParse(
-          '{"channel":"published","version":1,"config":{"copilot":{"voiceFirst":false}}}')!;
-      expect(remote.applyToConfig(const RendelConfig()).voiceFirst, isFalse);
+          '{"channel":"published","version":1,"config":{"copilot":{"voiceFirst":true}}}')!;
+      expect(remote.applyToConfig(const RendelConfig()).voiceFirst, isTrue);
     });
 
     testWidgets('draws the defaults', (tester) async {
