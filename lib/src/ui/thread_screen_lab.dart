@@ -297,21 +297,16 @@ class _LabCards extends StatelessWidget {
               constraints: const BoxConstraints(minWidth: 190, maxWidth: 300),
               padding: const EdgeInsets.fromLTRB(14, 7, 16, 7),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
-                if (card?.image case final image?)
+                // No picture from the app, no place for one: the words alone.
+                if (card?.image case final image?) ...[
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: image.startsWith('https://')
                         ? Image.network(image, width: 32, height: 32, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox(width: 32, height: 32))
                         : Image.asset(image, width: 32, height: 32, fit: BoxFit.cover),
-                  )
-                else
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(color: theme.colors.surfaceSunk, borderRadius: BorderRadius.circular(10)),
-                    child: Icon(Icons.auto_awesome_rounded, size: 20, color: theme.colors.accent),
                   ),
-                const SizedBox(width: 14),
+                  const SizedBox(width: 14),
+                ],
                 Flexible(
                   child: Column(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text(card?.title ?? s, maxLines: card == null ? 2 : 1, overflow: TextOverflow.ellipsis, style: theme.text.label.copyWith(fontSize: 16, fontWeight: FontWeight.w600, height: 1.2)),

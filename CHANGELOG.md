@@ -5,6 +5,14 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.95.1
+
+**Changed**
+
+- A suggestion with no picture from your app (`RendelLook.suggestionCards`)
+  is drawn with its words alone: the square with a sparkle that stood in its
+  place is gone.
+
 ## 0.95.0
 
 **Changed**

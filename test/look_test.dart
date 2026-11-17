@@ -94,6 +94,17 @@ void main() {
     expect(find.text('Return an item'), findsOneWidget);
   });
 
+  testWidgets('a suggestion with no picture from the app has no place for one (§5)', (tester) async {
+    await pump(tester, RendelTheme.paper());
+    final words = find.text('Return an item');
+    expect(words, findsOneWidget);
+    expect(find.byIcon(Icons.auto_awesome_rounded), findsNothing);
+    // The words start after the card's line and padding (0.8 + 14), not after
+    // a 32-point picture's place.
+    final card = find.ancestor(of: words, matching: find.byType(LabGlass)).first;
+    expect(tester.getRect(words).left - tester.getRect(card).left, closeTo(14.8, 0.5));
+  });
+
   testWidgets("the ground's light takes the app's two colours when it names them (§2)", (tester) async {
     RendelLook.groundLight = (const Color(0xFFD9A43A), const Color(0xFF1E3B2F));
     await pump(tester, RendelTheme.paper());
