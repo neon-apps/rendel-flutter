@@ -677,6 +677,10 @@ class _WayOn extends StatelessWidget {
   }
 }
 
+/// A catalog icon name is lower-case letters, hyphens and underscores; an
+/// emoji is not. What is neither a known glyph nor an emoji draws no mark.
+final RegExp _iconWord = RegExp(r'^[a-z_-]+$', caseSensitive: false);
+
 /// One whole question to go on with: the words, the item's mark on a round
 /// of the mark role, and the arrow that says tapping it asks.
 class _WayOnCard extends StatelessWidget {
@@ -684,7 +688,9 @@ class _WayOnCard extends StatelessWidget {
 
   final String label;
 
-  /// One emoji, or a catalog icon name.
+  /// One emoji, or a catalog icon name. A word this build does not know is
+  /// neither, so it draws no mark (mirrors the web SDK) rather than the raw
+  /// word in the round.
   final String? icon;
   final VoidCallback? onTap;
 
@@ -692,6 +698,12 @@ class _WayOnCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final glyph = _iconFor(icon);
+    // An icon name this build does not know is not an emoji either: draw the
+    // round for a glyph or an emoji, never for a stray word like "sparkle".
+    final emoji = glyph == null &&
+        icon != null &&
+        icon!.isNotEmpty &&
+        !_iconWord.hasMatch(icon!);
     final lab = RendelLab.of('look') == 'a';
     final card = Container(
       constraints: BoxConstraints(minHeight: lab ? 56 : 72),
@@ -717,7 +729,7 @@ class _WayOnCard extends StatelessWidget {
               style: theme.text.label.copyWith(fontSize: lab ? 15 : 14.5, height: 1.35, fontWeight: lab ? FontWeight.w500 : null),
             ),
           ),
-          if (icon != null && icon!.isNotEmpty) ...[
+          if (glyph != null || emoji) ...[
             const SizedBox(width: 10),
             Container(
               width: 48,

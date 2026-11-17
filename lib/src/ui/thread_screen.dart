@@ -1443,24 +1443,26 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           listenable: Listenable.merge([widget.followups, widget.support?.value]),
           builder: (context, _) {
             final all = widget.followups?.value ?? const <RendelFollowup>[];
-            // Lab · look A: the team's row on the opening only, and not while the
-            // keyboard is up (the screen is short then); on a page it is in the menu.
-            final lab = RendelLab.of('look') == 'a';
+            // The top of the opening is the opening's (Tuna 2026-11-17): a question sent puts the
+            // team's row and the messages waiting away, and the next opening brings them back. Not
+            // while the keyboard is up either (the screen is short then); on a page the team is in the menu.
             final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
-            final row = lab && (controller.messages.isNotEmpty || typing) ? null : _supportRow(theme);
+            final opening = controller.messages.isEmpty && !typing;
+            final row = opening ? _supportRow(theme) : null;
             // A task notice about the conversation on screen is moot over it: not drawn, and put away.
             final onScreen = controller.conversationId;
             final waiting = [for (final card in all) if (onScreen == null || card.conversationId != onScreen) card];
             if (waiting.length != all.length) {
               WidgetsBinding.instance.addPostFrameCallback((_) => RendelFollowups.instance.seen(onScreen));
             }
+            final shown = opening ? waiting : const <RendelFollowup>[];
             // Positioned even when empty: a sized child would size the stack.
-            if (waiting.isEmpty && row == null) {
+            if (shown.isEmpty && row == null) {
               if (_cards.value != 0) WidgetsBinding.instance.addPostFrameCallback((_) => _cards.value = 0);
               return const Positioned(top: 0, left: 0, child: SizedBox.shrink());
             }
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              for (final card in waiting) {
+              for (final card in shown) {
                 RendelFollowups.instance.shown(card.id);
               }
             });
@@ -1480,7 +1482,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (row != null) Padding(padding: EdgeInsets.only(bottom: theme.space.sm), child: row),
-                          for (final card in waiting)
+                          for (final card in shown)
                             Padding(
                               padding: EdgeInsets.only(bottom: theme.space.sm),
                               child: RendelFollowupCard(

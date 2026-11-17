@@ -5,6 +5,15 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.96.1
+
+**Changed**
+
+- The messages waiting at the top of the thread and the row for an open
+  conversation with the team belong to the opening: a question sent puts
+  them away, and a new conversation brings them back. They also step aside
+  while the keyboard is up.
+
 ## 0.96.0
 
 **Changed**

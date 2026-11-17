@@ -244,7 +244,7 @@ void main() {
     await tester.pumpAndSettle();
   });
 
-  testWidgets('a card waiting over an answer sits above it, never on it, with a title that can be read', (tester) async {
+  testWidgets('the cards are the opening\'s: an answer on screen puts them away until the next opening, and the title can be read', (tester) async {
     await _init(tester, next: null, inbox: [pushed, mailed]);
     await tester.pumpWidget(_app());
     await tester.pump();
@@ -252,20 +252,19 @@ void main() {
     await _settle(tester);
     await _settle(tester);
     await tester.pump(const Duration(seconds: 1));
-    // One card opens its conversation; the other still waits over that answer (QA R2-13).
+    // The title is drawn in the surface's ink, not the accent's (it was white on the light card).
+    final title = tester.widget<Text>(find.text('Yeni sezon'));
+    final theme = tester.widget<RendelFollowupCard>(find.byType(RendelFollowupCard).last).theme;
+    expect(title.style?.color, theme.colors.onSurface);
+    // One card opens its conversation; the other is not drawn over that answer (Tuna 2026-11-17,
+    // in place of QA R2-13's card above it), and still waits for the next opening.
     await tester.tap(find.text('Bak'));
     await _settle(tester);
     await _settle(tester);
     await tester.pump(const Duration(seconds: 1));
-    final answer = find.textContaining('Pegasus 41 artık', findRichText: true);
-    expect(answer, findsWidgets);
-    expect(find.text('Yeni sezon'), findsOneWidget);
-    final card = tester.getRect(find.ancestor(of: find.text('Yeni sezon'), matching: find.byType(RendelFollowupCard)));
-    expect(tester.getRect(answer.first).top, greaterThanOrEqualTo(card.bottom));
-    // The title is drawn in the surface's ink, not the accent's (it was white on the light card).
-    final title = tester.widget<Text>(find.text('Yeni sezon'));
-    final theme = tester.widget<RendelFollowupCard>(find.byType(RendelFollowupCard)).theme;
-    expect(title.style?.color, theme.colors.onSurface);
+    expect(find.textContaining('Pegasus 41 artık', findRichText: true), findsWidgets);
+    expect(find.text('Yeni sezon'), findsNothing);
+    expect(Rendel.followupCards.value.map((c) => c.title), ['Yeni sezon']);
     Navigator.of(tester.element(find.byType(Scaffold).first)).maybePop();
     await tester.pumpAndSettle();
   });

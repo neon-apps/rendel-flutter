@@ -920,6 +920,43 @@ void main() {
     await settle(tester);
   });
 
+  testWidgets('the way on draws a mark for a glyph or an emoji, never a stray word', (tester) async {
+    final api = _LiveApi();
+    final c = controller(api);
+    addTearDown(c.dispose);
+    await pump(tester, c);
+    await ask(tester, c, api, 'What next?', [
+      _text('t', 'Here is your answer.'),
+      _block('q', 'quick_replies', {
+        'items': [
+          {
+            'label': 'Rate the look',
+            'icon': 'star',
+            'action': {'kind': 'reply', 'text': 'Rate the look'},
+          },
+          {
+            'label': 'Open the twin',
+            'icon': 'sparkle',
+            'action': {'kind': 'reply', 'text': 'Open the twin'},
+          },
+          {
+            'label': 'Find a match',
+            'icon': '✨',
+            'action': {'kind': 'reply', 'text': 'Find a match'},
+          },
+        ],
+      }),
+    ]);
+
+    // A catalog name becomes its glyph.
+    expect(find.byIcon(Icons.star_outlined), findsOneWidget);
+    // A word this build does not know ("sparkle") draws no mark, not the raw word.
+    expect(find.text('sparkle'), findsNothing);
+    // An emoji is drawn as itself.
+    expect(find.text('✨'), findsOneWidget);
+    await settle(tester);
+  });
+
   test('every new string is in all six languages', () {
     const english = RendelStrings();
     for (final language in ['en', 'tr', 'de', 'fr', 'es', 'ar']) {
