@@ -101,6 +101,12 @@ class _Server {
   /// The person's next line is held for an address (409 contact_required).
   bool holdForContact = false;
 
+  /// Whether a saved address is emailed its code (never on a test key), the code an address is refused with (409),
+  /// and how each ask for the code again is answered, in turn (200 once they run out).
+  bool emailed = true;
+  String? contactRefused;
+  final List<int> resendStatus = [];
+
   /// The stream is held open and says nothing, as a quiet thread's does, until a test [say]s something on it.
   /// Broadcast, so the page opened a second time listens again.
   final StreamController<List<int>> _quiet = StreamController<List<int>>.broadcast();
@@ -198,9 +204,15 @@ class _Server {
       }
       return json({'status': 'confirmed'});
     }
+    if (path.endsWith('/contact/resend')) {
+      final status = resendStatus.isEmpty ? 200 : resendStatus.removeAt(0);
+      if (status != 200) return json({'error': {'code': status == 429 ? 'too_soon' : 'internal'}}, status);
+      return json({'emailed': true});
+    }
     if (path.endsWith('/contact')) {
+      if (contactRefused case final code?) return json({'error': {'code': code}}, 409);
       state = _state(contact: {'state': 'stated', 'required': false});
-      return json({'state': 'stated', 'emailed': false});
+      return json({'state': 'stated', 'emailed': emailed});
     }
     // A slip is no history: the phone has no current conversation after it (qa3-sdk-03).
     if (path.endsWith('/resolve') && sent?['by_mistake'] == true) noThread = true;
@@ -222,7 +234,7 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
-Future<void> _open(WidgetTester tester, RendelSupport support, {List<UIAction>? actions, bool supportOn = true}) async {
+Future<void> _open(WidgetTester tester, RendelSupport support, {List<UIAction>? actions, bool supportOn = true, bool sandbox = false}) async {
   await tester.pumpWidget(_app(Builder(
     builder: (context) => TextButton(
       onPressed: () => showRendelSupport(
@@ -235,6 +247,7 @@ Future<void> _open(WidgetTester tester, RendelSupport support, {List<UIAction>? 
         },
         canHandle: (_) => true,
         supportOn: () => supportOn,
+        sandbox: sandbox,
       ),
       child: const Text('open'),
     ),
@@ -302,6 +315,26 @@ void main() {
       expect(find.textContaining('By mistake'), findsNothing);
       // The box names the team, never the person in it.
       expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
+      await _close(tester);
+    });
+
+    testWidgets('names the day where the conversation runs into another one, as the web SDK does, and none within one day', (tester) async {
+      final server = _Server(
+        entries: [
+          _entry(1, text: "I'd like to talk to a person"),
+          {..._entry(2, text: 'Is anyone there?'), 'created_at': '2026-11-07T10:00:00Z'},
+        ],
+        state: _state(mode: 'human'),
+      );
+      await _open(tester, server.support());
+      final context = tester.element(find.text('Is anyone there?'));
+      final words = MaterialLocalizations.of(context);
+      final later = words.formatMediumDate(DateTime.parse('2026-11-07T10:00:00Z').toLocal());
+      // The second day once, between the two lines; the day the conversation began is not named.
+      expect(find.text(later), findsOneWidget);
+      expect(tester.getTopLeft(find.text(later)).dy, greaterThan(tester.getTopLeft(find.text("I'd like to talk to a person")).dy));
+      expect(tester.getTopLeft(find.text(later)).dy, lessThan(tester.getTopLeft(find.text('Is anyone there?')).dy));
+      expect(find.text(words.formatMediumDate(DateTime.parse('2026-11-01T10:00:00Z').toLocal())), findsNothing);
       await _close(tester);
     });
 
@@ -792,6 +825,102 @@ void main() {
       expect(tester.getRect(warning).bottom, lessThanOrEqualTo(thread.bottom));
       expect(tester.getRect(find.byType(TextField).first).top, greaterThanOrEqualTo(thread.top));
       expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('asks for no code on a test key, where no email goes: says the address is saved, and lets it be changed', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Kargom gelmedi')],
+        state: _state(contact: {'state': 'stated', 'required': false}),
+      );
+      await _open(tester, server.support(), sandbox: true);
+      expect(find.text('Address saved. This is a test key, so no email is sent and there is no code to enter.'), findsOneWidget);
+      // No code box, and no code to ask for again: the only field is the one to write to the team in.
+      expect(find.text('Got a code by email? Enter it here'), findsNothing);
+      expect(find.text('Send the code again'), findsNothing);
+      expect(find.byType(TextField), findsOneWidget);
+      await tester.tap(find.text('Change the address'));
+      await _settle(tester);
+      expect(find.widgetWithText(TextField, 'you@example.com'), findsOneWidget);
+      expect(find.text('Address saved. This is a test key, so no email is sent and there is no code to enter.'), findsNothing);
+      // The new address is saved, and still nothing asks for a code or says one could not go.
+      await tester.enterText(find.byType(TextField).first, 'yeni@example.com');
+      server.emailed = false;
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(server.posts.singleWhere((p) => p.path == 'contact').body, {'email': 'yeni@example.com'});
+      expect(find.text('Address saved. This is a test key, so no email is sent and there is no code to enter.'), findsOneWidget);
+      expect(find.text("We can't send a code right now. Try again in an hour."), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets('sends the code again from under the code box, and says when it cannot yet', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Kargom gelmedi')],
+        state: _state(contact: {'state': 'stated', 'required': false}),
+      );
+      await _open(tester, server.support());
+      expect(find.text('Got a code by email? Enter it here'), findsOneWidget);
+      expect(find.text('Send the code again'), findsOneWidget);
+      expect(find.text('Change the address'), findsOneWidget);
+      await tester.tap(find.text('Send the code again'));
+      await _settle(tester);
+      expect(server.posts.singleWhere((p) => p.path == 'contact/resend').body, <String, dynamic>{});
+      expect(find.text('A new code is on its way. The earlier one no longer works.'), findsOneWidget);
+      server.resendStatus.add(429);
+      await tester.tap(find.text('Send the code again'));
+      await _settle(tester);
+      expect(server.posts.where((p) => p.path == 'contact/resend'), hasLength(2));
+      expect(find.text('A new code is on its way. The earlier one no longer works.'), findsNothing);
+      expect(find.text("We can't send a code right now. Try again in an hour."), findsOneWidget);
+      await _close(tester);
+    });
+
+    testWidgets('takes another address in place of the code box, goes back to the code, and says when it cannot change again', (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Kargom gelmedi')],
+        state: _state(contact: {'state': 'stated', 'required': false}),
+      );
+      await _open(tester, server.support());
+      await tester.tap(find.text('Change the address'));
+      await _settle(tester);
+      // The email card stands in for the code box, under the link's own words; its ✕ is the way back, and puts nothing away.
+      expect(find.text('Change the address'), findsOneWidget);
+      expect(find.text('Got a code by email? Enter it here'), findsNothing);
+      expect(find.bySemanticsLabel('No thanks'), findsNothing);
+      await tester.tap(find.bySemanticsLabel('Go back'));
+      await _settle(tester);
+      expect(find.text('Got a code by email? Enter it here'), findsOneWidget);
+      expect(server.posts.where((p) => p.path.startsWith('contact')), isEmpty);
+      await tester.tap(find.text('Change the address'));
+      await _settle(tester);
+      await tester.enterText(find.byType(TextField).first, 'zeynep.yeni@example.com');
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(server.posts.singleWhere((p) => p.path == 'contact').body, {'email': 'zeynep.yeni@example.com'});
+      // An email went: the code box is back, saying so.
+      expect(find.text('Got a code by email? Enter it here'), findsOneWidget);
+      expect(find.text('Thanks. Check your inbox to confirm the address.'), findsOneWidget);
+      // Saved with no email sent (too many codes this hour): the code box says a code cannot go now, never "check your inbox".
+      server.emailed = false;
+      await tester.tap(find.text('Change the address'));
+      await _settle(tester);
+      await tester.enterText(find.byType(TextField).first, 'zeynep.baska@example.com');
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(find.text('Thanks. Check your inbox to confirm the address.'), findsNothing);
+      expect(find.text("We can't send a code right now. Try again in an hour."), findsOneWidget);
+      // Changed as often as a conversation allows: said under the field, which stays.
+      server.contactRefused = 'too_many_changes';
+      await tester.tap(find.text('Change the address'));
+      await _settle(tester);
+      await tester.enterText(find.byType(TextField).first, 'zeynep.son@example.com');
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(find.text("The address can't be changed again in this conversation."), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'zeynep.son@example.com'), findsOneWidget);
+      // The page's own ✕, above the card's.
+      await tester.tap(find.byIcon(Icons.close_rounded).first);
+      await _settle(tester);
     });
 
     testWidgets('says a line did not go, and sends it again under the same id', (tester) async {

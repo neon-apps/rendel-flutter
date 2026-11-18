@@ -44,6 +44,7 @@ Future<SupportExit?> showRendelSupport(
   RendelTheme? theme,
   RendelStrings? strings,
   bool Function()? supportOn,
+  bool sandbox = false,
 }) {
   final drawn = theme ?? RendelThemeScope.of(context);
   final words = strings ?? RendelStringsScope.of(context);
@@ -74,6 +75,7 @@ Future<SupportExit?> showRendelSupport(
             onUpload: onUpload,
             sources: sources,
             supportOn: supportOn,
+            sandbox: sandbox,
           ),
         ),
       ),
@@ -97,10 +99,15 @@ class RendelSupportSheet extends StatefulWidget {
     this.onUpload,
     this.sources = const [RendelAttachSource.photos, RendelAttachSource.files],
     this.supportOn,
+    this.sandbox = false,
   });
 
   final RendelSupport support;
   final String team;
+
+  /// Whether the app runs on a test key (`rd_pk_test_…`): the server emails nobody, so an address given is saved
+  /// and the page says so, with no code to ask for.
+  final bool sandbox;
 
   /// Whether the app has Support on, as its config says; null is on. Off, nothing written reaches the team: no box,
   /// nothing to sort, and a conversation its switch closed shows the app's own channels (K1). On again, that one is
@@ -144,6 +151,12 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   String? _emailRefused;
   bool _contactSaved = false;
   bool _codeWrong = false;
+
+  /// The code card: the person asked to give another address (the email card stands in for it until one is saved
+  /// or they go back), what is said under the code box, and a code being asked for again.
+  bool _changing = false;
+  String? _codeNote;
+  bool _resending = false;
 
   /// A line landed while the person had scrolled up to read: the pill brings them back.
   bool _newBelow = false;
@@ -260,9 +273,16 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       _newShown = false;
       _sortedHere = false;
       _note = null;
+      _changing = false;
+      _codeNote = null;
     }
     // What the person had read when the page opened, from the server's answer, taken before this read moves it.
     final state = widget.support.value.value.state;
+    // No code is waited for any more (the address is theirs, wherever that was shown): nothing of its card is kept.
+    if (state?.contactState != 'stated') {
+      _changing = false;
+      _codeNote = null;
+    }
     if (_newAfter == null && state != null && _fresh) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
     setState(() {});
     // Read once the page has what the server has, and only while the app is in front of the person (sdk-22 f).
@@ -372,12 +392,19 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       switch (result) {
         case 'invalid':
           _emailRefused = strings.supportContactInvalid;
+        case 'too_many':
+          _emailRefused = strings.supportContactTooMany;
         case 'failed':
           _emailRefused = strings.turnFailed;
         default:
           _email.clear();
           _emailWarned = false;
-          _contactSaved = true;
+          // "Check your inbox" only when an email went; a saved address no code went to says so, off a test key.
+          _contactSaved = result == 'stated';
+          _changing = false;
+          _codeWrong = false;
+          _code.clear();
+          _codeNote = result == 'unsent' && !widget.sandbox ? strings.supportCodeLater : null;
       }
     });
   }
@@ -387,9 +414,33 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     if (mounted) {
       setState(() {
         _codeWrong = !ok;
-        if (ok) _contactSaved = false;
+        if (ok) {
+          _contactSaved = false;
+          _changing = false;
+          _codeNote = null;
+        }
       });
     }
+  }
+
+  /// Asks for the code again; a new one makes the earlier one, and what was typed of it, no use.
+  Future<void> _resend(RendelStrings strings) async {
+    setState(() => _resending = true);
+    final result = await widget.support.resendCode();
+    if (!mounted) return;
+    setState(() {
+      _resending = false;
+      switch (result) {
+        case 'sent':
+          _codeNote = strings.supportCodeResent;
+          _codeWrong = false;
+          _code.clear();
+        case 'later':
+          _codeNote = strings.supportCodeLater;
+        default:
+          _codeNote = strings.turnFailed;
+      }
+    });
   }
 
   @override
@@ -429,11 +480,19 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     }
     final lastMarker = v.entries.where((e) => e.marker).lastOrNull;
     RendelSupportEntry? prev;
+    DateTime? lastDay;
     for (final entry in v.entries) {
       final before = prev;
       prev = entry;
       // The same read of their account said twice in a row is one line (check-08).
       if (rendelSupportSameLookup(before, entry)) continue;
+      // The day, once, where the conversation runs into another one, as the web SDK's `.rd-support-day`.
+      final day = entry.createdAt.toLocal();
+      if (lastDay != null && !DateUtils.isSameDay(lastDay, day)) {
+        run = null;
+        items.add(_DayMark(entry.createdAt));
+      }
+      lastDay = day;
       if (entry.marker) {
         run = null;
         // Sorted on this page: the card at the end says it, so the server's own line about it steps aside.
@@ -467,6 +526,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
         switch (item) {
           _Run() => _run(context, theme, strings, item, read: identical(item, readRun)),
           _NewMark() => _newLine(context, theme, strings, item.at),
+          _DayMark() => _dayLine(context, theme, item.at),
           _ => _event(context, theme, strings, item as RendelSupportEntry),
         },
       if (column != null) column,
@@ -709,6 +769,16 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   /// "Oct 28", in the app's language.
   String _day(BuildContext context, DateTime at) => MaterialLocalizations.of(context).formatShortMonthDay(at.toLocal());
+
+  /// "Wed, Nov 12" in the middle, where the conversation runs into another day.
+  Widget _dayLine(BuildContext context, RendelTheme theme, DateTime at) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Text(
+          MaterialLocalizations.of(context).formatMediumDate(at.toLocal()),
+          style: theme.text.caption.copyWith(fontSize: 12, fontWeight: FontWeight.w600, color: theme.colors.onSurfaceFaint),
+          textAlign: TextAlign.center,
+        ),
+      );
 
   /// "New · 09:41" across the page, above what the person had not read yet.
   Widget _newLine(BuildContext context, RendelTheme theme, RendelStrings strings, DateTime at) {
@@ -1008,7 +1078,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           auto: true,
         ),
       if (need != null || offersContact) _contactCard(theme, strings, kind: need ?? 'optional'),
-      if (contact == 'stated' && !resolved) _codeCard(theme, strings),
+      if (contact == 'stated' && !resolved) _changing ? _contactCard(theme, strings, kind: 'change') : _codeCard(theme, strings),
       // The contact block is a raised plate of its own: drawn as it is, never inside a second card (qa2-k1-01).
       if (reach != null) KeyedSubtree(key: const ValueKey('rd-support-reach'), child: ComponentRegistry.build(context, reach..ready = true, _dispatch)),
       // A read the team asked for that waits for the person's yes, in the server's words: Allow or Not now, never
@@ -1316,15 +1386,17 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   /// Where the reply can reach the person (K14), as a card in the team's column: checked by the API's own rule,
   /// said under the field once they leave it or tap Save, and from then on with each change.
-  /// [kind] is `required` (the box waits for it), `request` (above the box while the team is live, K2) or
-  /// `optional`; only the optional one can be put away.
+  /// [kind] is `required` (the box waits for it), `request` (above the box while the team is live, K2),
+  /// `optional` or `change` (another address than the one a code went to); only the optional one can be put away,
+  /// and the change one has the way back to its code.
   Widget _contactCard(RendelTheme theme, RendelStrings strings, {required String kind}) {
-    final required = kind != 'optional';
+    final change = kind == 'change';
+    final required = kind != 'optional' && !change;
     final problem = supportEmailProblem(_email.text);
     final warning = _emailRefused ??
         (_emailWarned && problem != null ? (problem == 'empty' ? strings.supportContactEmpty : strings.supportContactInvalid) : null);
     final title = Text(
-      kind == 'required' ? strings.supportContactAsk : kind == 'request' ? strings.supportContactRequest : strings.supportContactOptional,
+      change ? strings.supportContactChange : kind == 'required' ? strings.supportContactAsk : kind == 'request' ? strings.supportContactRequest : strings.supportContactOptional,
       style: _heading(theme),
     );
     final threadId = widget.support.value.value.threadId;
@@ -1347,8 +1419,10 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                   setState(() {
                     _emailWarned = false;
                     _emailRefused = null;
+                    if (change) _changing = false;
                   });
-                  unawaited(widget.support.skipContact(threadId));
+                  // Back to the code of the address they gave: nothing is put away.
+                  if (!change) unawaited(widget.support.skipContact(threadId));
                 },
                 style: IconButton.styleFrom(
                   backgroundColor: theme.colors.onSurface.withValues(alpha: 0.06),
@@ -1356,7 +1430,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                   fixedSize: const Size(32, 32),
                   padding: EdgeInsets.zero,
                 ),
-                icon: Icon(Icons.close_rounded, size: 16, color: theme.colors.onSurfaceSoft, semanticLabel: strings.supportContactSkip),
+                icon: Icon(Icons.close_rounded, size: 16, color: theme.colors.onSurfaceSoft, semanticLabel: change ? strings.goBack : strings.supportContactSkip),
               ),
             ),
           ],
@@ -1391,21 +1465,20 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     ]);
   }
 
-  /// The code the address got, to show it is theirs; just after the address went, the card says it did.
+  /// The code the address got, to show it is theirs; just after the address went, the card says it did. Under the
+  /// box, the code asked for again and another address given. On a test key no email goes, so there is no code to
+  /// ask for: the card says the address is saved, and only offers another one.
   Widget _codeCard(RendelTheme theme, RendelStrings strings) {
+    final change = _link(theme, strings.supportContactChange, () {
+      setState(() {
+        _changing = true;
+        _codeNote = null;
+      });
+    });
+    if (widget.sandbox) return _plate(theme, [_saved(theme, strings.supportContactTest), change]);
     return _plate(theme, [
       if (_contactSaved) ...[
-        Semantics(
-          liveRegion: true,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.check_circle_outline_rounded, size: 17, color: theme.accentText),
-              const SizedBox(width: 6),
-              Expanded(child: Text(strings.supportContactSaved, style: theme.text.caption.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w500))),
-            ],
-          ),
-        ),
+        _saved(theme, strings.supportContactSaved),
         const SizedBox(height: 8),
       ],
       Text(strings.supportCodeLabel, style: _heading(theme)),
@@ -1426,8 +1499,52 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
         button: _attached(theme, strings.confirm, () => _verify(strings)),
       ),
       if (_codeWrong) _warning(theme, strings.supportCodeWrong),
+      if (_codeNote case final note?)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(2, 6, 2, 0),
+          child: Semantics(liveRegion: true, child: Text(note, style: _meta(theme).copyWith(fontSize: 12))),
+        ),
+      // A Wrap, so a long translation takes a line of its own.
+      Wrap(
+        spacing: 16,
+        children: [
+          _link(theme, strings.supportCodeResend, _resending ? null : () => _resend(strings)),
+          change,
+        ],
+      ),
     ]);
   }
+
+  /// That the address went, or was saved: a check and the words, said as they come.
+  Widget _saved(RendelTheme theme, String text) => Semantics(
+        liveRegion: true,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Icons.check_circle_outline_rounded, size: 17, color: theme.accentText),
+            const SizedBox(width: 6),
+            Expanded(child: Text(text, style: theme.text.caption.copyWith(color: theme.colors.onSurface, fontWeight: FontWeight.w500))),
+          ],
+        ),
+      );
+
+  /// A quiet way on under the code box: small underlined words, as the assistant's "skip" under a choice.
+  Widget _link(RendelTheme theme, String label, VoidCallback? onTap) => RendelPressable(
+        semanticLabel: label,
+        onTap: onTap,
+        // A Row, so the 44pt the press guarantees centres the words in it.
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Flexible(
+              child: Text(
+                label,
+                style: theme.text.caption.copyWith(fontSize: 13, color: theme.colors.onSurfaceSoft, decoration: TextDecoration.underline, decorationColor: theme.colors.onSurfaceSoft),
+              ),
+            ),
+          ],
+        ),
+      );
 
   /// The field with its mark and its button attached, as one control; red, with the warning under it, while wrong.
   Widget _group(RendelTheme theme, {required IconData glyph, required Widget field, required Widget button, required bool invalid}) => Container(
@@ -1630,6 +1747,11 @@ class _RatingCardState extends State<_RatingCard> {
 
 class _NewMark {
   _NewMark(this.at);
+  final DateTime at;
+}
+
+class _DayMark {
+  _DayMark(this.at);
   final DateTime at;
 }
 

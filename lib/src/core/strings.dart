@@ -239,6 +239,12 @@ class RendelStrings {
     this.supportContactSaved = 'Thanks. Check your inbox to confirm the address.',
     this.supportCodeLabel = 'Got a code by email? Enter it here',
     this.supportCodeWrong = 'That code didn\'t match. Try again.',
+    this.supportCodeResend = 'Send the code again',
+    this.supportCodeResent = 'A new code is on its way. The earlier one no longer works.',
+    this.supportCodeLater = "We can't send a code right now. Try again in an hour.",
+    this.supportContactChange = 'Change the address',
+    this.supportContactTooMany = "The address can't be changed again in this conversation.",
+    this.supportContactTest = 'Address saved. This is a test key, so no email is sent and there is no code to enter.',
     this.supportNewLine = 'New message',
     this.supportOfferTeam = 'Talk to the team',
     this.supportClosed = 'This conversation is closed. Write any time and the team will pick it up.',
@@ -736,6 +742,24 @@ class RendelStrings {
   final String supportContactSaved;
   final String supportCodeLabel;
   final String supportCodeWrong;
+
+  /// The link under the code box that asks for the code again.
+  final String supportCodeResend;
+
+  /// Said under the code box once a new code went.
+  final String supportCodeResent;
+
+  /// Said under the code box when no code can go now: too many in the last hour, or the address was saved and no email went.
+  final String supportCodeLater;
+
+  /// The link under the code box to give another address, and the title of the card that takes it.
+  final String supportContactChange;
+
+  /// Said under the email field once the address was changed as often as a conversation allows.
+  final String supportContactTooMany;
+
+  /// On a test key, in place of the code box: the address is saved, no email goes and there is no code.
+  final String supportContactTest;
   final String supportNewLine;
 
   /// Under an answer rated down, where the app offers its team then: opens the team's page.
@@ -1117,6 +1141,12 @@ class RendelStrings {
     String? supportContactSaved,
     String? supportCodeLabel,
     String? supportCodeWrong,
+    String? supportCodeResend,
+    String? supportCodeResent,
+    String? supportCodeLater,
+    String? supportContactChange,
+    String? supportContactTooMany,
+    String? supportContactTest,
     String? supportNewLine,
     String? supportOfferTeam,
     String? supportClosed,
@@ -1368,6 +1398,12 @@ class RendelStrings {
       supportContactSaved: supportContactSaved ?? this.supportContactSaved,
       supportCodeLabel: supportCodeLabel ?? this.supportCodeLabel,
       supportCodeWrong: supportCodeWrong ?? this.supportCodeWrong,
+      supportCodeResend: supportCodeResend ?? this.supportCodeResend,
+      supportCodeResent: supportCodeResent ?? this.supportCodeResent,
+      supportCodeLater: supportCodeLater ?? this.supportCodeLater,
+      supportContactChange: supportContactChange ?? this.supportContactChange,
+      supportContactTooMany: supportContactTooMany ?? this.supportContactTooMany,
+      supportContactTest: supportContactTest ?? this.supportContactTest,
       supportNewLine: supportNewLine ?? this.supportNewLine,
       supportOfferTeam: supportOfferTeam ?? this.supportOfferTeam,
       supportClosed: supportClosed ?? this.supportClosed,
@@ -1636,6 +1672,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactSaved: 'Teşekkürler. Adresi onaylamak için gelen kutunuzu kontrol edin.',
     supportCodeLabel: 'E-posta ile bir kod mu aldınız? Buraya girin',
     supportCodeWrong: 'Bu kod eşleşmedi. Tekrar deneyin.',
+    supportCodeResend: 'Kodu tekrar gönder',
+    supportCodeResent: 'Yeni kod yola çıktı. Önceki kod artık geçerli değil.',
+    supportCodeLater: 'Şu anda kod gönderemiyoruz. Bir saat sonra tekrar deneyin.',
+    supportContactChange: 'E-posta adresini değiştir',
+    supportContactTooMany: 'Bu sohbette adres tekrar değiştirilemez.',
+    supportContactTest: 'Adres kaydedildi. Bu bir test anahtarı olduğu için e-posta gönderilmez ve girilecek bir kod yoktur.',
     supportNewLine: 'Yeni mesaj',
     supportOfferTeam: 'Ekibimizle görüşün',
     supportClosed: 'Bu sohbet kapatıldı. İstediğiniz zaman yazın, ekip ilgilenecektir.',
@@ -1893,6 +1935,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactSaved: 'Danke. Bitte bestätigen Sie die Adresse in Ihrem Postfach.',
     supportCodeLabel: 'Code per E-Mail erhalten? Hier eingeben',
     supportCodeWrong: 'Der Code stimmt nicht. Bitte erneut versuchen.',
+    supportCodeResend: 'Code erneut senden',
+    supportCodeResent: 'Ein neuer Code ist unterwegs. Der vorherige ist nicht mehr gültig.',
+    supportCodeLater: 'Wir können gerade keinen Code senden. Versuchen Sie es in einer Stunde erneut.',
+    supportContactChange: 'E-Mail-Adresse ändern',
+    supportContactTooMany: 'Die Adresse kann in dieser Unterhaltung nicht mehr geändert werden.',
+    supportContactTest: 'Adresse gespeichert. Da dies ein Testschlüssel ist, wird keine E-Mail gesendet und Sie müssen keinen Code eingeben.',
     supportNewLine: 'Neue Nachricht',
     supportOfferTeam: 'Mit dem Team sprechen',
     supportClosed: 'Dieses Gespräch ist abgeschlossen. Schreiben Sie jederzeit, das Team meldet sich.',
@@ -2149,6 +2197,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactSaved: 'Merci. Vérifiez votre boîte de réception pour confirmer l’adresse.',
     supportCodeLabel: 'Vous avez reçu un code par e-mail ? Saisissez-le ici',
     supportCodeWrong: 'Ce code ne correspond pas. Réessayez.',
+    supportCodeResend: 'Renvoyer le code',
+    supportCodeResent: "Un nouveau code est en route. L'ancien n'est plus valide.",
+    supportCodeLater: "Nous ne pouvons pas envoyer de code pour l'instant. Réessayez dans une heure.",
+    supportContactChange: "Modifier l'adresse",
+    supportContactTooMany: "L'adresse ne peut plus être modifiée dans cette conversation.",
+    supportContactTest: "Adresse enregistrée. Il s'agit d'une clé de test : aucun e-mail n'est envoyé et aucun code n'est à saisir.",
     supportNewLine: 'Nouveau message',
     supportOfferTeam: 'Parler à l’équipe',
     supportClosed: 'Cette conversation est terminée. Écrivez quand vous voulez, l’équipe reprendra.',
@@ -2404,6 +2458,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactSaved: 'Gracias. Revisa tu bandeja de entrada para confirmar la dirección.',
     supportCodeLabel: '¿Te llegó un código por correo? Escríbelo aquí',
     supportCodeWrong: 'Ese código no coincide. Inténtalo de nuevo.',
+    supportCodeResend: 'Reenviar el código',
+    supportCodeResent: 'Un nuevo código está en camino. El anterior ya no funciona.',
+    supportCodeLater: 'No podemos enviar un código ahora. Intenta de nuevo en una hora.',
+    supportContactChange: 'Cambiar el correo',
+    supportContactTooMany: 'No puedes volver a cambiar el correo en esta conversación.',
+    supportContactTest: 'Correo guardado. Esta es una clave de prueba, así que no se envía ningún correo ni hay un código que ingresar.',
     supportNewLine: 'Mensaje nuevo',
     supportOfferTeam: 'Hablar con el equipo',
     supportClosed: 'Esta conversación está cerrada. Escribe cuando quieras y el equipo la retomará.',
@@ -2658,6 +2718,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactSaved: 'شكرًا. تحقق من بريدك لتأكيد العنوان.',
     supportCodeLabel: 'وصلك رمز عبر البريد؟ أدخله هنا',
     supportCodeWrong: 'الرمز غير مطابق. حاول مرة أخرى.',
+    supportCodeResend: 'إعادة إرسال الرمز',
+    supportCodeResent: 'الرمز الجديد في طريقه إليك. لم يعد الرمز السابق صالحاً.',
+    supportCodeLater: 'لا يمكننا إرسال رمز الآن. يُرجى المحاولة بعد ساعة.',
+    supportContactChange: 'تغيير البريد الإلكتروني',
+    supportContactTooMany: 'لا يمكن تغيير البريد مجدداً في هذه المحادثة.',
+    supportContactTest: 'تم حفظ البريد. هذا مفتاح تجريبي، لذا لن نرسل أي رسالة ولا داعي لإدخال رمز.',
     supportNewLine: 'رسالة جديدة',
     supportOfferTeam: 'تحدّث مع الفريق',
     supportClosed: 'هذه المحادثة مغلقة. اكتب في أي وقت وسيتابع الفريق.',

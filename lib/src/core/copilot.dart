@@ -1063,6 +1063,7 @@ class Rendel {
       theme: themeOf(context),
       strings: strings,
       supportOn: _supportOnForPage,
+      sandbox: _sandboxKey,
     );
     // ✕ closes all of Rendel, as on the web.
     if (exit == SupportExit.closed) _presentation?.dismiss();

@@ -909,15 +909,30 @@ class RendelSupport {
     return true;
   }
 
-  /// The address the reply goes to (K14): 'stated', 'verified', 'invalid' or 'failed'.
+  /// The address the reply goes to (K14): 'stated', 'verified', 'unsent', 'invalid', 'too_many' or 'failed'.
+  /// 'unsent' is an address the server saved without emailing its code (a test key, or too many codes this hour);
+  /// 'too_many' is one it would not take, the address having changed as often as a conversation allows.
   Future<String> contact(String email) async {
     final threadId = _now.threadId;
     if (threadId == null) return 'failed';
     final answer = await api.support('POST', _path(threadId, 'contact'), user: user(), body: {'email': email});
     if (answer.status == 400) return 'invalid';
+    final error = answer.json?['error'];
+    if (answer.status == 409 && error is Map && error['code'] == 'too_many_changes') return 'too_many';
     if (answer.status != 200) return 'failed';
     await load();
-    return answer.json?['state'] == 'verified' ? 'verified' : 'stated';
+    if (answer.json?['state'] == 'verified') return 'verified';
+    return answer.json?['emailed'] == true ? 'stated' : 'unsent';
+  }
+
+  /// Asks for the address's code again: 'sent', 'later' (too soon after the last one, or no email can go now) or 'failed'.
+  Future<String> resendCode() async {
+    final threadId = _now.threadId;
+    if (threadId == null) return 'failed';
+    final answer = await api.support('POST', _path(threadId, 'contact/resend'), user: user(), body: {});
+    if (answer.status == 429) return 'later';
+    if (answer.status != 200) return 'failed';
+    return answer.json?['emailed'] == true ? 'sent' : 'later';
   }
 
   Future<bool> verify(String code) async {

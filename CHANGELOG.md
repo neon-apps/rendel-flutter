@@ -5,6 +5,28 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.98.0
+
+**Added**
+
+- Under the box for the emailed code in a conversation with the team, a
+  person can ask for the code again or change a mistyped address: the code
+  card has "Send the code again" and "Change the address". A new code makes
+  the earlier one stop working; the server sends at most two an hour and takes
+  three changes of address in a conversation. Six new `RendelStrings` fields
+  carry the words: `supportCodeResend`, `supportCodeResent`,
+  `supportCodeLater`, `supportContactChange`, `supportContactTooMany` and
+  `supportContactTest`.
+
+**Fixed**
+
+- On a test key, which emails nobody, the card no longer asks for a code that
+  is not coming: it says the address is saved and that no email is sent.
+- "Thanks. Check your inbox" is said only when an email went.
+- A conversation with the team names the day where it runs into another one
+  ("Wed, Nov 12"), as the web SDK does. Lines from different days stood under
+  each other with only their times and read as one message sent twice.
+
 ## 0.97.1
 
 **Fixed**
