@@ -5,6 +5,16 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.97.1
+
+**Fixed**
+
+- Once the app switches Support back on, a page or app that saw it switched
+  off picks that up when the person comes back to it, when Rendel or
+  `openSupport` opens, or within five minutes, without a restart.
+- After "By mistake? Back to the assistant", `openSupport` opens a fresh page
+  and the next message starts a new conversation.
+
 ## 0.97.0
 
 **Changed**

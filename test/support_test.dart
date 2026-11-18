@@ -202,6 +202,8 @@ class _Server {
       state = _state(contact: {'state': 'stated', 'required': false});
       return json({'state': 'stated', 'emailed': false});
     }
+    // A slip is no history: the phone has no current conversation after it (qa3-sdk-03).
+    if (path.endsWith('/resolve') && sent?['by_mistake'] == true) noThread = true;
     return http.StreamedResponse(const Stream.empty(), 204);
   });
 
@@ -876,6 +878,44 @@ void main() {
       await tester.tap(find.text("I'm sorted"));
       await _settle(tester);
       expect(sorted.posts.singleWhere((p) => p.path == 'resolve').body, isEmpty);
+    });
+
+    testWidgets('forgets a conversation put away By mistake: Contact us opens an empty page, and the next line starts a new one (qa4-sdk-02)', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state());
+      final support = server.support();
+      await _open(tester, support);
+      await tester.tap(find.textContaining('By mistake'));
+      await _settle(tester);
+      expect(find.byType(RendelSupportSheet), findsNothing);
+      expect(support.open, isFalse);
+      // Contact us, in the same app life.
+      support.begin('open_support');
+      await _open(tester, support);
+      expect(find.text('Kargom gelmedi'), findsNothing);
+      expect(find.text('Write to open it again'), findsNothing);
+      await tester.enterText(find.byType(TextField).last, 'Bir sorum daha var');
+      await tester.runAsync(() async {
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await _settle(tester);
+      expect([for (final h in server.handoffs) h['text']], ['Bir sorum daha var']);
+      expect(server.posts.where((p) => p.path == 'messages'), isEmpty);
+      await _close(tester);
+    });
+
+    test('says a read once, even when a state read before the server had it comes back (qa4-sdk-04)', () async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Bakıyorum.')], state: _state(mode: 'human'));
+      final support = server.support();
+      await support.load();
+      support.read();
+      // The stream's or a reload's state, from before the server had the read.
+      await support.load();
+      support.read();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      expect([for (final p in server.posts) if (p.path == 'read') p.body], [
+        {'seq': 2},
+      ]);
     });
 
     testWidgets('closes with nothing of the last person on it when they sign out with the page up (qa3-sdk-02)', (tester) async {

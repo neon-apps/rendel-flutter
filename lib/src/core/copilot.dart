@@ -322,6 +322,10 @@ class Rendel {
   /// The conversation a read since its close found Support on for (D4): not read again for it.
   static String? _supportCheckedFor;
 
+  /// Support was switched off since this app saw it on (qa4-k1-02): the config is read again every few minutes, when
+  /// the app comes back and when Rendel or Contact us opens, so Support switched back on reaches it without a restart.
+  static bool _supportWentOff = false;
+
   /// What the team's page reads for whether Support is on: off while the config is read again (qa3-k1-01).
   static bool _supportOnForPage() => supportOn && !_supportRecheck;
 
@@ -784,6 +788,8 @@ class Rendel {
     unawaited(_refreshInbox());
     // And their conversation with the team, if one is open: its row says what came since.
     if (_supportTeam != null) unawaited(_supportOf(api).refreshUnread());
+    // Support switched off since this app saw it on: it may be on again (qa4-k1-02).
+    if (_supportWentOff) unawaited(_refreshConfig());
     // Already presented: in the bubble while a screen it opened is in front,
     // the launcher does what the bubble does. Over the app, a second sheet of
     // the same thread is not drawn.
@@ -1006,6 +1012,8 @@ class Rendel {
   /// whose first line opens the thread with that answer's conversation.
   static Future<bool> _openSupport(BuildContext context, {String? thread, String trigger = 'open_support', String? conversationId}) async {
     final api = await _whenClient();
+    // Switched off since this app saw it on: the config first, so Support on again opens the page as on (qa4-k1-02).
+    if (_supportWentOff) await _refreshConfig();
     final on = _supportTeam != null;
     // Tapped before the launch's read of the kept team came back.
     if (!on && _keptTeam == null) await _loadKeptTeam();
@@ -1517,6 +1525,8 @@ class Rendel {
     _support = null;
     _supportRecheck = false;
     _supportCheckedFor = null;
+    _supportWentOff = false;
+    _recheckConfig();
     _supportBeat?.cancel();
     _supportBeat = null;
     _supportTicked = null;
@@ -1625,23 +1635,38 @@ class Rendel {
     final next = yes ? null : (reason ?? 'unavailable');
     if (next == _unavailable) return;
     _unavailable = next;
-    _recheck?.cancel();
-    _recheck = null;
     if (next != null) {
       RendelLog.warn(
         'unavailable',
         'New conversations are paused ($next); Rendel stays on screen and answers with a notice until they can start again.',
       );
-      _recheck = Timer.periodic(
-        next == 'unreachable' ? const Duration(minutes: 1) : const Duration(minutes: 5),
-        (_) => unawaited(_refreshConfig()),
-      );
-      _lifecycle ??= AppLifecycleListener(onResume: () {
-        if (_unavailable != null) unawaited(_refreshConfig());
-      });
     }
+    _recheckConfig();
     available.value = next == null;
     configRevision.value++;
+  }
+
+  /// How often the config is being read again; null while it is not.
+  static Duration? _recheckEvery;
+
+  /// Read again on a beat and when the app comes back while new conversations are paused, back without a restart
+  /// once credit is added, the budget raised or a new day begins; and while Support, switched off since this app saw
+  /// it on, may be on again (qa4-k1-02).
+  static void _recheckConfig() {
+    final every = _unavailable == 'unreachable'
+        ? const Duration(minutes: 1)
+        : _unavailable != null || _supportWentOff
+            ? const Duration(minutes: 5)
+            : null;
+    if (every == _recheckEvery) return;
+    _recheckEvery = every;
+    _recheck?.cancel();
+    _recheck = every == null ? null : Timer.periodic(every, (_) => unawaited(_refreshConfig()));
+    if (every != null) {
+      _lifecycle ??= AppLifecycleListener(onResume: () {
+        if (_unavailable != null || _supportWentOff) unawaited(_refreshConfig());
+      });
+    }
   }
 
   static void _refuse(String? code) {
@@ -1676,7 +1701,12 @@ class Rendel {
       ..captureKnown = true;
     RendelScreens.instance.consentChanged();
     // The launcher's count is read with the config: at launch and when the app comes back.
+    final wasOn = _supportTeam != null;
     _supportTeam = remote.supportTeam;
+    // On again after this app saw it switched off: the team's page draws the box again (qa4-k1-02).
+    if (_supportTeam != null && _supportWentOff) _support?.redraw();
+    _supportWentOff = _supportTeam == null && (wasOn || _supportWentOff);
+    _recheckConfig();
     if (_supportTeam != null) {
       if (_api case final api?) unawaited(_supportOf(api).refreshUnread());
       _supportBeat ??= Timer.periodic(const Duration(seconds: 30), (_) => unawaited(supportTick()));

@@ -867,12 +867,18 @@ class RendelSupport {
     unawaited(api.support('POST', _path(threadId, 'typing'), user: user(), body: const {}).then((answer) => _refusedOff(answer.status, answer.json)));
   }
 
+  /// The read last said to the server.
+  ({String threadId, int seq})? _readSent;
+
   /// Read up to the newest line: the badge clears. Said once per new line.
   void read() {
     final threadId = _now.threadId;
     final seq = _now.cursor;
     final state = _now.state;
     if (threadId == null || seq == 0 || state == null || state.userReadSeq >= seq) return;
+    // A state read before the server had it (the stream's, a reload's) does not say it again (qa4-sdk-04).
+    if (_readSent?.threadId == threadId && _readSent!.seq >= seq) return;
+    _readSent = (threadId: threadId, seq: seq);
     unawaited(api.support('POST', _path(threadId, 'read'), user: user(), body: {'seq': seq}));
     value.value = _now.copyWith(unread: 0, state: state.read(seq));
   }
@@ -890,6 +896,15 @@ class RendelSupport {
     if (threadId == null) return false;
     final answer = await api.support('POST', _path(threadId, 'resolve'), user: user(), body: byMistake ? const {'by_mistake': true} : const {});
     if (answer.status != 204) return false;
+    // A slip, put away before the team acted, is no history: nothing of it stays, so Contact us opens an empty page
+    // and the next first line starts a new conversation (qa4-sdk-02). Its page closes, so nothing follows it either.
+    if (byMistake) {
+      watch(false);
+      _open = false;
+      _viewing = null;
+      value.value = RendelSupportSnapshot(unread: _now.unread);
+      return true;
+    }
     await load();
     return true;
   }

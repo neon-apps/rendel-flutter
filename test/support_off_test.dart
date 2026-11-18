@@ -376,6 +376,45 @@ void main() {
     expect(find.textContaining('By mistake'), findsNothing);
     Navigator.of(context).popUntil((route) => route.isFirst);
     await _settle(tester);
+    // Off, the config is read again on a beat (qa4-k1-02): that timer goes with the test.
+    Rendel.resetForTest();
+  });
+
+  testWidgets('reads the config again once it saw Support switched off, so Support switched back on reaches the app without a restart (qa4-k1-02)', (tester) async {
+    final (server, context) = await openOnTeamPage(tester);
+    server
+      ..supportOn = false
+      ..current = _closedByOff;
+    server.say([
+      {'type': 'support.entry', 'entry': (_closedByOff['entries'] as List).last},
+      {'type': 'support.state', 'state': _closedByOff['state']},
+    ]);
+    await _settle(tester);
+    await _settle(tester);
+    expect(find.text('Reach the Grove team'), findsOneWidget);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _settle(tester);
+    // Back to the foreground: read again.
+    final before = configReads(server);
+    for (final state in [AppLifecycleState.inactive, AppLifecycleState.hidden, AppLifecycleState.inactive, AppLifecycleState.resumed]) {
+      tester.binding.handleAppLifecycleStateChanged(state);
+    }
+    await _settle(tester);
+    expect(configReads(server), before + 1);
+    expect(Rendel.supportOn, isFalse);
+    // Switched back on, and the app's own Contact us: the config first, then a page to write in.
+    server.supportOn = true;
+    unawaited(Rendel.openSupport(context));
+    await _settle(tester);
+    await _settle(tester);
+    expect(configReads(server), before + 2);
+    expect(Rendel.supportOn, isTrue);
+    expect(find.text('Reach the Grove team'), findsNothing);
+    expect(find.byType(TextField), findsOneWidget);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _settle(tester);
+    // On again, the team's count is read on its beat: that timer goes with the test.
+    Rendel.resetForTest();
   });
 
   testWidgets('says why a line did not go when the server refuses it because Support is off, and redraws the page as off (qa3-k1-01)', (tester) async {
