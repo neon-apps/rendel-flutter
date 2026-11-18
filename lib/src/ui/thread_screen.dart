@@ -230,10 +230,17 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// The person's conversations with the team as last read, for Recent; read again when stale.
   List<RendelSupportThread> _threads = const [];
   DateTime? _threadsAt;
+  int _threadsResets = 0;
   bool _wasOpen = false;
 
   void _readThreads() {
     final support = widget.support;
+    // Signed out since they were read: none of the last person's conversations stay in Recent (qa3-sdk-02).
+    if (support != null && support.resets != _threadsResets) {
+      _threadsResets = support.resets;
+      _threads = const [];
+      _threadsAt = null;
+    }
     final at = _threadsAt;
     if (support == null || widget.onSupportThread == null || (at != null && DateTime.now().difference(at) < const Duration(seconds: 30))) return;
     _threadsAt = DateTime.now();
@@ -259,10 +266,11 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
         threads: _threads,
         reload: support.threads,
         team: team,
-        assistant: widget.title,
         theme: RendelThemeScope.of(context),
         strings: _strings,
         onOpen: open,
+        // ✕ closes all of Rendel, as the support page's and the web's do.
+        onClose: () => Navigator.of(context).maybePop(),
       ),
     );
   }
@@ -1448,7 +1456,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
             // while the keyboard is up either (the screen is short then); on a page the team is in the menu.
             final typing = MediaQuery.viewInsetsOf(context).bottom > 0;
             final opening = controller.messages.isEmpty && !typing;
-            final row = opening ? _supportRow(theme) : null;
+            // On one of Rendel's answers the team's reply is a line at the top, as on the web (sdk-09).
+            final onPage = controller.page >= 0 && controller.pages.isNotEmpty;
+            final row = opening || onPage ? _supportRow(theme, onPage: onPage) : null;
             // A task notice about the conversation on screen is moot over it: not drawn, and put away.
             final onScreen = controller.conversationId;
             final waiting = [for (final card in all) if (onScreen == null || card.conversationId != onScreen) card];
@@ -1510,8 +1520,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
   /// An open conversation with the team, at the top of the thread: it opens
   /// again from here, saying the newest line and how many the team wrote
-  /// since. Null while there is none, or its page is on screen.
-  Widget? _supportRow(RendelTheme theme) {
+  /// since. Null while there is none, or its page is on screen. On one of
+  /// Rendel's answers ([onPage]) only the team's new reply shows, as a line.
+  Widget? _supportRow(RendelTheme theme, {required bool onPage}) {
     final support = widget.support;
     final team = widget.supportTeam;
     // Opened or sorted since Recent was read: it is read again.
@@ -1539,11 +1550,12 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final title = strings.supportRowTitleOf(team);
     final unread = v.unread;
     final initial = (agent ?? team).trim();
-    // The person spoke last and the team is away: waiting, and until when.
-    final waiting = unread == 0 && (last == null || last.author == RendelSupportAuthorKind.user) ? v.state?.waiting : null;
-    final c = widget.controller;
+    // The person spoke last and the team is away: waiting, and until when, on the person's own clock (C4).
+    final waiting = unread == 0 && (last == null || last.author == RendelSupportAuthorKind.user)
+        ? supportBackOn(context, strings, waiting: v.state?.waiting, backAt: v.state?.backAt).waiting
+        : null;
     // On one of Rendel's answers, the team's reply is a line at the top, never a jump to their page.
-    if (c.pages.isNotEmpty && unread > 0 && last != null && last.author == RendelSupportAuthorKind.agent) {
+    if (onPage && unread > 0 && last != null && last.author == RendelSupportAuthorKind.agent) {
       final text = (last.text?.isNotEmpty ?? false) ? last.text! : strings.photos;
       return RendelPressable(
         semanticLabel: '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}',
@@ -1595,6 +1607,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
         ),
       );
     }
+    // On a page, nothing else: the team is a row of the top bar's menu there.
+    if (onPage) return null;
     // Read out in full; seen as the team's name, as the page's header says it.
     return RendelPressable(
       semanticLabel: unread > 0 ? '$title. ${strings.supportUnread.replaceAll('{count}', '$unread')}' : title,

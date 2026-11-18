@@ -91,6 +91,7 @@ class RendelStrings {
     this.expiredBody = 'Nothing was done. Ask again to start it over.',
     this.confirmed = 'Confirmed',
     this.notAnswered = 'Not answered',
+    this.cardFailed = 'Didn\'t go through',
     this.notConfirmed = 'Not confirmed',
     this.subtotal = 'Subtotal',
     this.tax = 'Tax',
@@ -176,6 +177,7 @@ class RendelStrings {
     this.collapse = 'Hide',
     this.directions = 'Directions',
     this.call = 'Call',
+    this.email = 'Email',
     this.openNow = 'Open now',
     this.closed = 'Closed',
     this.openInMaps = 'Open in Maps',
@@ -209,6 +211,11 @@ class RendelStrings {
     this.supportTeam = '{team} team',
     this.supportHere = 'Here',
     this.supportAway = 'Away',
+    this.supportBackWhen = 'Back {when}',
+    this.supportWaitingWhen = 'Waiting for the team · back {when}',
+    this.supportWhenToday = 'today at {time}',
+    this.supportWhenTomorrow = 'tomorrow at {time}',
+    this.supportWhenDay = 'on {day} at {time}',
     this.supportBack = 'Back to the assistant',
     this.supportMistake = 'By mistake? Back to the assistant',
     this.supportSorted = 'I\'m sorted',
@@ -217,8 +224,12 @@ class RendelStrings {
     this.supportWriteTeam = 'Message the {team} team',
     this.supportTyping = '{name} is typing…',
     this.supportUnsent = 'Not sent. Tap to try again.',
+    this.supportUnsentOff = 'Not sent. Messages here no longer reach the team.',
+    this.supportTooLong = 'That\'s too long to send. Shorten it and try again.',
+    this.supportTooMany = 'Too many conversations were started from here just now. Try again in a little while.',
     this.supportContactAsk = 'Where should we send the reply? Add your email to keep going.',
     this.supportContactOptional = 'Want the reply by email too?',
+    this.supportContactRequest = 'Add your email so the reply reaches you after you leave.',
     this.supportContactWhy = 'We only use this address to reply to this conversation.',
     this.supportContactSkip = 'No thanks',
     this.supportContactPlaceholder = 'you@example.com',
@@ -249,6 +260,7 @@ class RendelStrings {
     this.supportSortedWith = 'Sorted with {name}',
     this.supportSortedOn = 'Sorted on {date}',
     this.supportSortedMark = 'Sorted',
+    this.supportClosedMark = 'Closed',
     this.supportOpenedAgain = 'Opened again',
     this.supportNewMark = 'New',
     this.supportReplied = '{name} replied',
@@ -256,6 +268,10 @@ class RendelStrings {
     this.supportReopenHint = 'Write to open it again',
     this.supportOtherOpen = 'Another conversation with the team is open.',
     this.supportGoTo = 'Go to it',
+    this.supportReachTeam = 'Reach the {team} team',
+    this.supportAllow = 'Allow',
+    this.supportDeny = 'Not now',
+    this.supportAskFailed = 'Your answer didn\'t reach the team. Try again.',
     this.memoryEmpty = 'Tell me a preference once, like “always lactose-free”, and I\'ll keep it in mind.',
     this.memoryForget = 'Forget',
     this.memoryForgetAll = 'Forget all',
@@ -436,6 +452,7 @@ class RendelStrings {
   final String expiredBody;
   final String confirmed;
   final String notAnswered;
+  final String cardFailed;
   final String notConfirmed;
 
   /// The summing rows of a receipt.
@@ -630,6 +647,9 @@ class RendelStrings {
   /// expiry (`{date}`).
   final String directions;
   final String call;
+
+  /// Before an address on a contact button, as [call] is before a number: "Email support@grove.test" (qa3-k1-02).
+  final String email;
   final String openNow;
   final String closed;
   final String openInMaps;
@@ -676,6 +696,14 @@ class RendelStrings {
   final String supportTeam;
   final String supportHere;
   final String supportAway;
+  /// C4: the head's line while the team is away, with when they are back on the person's own clock (`when`).
+  final String supportBackWhen;
+  /// C4: the row's line while the team is away from an open conversation, with `when`.
+  final String supportWaitingWhen;
+  /// C4: `when` for a return later today, tomorrow, or on another day (`day`), at the person's `time`.
+  final String supportWhenToday;
+  final String supportWhenTomorrow;
+  final String supportWhenDay;
   final String supportBack;
   final String supportMistake;
   final String supportSorted;
@@ -684,8 +712,17 @@ class RendelStrings {
   final String supportWriteTeam;
   final String supportTyping;
   final String supportUnsent;
+
+  /// Under a line refused because the app switched Support off: why, and no retry (qa3-k1-01).
+  final String supportUnsentOff;
+  final String supportTooLong;
+
+  /// Over the box when a first line could not start a conversation: too many were started from here (D1).
+  final String supportTooMany;
   final String supportContactAsk;
   final String supportContactOptional;
+  /// K2: the email card above the box while the team is live for the person: they keep writing.
+  final String supportContactRequest;
   final String supportContactWhy;
 
   /// The ✕ that puts the optional email card away for this conversation, said by a screen reader.
@@ -734,6 +771,8 @@ class RendelStrings {
   final String supportSortedWith;
   final String supportSortedOn;
   final String supportSortedMark;
+  /// K1: a conversation closed because the app switched Support off, beside the head's and the row's "Sorted".
+  final String supportClosedMark;
   final String supportOpenedAgain;
   final String supportNewMark;
   final String supportReplied;
@@ -741,6 +780,11 @@ class RendelStrings {
   final String supportReopenHint;
   final String supportOtherOpen;
   final String supportGoTo;
+  /// K1: over the app's own ways to reach the team, under a conversation Support's switch closed.
+  final String supportReachTeam;
+  final String supportAllow;
+  final String supportDeny;
+  final String supportAskFailed;
   final String memoryEmpty;
   final String memoryForget;
   final String memoryForgetAll;
@@ -928,6 +972,7 @@ class RendelStrings {
     String? expiredBody,
     String? confirmed,
     String? notAnswered,
+    String? cardFailed,
     String? notConfirmed,
     String? subtotal,
     String? tax,
@@ -1010,6 +1055,7 @@ class RendelStrings {
     String? collapse,
     String? directions,
     String? call,
+    String? email,
     String? openNow,
     String? closed,
     String? openInMaps,
@@ -1043,6 +1089,11 @@ class RendelStrings {
     String? supportTeam,
     String? supportHere,
     String? supportAway,
+    String? supportBackWhen,
+    String? supportWaitingWhen,
+    String? supportWhenToday,
+    String? supportWhenTomorrow,
+    String? supportWhenDay,
     String? supportBack,
     String? supportMistake,
     String? supportSorted,
@@ -1051,8 +1102,12 @@ class RendelStrings {
     String? supportWriteTeam,
     String? supportTyping,
     String? supportUnsent,
+    String? supportUnsentOff,
+    String? supportTooLong,
+    String? supportTooMany,
     String? supportContactAsk,
     String? supportContactOptional,
+    String? supportContactRequest,
     String? supportContactWhy,
     String? supportContactSkip,
     String? supportContactPlaceholder,
@@ -1083,6 +1138,7 @@ class RendelStrings {
     String? supportSortedWith,
     String? supportSortedOn,
     String? supportSortedMark,
+    String? supportClosedMark,
     String? supportOpenedAgain,
     String? supportNewMark,
     String? supportReplied,
@@ -1090,6 +1146,10 @@ class RendelStrings {
     String? supportReopenHint,
     String? supportOtherOpen,
     String? supportGoTo,
+    String? supportReachTeam,
+    String? supportAllow,
+    String? supportDeny,
+    String? supportAskFailed,
     String? memoryEmpty,
     String? memoryForget,
     String? memoryForgetAll,
@@ -1163,6 +1223,7 @@ class RendelStrings {
       expiredBody: expiredBody ?? this.expiredBody,
       confirmed: confirmed ?? this.confirmed,
       notAnswered: notAnswered ?? this.notAnswered,
+      cardFailed: cardFailed ?? this.cardFailed,
       notConfirmed: notConfirmed ?? this.notConfirmed,
       subtotal: subtotal ?? this.subtotal,
       tax: tax ?? this.tax,
@@ -1245,6 +1306,7 @@ class RendelStrings {
       collapse: collapse ?? this.collapse,
       directions: directions ?? this.directions,
       call: call ?? this.call,
+      email: email ?? this.email,
       openNow: openNow ?? this.openNow,
       closed: closed ?? this.closed,
       openInMaps: openInMaps ?? this.openInMaps,
@@ -1278,6 +1340,11 @@ class RendelStrings {
       supportTeam: supportTeam ?? this.supportTeam,
       supportHere: supportHere ?? this.supportHere,
       supportAway: supportAway ?? this.supportAway,
+      supportBackWhen: supportBackWhen ?? this.supportBackWhen,
+      supportWaitingWhen: supportWaitingWhen ?? this.supportWaitingWhen,
+      supportWhenToday: supportWhenToday ?? this.supportWhenToday,
+      supportWhenTomorrow: supportWhenTomorrow ?? this.supportWhenTomorrow,
+      supportWhenDay: supportWhenDay ?? this.supportWhenDay,
       supportBack: supportBack ?? this.supportBack,
       supportMistake: supportMistake ?? this.supportMistake,
       supportSorted: supportSorted ?? this.supportSorted,
@@ -1286,8 +1353,12 @@ class RendelStrings {
       supportWriteTeam: supportWriteTeam ?? this.supportWriteTeam,
       supportTyping: supportTyping ?? this.supportTyping,
       supportUnsent: supportUnsent ?? this.supportUnsent,
+      supportUnsentOff: supportUnsentOff ?? this.supportUnsentOff,
+      supportTooLong: supportTooLong ?? this.supportTooLong,
+      supportTooMany: supportTooMany ?? this.supportTooMany,
       supportContactAsk: supportContactAsk ?? this.supportContactAsk,
       supportContactOptional: supportContactOptional ?? this.supportContactOptional,
+      supportContactRequest: supportContactRequest ?? this.supportContactRequest,
       supportContactWhy: supportContactWhy ?? this.supportContactWhy,
       supportContactSkip: supportContactSkip ?? this.supportContactSkip,
       supportContactPlaceholder: supportContactPlaceholder ?? this.supportContactPlaceholder,
@@ -1318,6 +1389,7 @@ class RendelStrings {
       supportSortedWith: supportSortedWith ?? this.supportSortedWith,
       supportSortedOn: supportSortedOn ?? this.supportSortedOn,
       supportSortedMark: supportSortedMark ?? this.supportSortedMark,
+      supportClosedMark: supportClosedMark ?? this.supportClosedMark,
       supportOpenedAgain: supportOpenedAgain ?? this.supportOpenedAgain,
       supportNewMark: supportNewMark ?? this.supportNewMark,
       supportReplied: supportReplied ?? this.supportReplied,
@@ -1325,6 +1397,10 @@ class RendelStrings {
       supportReopenHint: supportReopenHint ?? this.supportReopenHint,
       supportOtherOpen: supportOtherOpen ?? this.supportOtherOpen,
       supportGoTo: supportGoTo ?? this.supportGoTo,
+      supportReachTeam: supportReachTeam ?? this.supportReachTeam,
+      supportAllow: supportAllow ?? this.supportAllow,
+      supportDeny: supportDeny ?? this.supportDeny,
+      supportAskFailed: supportAskFailed ?? this.supportAskFailed,
       memoryEmpty: memoryEmpty ?? this.memoryEmpty,
       memoryForget: memoryForget ?? this.memoryForget,
       memoryForgetAll: memoryForgetAll ?? this.memoryForgetAll,
@@ -1418,6 +1494,7 @@ const Map<String, RendelStrings> _byLocale = {
     expiredBody: 'Hiçbir şey yapılmadı. Baştan başlatmak için tekrar sorun.',
     confirmed: 'Onaylandı',
     notAnswered: 'Yanıtlanmadı',
+    cardFailed: 'Gerçekleşmedi',
     notConfirmed: 'Onaylanmadı',
     subtotal: 'Ara toplam',
     tax: 'Vergi',
@@ -1497,6 +1574,7 @@ const Map<String, RendelStrings> _byLocale = {
     collapse: 'Gizle',
     directions: 'Yol tarifi',
     call: 'Ara',
+    email: 'E-posta',
     openNow: 'Şu an açık',
     closed: 'Kapalı',
     openInMaps: 'Haritalarda aç',
@@ -1530,6 +1608,11 @@ const Map<String, RendelStrings> _byLocale = {
     supportTeam: '{team} ekibi',
     supportHere: 'Burada',
     supportAway: 'Uzakta',
+    supportBackWhen: 'Dönüş: {when}',
+    supportWaitingWhen: 'Ekip bekleniyor · Dönüş: {when}',
+    supportWhenToday: 'bugün saat {time}',
+    supportWhenTomorrow: 'yarın saat {time}',
+    supportWhenDay: '{day} günü saat {time}',
     supportBack: 'Asistana dön',
     supportMistake: 'Yanlışlıkla mı oldu? Asistana dön',
     supportSorted: 'Sorunum çözüldü',
@@ -1538,8 +1621,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportWriteTeam: '{team} ekibine yazın…',
     supportTyping: '{name} yazıyor…',
     supportUnsent: 'Gönderilemedi. Tekrar denemek için dokunun.',
+    supportUnsentOff: 'Gönderilemedi. Buradaki mesajlar artık ekibe ulaşmıyor.',
+    supportTooLong: 'Mesajınız göndermek için çok uzun. Kısaltıp tekrar deneyin.',
+    supportTooMany: 'Az önce buradan çok fazla sohbet başlatıldı. Lütfen biraz sonra tekrar deneyin.',
     supportContactAsk: 'Yanıtı nereye gönderelim? Devam etmek için e-posta adresinizi ekleyin.',
     supportContactOptional: 'Yanıtı e-posta ile de almak ister misiniz?',
+    supportContactRequest: 'Siz ayrıldıktan sonra yanıtın size ulaşması için e-posta adresinizi ekleyin.',
     supportContactWhy: 'Bu adresi yalnızca bu sohbete yanıt vermek için kullanırız.',
     supportContactSkip: 'Hayır, teşekkürler',
     supportContactPlaceholder: 'adiniz@ornek.com',
@@ -1570,6 +1657,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedWith: '{name} ile çözüldü',
     supportSortedOn: '{date} tarihinde çözüldü',
     supportSortedMark: 'Çözüldü',
+    supportClosedMark: 'Kapatıldı',
     supportOpenedAgain: 'Tekrar açıldı',
     supportNewMark: 'Yeni',
     supportReplied: '{name} yanıtladı',
@@ -1577,6 +1665,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportReopenHint: 'Yeniden açmak için yazın…',
     supportOtherOpen: 'Ekiple açık bir yazışmanız zaten var.',
     supportGoTo: 'Yazışmaya git',
+    supportReachTeam: '{team} ekibine ulaşın',
+    supportAllow: 'İzin ver',
+    supportDeny: 'Şimdi değil',
+    supportAskFailed: 'Yanıtınız ekibe ulaşmadı. Tekrar deneyin.',
     memoryEmpty: 'Bana \'hep laktozsuz\' gibi bir tercihinizi söyleyin, sonraki seferler için aklımda tutayım.',
     memoryForget: 'Unut',
     memoryForgetAll: 'Tümünü unut',
@@ -1659,6 +1751,7 @@ const Map<String, RendelStrings> _byLocale = {
     expiredBody: 'Es wurde nichts ausgeführt. Fragen Sie erneut, um von vorn zu beginnen.',
     confirmed: 'Bestätigt',
     notAnswered: 'Nicht beantwortet',
+    cardFailed: 'Fehlgeschlagen',
     notConfirmed: 'Nicht bestätigt',
     subtotal: 'Zwischensumme',
     tax: 'Steuern',
@@ -1738,6 +1831,7 @@ const Map<String, RendelStrings> _byLocale = {
     collapse: 'Ausblenden',
     directions: 'Route',
     call: 'Anrufen',
+    email: 'E-Mail',
     openNow: 'Jetzt geöffnet',
     closed: 'Geschlossen',
     openInMaps: 'In Karten öffnen',
@@ -1771,6 +1865,11 @@ const Map<String, RendelStrings> _byLocale = {
     supportTeam: 'Team von {team}',
     supportHere: 'Erreichbar',
     supportAway: 'Abwesend',
+    supportBackWhen: 'Wieder da {when}',
+    supportWaitingWhen: 'Warten auf das Team · wieder da {when}',
+    supportWhenToday: 'heute um {time} Uhr',
+    supportWhenTomorrow: 'morgen um {time} Uhr',
+    supportWhenDay: 'am {day} um {time} Uhr',
     supportBack: 'Zurück zum Assistenten',
     supportMistake: 'Aus Versehen? Zurück zum Assistenten',
     supportSorted: 'Hat sich erledigt',
@@ -1779,8 +1878,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportWriteTeam: 'Nachricht an das Team von {team}…',
     supportTyping: '{name} schreibt…',
     supportUnsent: 'Nicht gesendet. Zum erneuten Senden tippen.',
+    supportUnsentOff: 'Nicht gesendet. Nachrichten hier erreichen das Team nicht mehr.',
+    supportTooLong: 'Ihre Nachricht ist zu lang. Bitte kürzen Sie den Text und versuchen Sie es erneut.',
+    supportTooMany: 'Hier wurden gerade zu viele Unterhaltungen gestartet. Bitte versuchen Sie es gleich noch einmal.',
     supportContactAsk: 'Wohin sollen wir die Antwort schicken? Geben Sie Ihre E-Mail-Adresse an, um fortzufahren.',
     supportContactOptional: 'Möchten Sie die Antwort auch per E-Mail?',
+    supportContactRequest: 'Hinterlassen Sie Ihre E-Mail-Adresse, damit die Antwort Sie auch nach dem Verlassen erreicht.',
     supportContactWhy: 'Wir nutzen diese Adresse nur, um auf dieses Gespräch zu antworten.',
     supportContactSkip: 'Nein danke',
     supportContactPlaceholder: 'sie@beispiel.de',
@@ -1811,6 +1914,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedWith: 'Geklärt mit {name}',
     supportSortedOn: 'Geklärt am {date}',
     supportSortedMark: 'Geklärt',
+    supportClosedMark: 'Geschlossen',
     supportOpenedAgain: 'Wieder geöffnet',
     supportNewMark: 'Neu',
     supportReplied: '{name} hat geantwortet',
@@ -1818,6 +1922,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportReopenHint: 'Schreiben Sie, um sie wieder zu öffnen',
     supportOtherOpen: 'Eine andere Unterhaltung mit dem Team ist offen.',
     supportGoTo: 'Dorthin',
+    supportReachTeam: 'Kontaktieren Sie das {team} Team',
+    supportAllow: 'Zulassen',
+    supportDeny: 'Jetzt nicht',
+    supportAskFailed: 'Ihre Antwort hat das Team nicht erreicht. Bitte versuchen Sie es erneut.',
     memoryEmpty: 'Sagen Sie mir einmal eine Vorliebe, etwa „immer laktosefrei“, und ich behalte sie im Kopf.',
     memoryForget: 'Vergessen',
     memoryForgetAll: 'Alles vergessen',
@@ -1899,6 +2007,7 @@ const Map<String, RendelStrings> _byLocale = {
     expiredBody: 'Rien n’a été fait. Redemandez pour recommencer.',
     confirmed: 'Confirmé',
     notAnswered: 'Sans réponse',
+    cardFailed: 'Non abouti',
     notConfirmed: 'Non confirmé',
     subtotal: 'Sous-total',
     tax: 'Taxes',
@@ -1978,6 +2087,7 @@ const Map<String, RendelStrings> _byLocale = {
     collapse: 'Masquer',
     directions: 'Itinéraire',
     call: 'Appeler',
+    email: 'E-mail',
     openNow: 'Ouvert maintenant',
     closed: 'Fermé',
     openInMaps: 'Ouvrir dans Cartes',
@@ -2011,6 +2121,11 @@ const Map<String, RendelStrings> _byLocale = {
     supportTeam: 'Équipe {team}',
     supportHere: 'Disponible',
     supportAway: 'Absente',
+    supportBackWhen: 'De retour {when}',
+    supportWaitingWhen: 'En attente de l\'équipe · de retour {when}',
+    supportWhenToday: 'aujourd\'hui à {time}',
+    supportWhenTomorrow: 'demain à {time}',
+    supportWhenDay: '{day} à {time}',
     supportBack: 'Retour à l’assistant',
     supportMistake: 'Par erreur ? Retour à l’assistant',
     supportSorted: 'C’est réglé',
@@ -2019,8 +2134,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportWriteTeam: 'Écrire à l’équipe {team}…',
     supportTyping: '{name} écrit…',
     supportUnsent: 'Non envoyé. Touchez pour réessayer.',
+    supportUnsentOff: 'Non envoyé. Les messages envoyés ici ne parviennent plus à l\'équipe.',
+    supportTooLong: 'Ce message est trop long. Veuillez le raccourcir et réessayer.',
+    supportTooMany: 'Trop de conversations viennent d’être lancées d’ici. Réessayez d’ici un petit moment.',
     supportContactAsk: 'Où devons-nous envoyer la réponse ? Ajoutez votre e-mail pour continuer.',
     supportContactOptional: 'Voulez-vous aussi la réponse par e-mail ?',
+    supportContactRequest: 'Ajoutez votre e-mail pour recevoir la réponse si vous quittez l\'application.',
     supportContactWhy: 'Nous utilisons cette adresse uniquement pour répondre à cette conversation.',
     supportContactSkip: 'Non merci',
     supportContactPlaceholder: 'vous@exemple.fr',
@@ -2051,6 +2170,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedWith: 'Réglé avec {name}',
     supportSortedOn: 'Réglé le {date}',
     supportSortedMark: 'Réglé',
+    supportClosedMark: 'Fermé',
     supportOpenedAgain: 'Rouverte',
     supportNewMark: 'Nouveau',
     supportReplied: '{name} a répondu',
@@ -2058,6 +2178,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportReopenHint: 'Écrivez pour la rouvrir',
     supportOtherOpen: 'Une autre conversation avec l’équipe est ouverte.',
     supportGoTo: 'Y aller',
+    supportReachTeam: 'Contacter l\'équipe {team}',
+    supportAllow: 'Autoriser',
+    supportDeny: 'Pas maintenant',
+    supportAskFailed: 'Votre réponse n\'est pas parvenue à l\'équipe. Veuillez réessayer.',
     memoryEmpty: 'Dites-moi une préférence une fois, comme « toujours sans lactose », et je la garderai en tête.',
     memoryForget: 'Oublier',
     memoryForgetAll: 'Tout oublier',
@@ -2138,6 +2262,7 @@ const Map<String, RendelStrings> _byLocale = {
     expiredBody: 'No se hizo nada. Vuelve a pedirlo para empezar de nuevo.',
     confirmed: 'Confirmado',
     notAnswered: 'Sin respuesta',
+    cardFailed: 'No se completó',
     notConfirmed: 'No confirmado',
     subtotal: 'Subtotal',
     tax: 'Impuestos',
@@ -2217,6 +2342,7 @@ const Map<String, RendelStrings> _byLocale = {
     collapse: 'Ocultar',
     directions: 'Cómo llegar',
     call: 'Llamar',
+    email: 'Correo',
     openNow: 'Abierto ahora',
     closed: 'Cerrado',
     openInMaps: 'Abrir en Mapas',
@@ -2250,6 +2376,11 @@ const Map<String, RendelStrings> _byLocale = {
     supportTeam: 'Equipo de {team}',
     supportHere: 'Disponible',
     supportAway: 'Ausente',
+    supportBackWhen: 'De vuelta {when}',
+    supportWaitingWhen: 'Esperando al equipo · de vuelta {when}',
+    supportWhenToday: 'hoy a las {time}',
+    supportWhenTomorrow: 'mañana a las {time}',
+    supportWhenDay: 'el {day} a las {time}',
     supportBack: 'Volver al asistente',
     supportMistake: '¿Por error? Volver al asistente',
     supportSorted: 'Ya está resuelto',
@@ -2258,8 +2389,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportWriteTeam: 'Escribe al equipo de {team}…',
     supportTyping: '{name} está escribiendo…',
     supportUnsent: 'No enviado. Toca para volver a intentarlo.',
+    supportUnsentOff: 'No enviado. Los mensajes aquí ya no llegan al equipo.',
+    supportTooLong: 'El texto es muy largo. Acórtalo e inténtalo de nuevo.',
+    supportTooMany: 'Se han iniciado demasiadas conversaciones desde aquí hace poco. Inténtelo de nuevo en unos minutos.',
     supportContactAsk: '¿Dónde te enviamos la respuesta? Añade tu correo para continuar.',
     supportContactOptional: '¿Quieres recibir la respuesta también por correo?',
+    supportContactRequest: 'Añade tu correo para recibir la respuesta cuando salgas.',
     supportContactWhy: 'Solo usamos esta dirección para responder a esta conversación.',
     supportContactSkip: 'No, gracias',
     supportContactPlaceholder: 'tu@ejemplo.com',
@@ -2290,6 +2425,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedWith: 'Resuelto con {name}',
     supportSortedOn: 'Resuelto el {date}',
     supportSortedMark: 'Resuelto',
+    supportClosedMark: 'Cerrado',
     supportOpenedAgain: 'Abierta de nuevo',
     supportNewMark: 'Nuevo',
     supportReplied: '{name} respondió',
@@ -2297,6 +2433,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportReopenHint: 'Escribe para abrirla de nuevo',
     supportOtherOpen: 'Hay otra conversación abierta con el equipo.',
     supportGoTo: 'Ir a ella',
+    supportReachTeam: 'Contacta al equipo de {team}',
+    supportAllow: 'Permitir',
+    supportDeny: 'Ahora no',
+    supportAskFailed: 'Tu respuesta no llegó al equipo. Inténtalo de nuevo.',
     memoryEmpty: 'Dime una preferencia una vez, como «siempre sin lactosa», y la tendré en cuenta.',
     memoryForget: 'Olvidar',
     memoryForgetAll: 'Olvidar todo',
@@ -2376,6 +2516,7 @@ const Map<String, RendelStrings> _byLocale = {
     expiredBody: 'لم يُنفَّذ شيء. اسأل مرة أخرى للبدء من جديد.',
     confirmed: 'تم التأكيد',
     notAnswered: 'بلا إجابة',
+    cardFailed: 'لم تكتمل',
     notConfirmed: 'لم يتم التأكيد',
     subtotal: 'المجموع الفرعي',
     tax: 'الضريبة',
@@ -2455,6 +2596,7 @@ const Map<String, RendelStrings> _byLocale = {
     collapse: 'إخفاء',
     directions: 'الاتجاهات',
     call: 'اتصال',
+    email: 'مراسلة',
     openNow: 'مفتوح الآن',
     closed: 'مغلق',
     openInMaps: 'فتح في الخرائط',
@@ -2488,6 +2630,11 @@ const Map<String, RendelStrings> _byLocale = {
     supportTeam: 'فريق {team}',
     supportHere: 'متاح',
     supportAway: 'غير متاح',
+    supportBackWhen: 'العودة {when}',
+    supportWaitingWhen: 'بانتظار الفريق · العودة {when}',
+    supportWhenToday: 'اليوم عند الساعة {time}',
+    supportWhenTomorrow: 'غداً عند الساعة {time}',
+    supportWhenDay: 'يوم {day} عند الساعة {time}',
     supportBack: 'العودة إلى المساعد',
     supportMistake: 'عن طريق الخطأ؟ العودة إلى المساعد',
     supportSorted: 'تم حل مشكلتي',
@@ -2496,8 +2643,12 @@ const Map<String, RendelStrings> _byLocale = {
     supportWriteTeam: 'اكتب إلى فريق {team}…',
     supportTyping: '{name} يكتب…',
     supportUnsent: 'لم تُرسل. اضغط لإعادة المحاولة.',
+    supportUnsentOff: 'لم يتم الإرسال. لم تعد الرسائل هنا تصل إلى الفريق.',
+    supportTooLong: 'النص طويل جدا. يرجى اختصاره والمحاولة مرة أخرى.',
+    supportTooMany: 'تم بدء محادثات كثيرة من هنا للتو. يُرجى المحاولة مجددًا بعد قليل.',
     supportContactAsk: 'إلى أين نرسل الرد؟ أضف بريدك الإلكتروني للمتابعة.',
     supportContactOptional: 'هل تريد الرد عبر البريد الإلكتروني أيضًا؟',
+    supportContactRequest: 'أضف بريدك الإلكتروني ليصلك الرد بعد المغادرة.',
     supportContactWhy: 'نستخدم هذا العنوان فقط للرد على هذه المحادثة.',
     supportContactSkip: 'لا، شكرًا',
     supportContactPlaceholder: 'you@example.com',
@@ -2528,6 +2679,7 @@ const Map<String, RendelStrings> _byLocale = {
     supportSortedWith: 'تم الحل مع {name}',
     supportSortedOn: 'تم الحل في {date}',
     supportSortedMark: 'تم الحل',
+    supportClosedMark: 'مغلق',
     supportOpenedAgain: 'أُعيد فتحها',
     supportNewMark: 'جديد',
     supportReplied: 'ردّ {name}',
@@ -2535,6 +2687,10 @@ const Map<String, RendelStrings> _byLocale = {
     supportReopenHint: 'اكتب لإعادة فتحها',
     supportOtherOpen: 'هناك محادثة أخرى مفتوحة مع الفريق.',
     supportGoTo: 'الانتقال إليها',
+    supportReachTeam: 'تواصل مع فريق {team}',
+    supportAllow: 'السماح',
+    supportDeny: 'ليس الآن',
+    supportAskFailed: 'لم يصل ردك إلى الفريق. يرجى المحاولة مرة أخرى.',
     memoryEmpty: 'أخبرني بتفضيل مرة واحدة، مثل «دائمًا خالٍ من اللاكتوز»، وسأتذكره.',
     memoryForget: 'انسَ',
     memoryForgetAll: 'انسَ الكل',

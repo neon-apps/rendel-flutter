@@ -5,6 +5,16 @@ part of 'support_sheet.dart';
 /// round glass buttons at the top with the team named between them, and the
 /// same message card as the assistant's, on the SDK's own thread.
 
+/// Near the 4,000 characters a line may hold, how much of it is used: "3,812 / 4,000", as on the web (sdk-19).
+Widget? _supportCount(BuildContext context, {required int currentLength, required bool isFocused, required int? maxLength}) {
+  if (maxLength == null || currentLength < maxLength * 0.9) return null;
+  final digits = MaterialLocalizations.of(context);
+  return Padding(
+    padding: const EdgeInsetsDirectional.only(end: 13),
+    child: Text('${digits.formatDecimal(currentLength)} / ${digits.formatDecimal(maxLength)}', style: RendelThemeScope.of(context).text.caption.copyWith(fontSize: 12)),
+  );
+}
+
 Widget _labRoundButton(RendelTheme theme, {required IconData icon, required String label, required VoidCallback onTap}) => RendelPressable(
   semanticLabel: label,
   onTap: onTap,
@@ -34,25 +44,29 @@ extension _LabSupport on _RendelSupportSheetState {
                     style: theme.text.body.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.onSurface),
                   ),
                 ),
-                const SizedBox(height: 2),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!resolved) ...[Container(width: 7, height: 7, decoration: BoxDecoration(color: tone, shape: BoxShape.circle)), const SizedBox(width: 6)],
-                    Flexible(
-                      child: Text(
-                        resolved ? _sortedOn(context, strings) : (state?.presence ?? (here ? strings.supportHere : strings.supportAway)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.text.caption.copyWith(fontSize: 13, color: theme.colors.onSurfaceSoft),
+                // No thread yet (K3): nothing is known of the team, so nothing is said.
+                if (state != null) ...[
+                  const SizedBox(height: 2),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!resolved) ...[Container(width: 7, height: 7, decoration: BoxDecoration(color: tone, shape: BoxShape.circle)), const SizedBox(width: 6)],
+                      Flexible(
+                        child: Text(
+                          _status(context, strings, state, resolved: resolved),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.text.caption.copyWith(fontSize: 13, color: theme.colors.onSurfaceSoft),
+                        ),
                       ),
-                    ),
-                  ],
-                ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-          _labRoundButton(theme, icon: Icons.close_rounded, label: strings.closeDetail, onTap: () => Navigator.of(context).maybePop(SupportExit.closed)),
+          // ✕ closes all of Rendel, and says so, as the web's does (sdk-22).
+          _labRoundButton(theme, icon: Icons.close_rounded, label: strings.closeCopilot, onTap: () => Navigator.of(context).maybePop(SupportExit.closed)),
         ],
       ),
     );
@@ -135,6 +149,7 @@ extension _LabSupport on _RendelSupportSheetState {
                   minLines: 1,
                   maxLines: 5,
                   maxLength: 4000,
+                  buildCounter: _supportCount,
                   textInputAction: TextInputAction.send,
                   onChanged: (_) => widget.support.typing(),
                   onSubmitted: (_) => _send(),
@@ -142,7 +157,6 @@ extension _LabSupport on _RendelSupportSheetState {
                   decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
-                    counterText: '',
                     hintText: resolved ? strings.supportReopenHint : strings.supportWriteTeamOf(widget.team),
                     hintStyle: theme.text.body.copyWith(fontSize: theme.type.body, color: theme.colors.onSurfaceFaint.withValues(alpha: 0.8)),
                     contentPadding: const EdgeInsets.fromLTRB(13, 6, 13, 6),

@@ -144,7 +144,9 @@ class RendelLocalKeys {
 
   /// `confirm_card`: 'confirmed', 'declined' or 'abandoned', absent while the
   /// card is still answerable. 'abandoned' is set when the user asks something
-  /// else instead, which the server treats as an answer too.
+  /// else instead, which the server treats as an answer too. A card the team
+  /// sent through Support carries it from the server, and 'failed' once it was
+  /// confirmed and the write then failed: drawn as not gone through (qa3-sdk-01).
 
   static const String resolved = '_resolved';
 

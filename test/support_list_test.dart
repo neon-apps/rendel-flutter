@@ -88,6 +88,32 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  // sdk-18: the head took 110pt each side for the back link, leaving the title 82pt at 320 wide.
+  testWidgets('heads the list with round back and close, and gives the title the room between them at 320 wide', (tester) async {
+    tester.view.physicalSize = const Size(320 * 3, 568 * 3);
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+    await openList(tester, [_thread('t1', 'Kargo nerede', resolved: true)]);
+    final title = find.text('Halden ekibiyle yazışmalar');
+    expect(title, findsOneWidget);
+    expect(tester.getSize(title).width, greaterThan(180));
+    expect(find.bySemanticsLabel(RendelStrings.forLocale('tr').supportBack), findsOneWidget);
+    expect(find.bySemanticsLabel(RendelStrings.forLocale('tr').closeCopilot), findsOneWidget);
+    expect(find.byIcon(Icons.close_rounded), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.chevron_left_rounded));
+    await tester.pumpAndSettle();
+    expect(title, findsNothing);
+  });
+
+  testWidgets('names a conversation with no first line by the team, and leaves out one nobody wrote in (apps-15)', (tester) async {
+    await openList(tester, [
+      RendelSupportThread(threadId: 't1', resolved: true, title: '', last: (mine: false, text: 'İadeniz yapıldı'), lastMessageAt: DateTime.now()),
+      RendelSupportThread(threadId: 't2', resolved: true, title: '', lastMessageAt: DateTime.now()),
+    ]);
+    expect(find.text(RendelStrings.forLocale('tr').supportRowTitleOf('Halden')), findsOneWidget);
+    expect(find.byType(RendelSupportThreadItem), findsOneWidget);
+  });
+
   test('a thread with a missing or bad field is dropped, not thrown', () {
     expect(RendelSupportThread.tryParse({'thread_id': 't', 'title': 'x'}), isNull);
     expect(RendelSupportThread.tryParse({'thread_id': 't', 'title': 'x', 'last_message_at': 'nope'}), isNull);

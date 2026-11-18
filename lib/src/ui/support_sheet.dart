@@ -9,6 +9,7 @@ import '../core/support.dart';
 import '../protocol/protocol.dart' show CancelAction, ConfirmAction, NavigateAction, RendelLocalKeys, UIAction, WireBlock;
 import 'renderer/blocks.dart' show RendelActionButton, RendelPressable;
 import 'renderer/registry.dart';
+import 'support_list.dart' show supportBackOn;
 import 'theme.dart';
 import 'lab/lab.dart';
 
@@ -42,6 +43,7 @@ Future<SupportExit?> showRendelSupport(
   List<RendelAttachSource> sources = const [RendelAttachSource.photos, RendelAttachSource.files],
   RendelTheme? theme,
   RendelStrings? strings,
+  bool Function()? supportOn,
 }) {
   final drawn = theme ?? RendelThemeScope.of(context);
   final words = strings ?? RendelStringsScope.of(context);
@@ -71,6 +73,7 @@ Future<SupportExit?> showRendelSupport(
             onPick: onPick,
             onUpload: onUpload,
             sources: sources,
+            supportOn: supportOn,
           ),
         ),
       ),
@@ -93,10 +96,16 @@ class RendelSupportSheet extends StatefulWidget {
     this.onPick,
     this.onUpload,
     this.sources = const [RendelAttachSource.photos, RendelAttachSource.files],
+    this.supportOn,
   });
 
   final RendelSupport support;
   final String team;
+
+  /// Whether the app has Support on, as its config says; null is on. Off, nothing written reaches the team: no box,
+  /// nothing to sort, and a conversation its switch closed shows the app's own channels (K1). On again, that one is
+  /// written in again like any sorted one (D4).
+  final bool Function()? supportOn;
 
   /// What the assistant is called: the way back says it.
   final String? assistant;
@@ -149,6 +158,21 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   /// The person sorted it on this page: the card says so, where a sorted one opened later keeps its "Sorted" line.
   bool _sortedHere = false;
 
+  /// The session's reads when the page opened, and whether this page's own read came back: what the session kept
+  /// from an earlier opening is drawn at once, and what the person had not read is told from the server's answer (sdk-08).
+  late final int _openedReads;
+
+  /// The session's resets when the page opened: another one means the person signed out (qa3-sdk-02).
+  late final int _resets;
+  bool _loaded = false;
+  bool get _fresh => _loaded || widget.support.reads > _openedReads;
+
+  /// The thread this page was drawn for: another one starts its page state again (sdk-02).
+  String? _threadDrawn;
+
+  /// How far large text grows the head and the box: the lines between them take the rest (sdk-17).
+  static const double _chromeScale = 1.3;
+
   /// The words of the card that asks how it went, and the thread they were asked of.
   RendelSupportRating? _rateWords;
   String? _rateThread;
@@ -162,9 +186,11 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       if (action is ConfirmAction || action is CancelAction) {
         final confirm = action is ConfirmAction;
         final id = action is ConfirmAction ? action.invocationId : (action as CancelAction).invocationId;
-        final done = await widget.support.decideCard(id, confirm: confirm);
+        final done = await widget.support.decideCard(id, confirm: confirm, typed: action is ConfirmAction ? action.typed : null);
         final ok = done == 'succeeded' || done == 'declined';
-        if (mounted) setState(() => _note = ok ? null : RendelStringsScope.of(context).turnFailed);
+        // Only an answer that never came asks to be tried again. A typed value refused says so under its field, on the
+        // card, which stays open (sdk-10); a write that ran at the tap and failed says so on the card (qa2-sdk-03).
+        if (mounted) setState(() => _note = done == 'unanswered' || done == 'expired' ? RendelStringsScope.of(context).turnFailed : null);
         return ok;
       }
       if (action is NavigateAction && mounted) Navigator.of(context).maybePop();
@@ -184,11 +210,19 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     });
     WidgetsBinding.instance.addObserver(this);
     widget.support.value.addListener(_changed);
+    _input.addListener(_typed);
     // The cards the person put away arrive from storage after the page opens.
     widget.support.contactSkipped.addListener(_redraw);
+    // Taken now, before the first read can move it.
+    _openedReads = widget.support.reads;
+    _resets = widget.support.resets;
+    _threadDrawn = widget.support.value.value.threadId;
     // The stream follows a thread, so it opens once the thread is read.
     unawaited(widget.support.load().then((_) {
-      if (mounted) widget.support.watch(true);
+      if (!mounted) return;
+      _loaded = true;
+      _changed();
+      widget.support.watch(true);
     }));
   }
 
@@ -204,13 +238,36 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     if (mounted) setState(() {});
   }
 
+  /// Shortened to what the API takes, or emptied: "too long" no longer holds (qa2-sdk-02).
+  void _typed() {
+    if (!mounted || _note == null || _note != RendelStringsScope.of(context).supportTooLong || _input.text.length > 4000) return;
+    setState(() => _note = null);
+  }
+
   void _changed() {
     if (!mounted) return;
-    // What the person had read when the page opened, taken before this read moves it.
+    // Signed out, or somebody else signed in, with the page up: it closes, with nothing of theirs left on it (qa3-sdk-02).
+    if (widget.support.resets != _resets) {
+      Navigator.of(context).maybePop();
+      return;
+    }
+    final thread = widget.support.value.value.threadId;
+    if (thread != _threadDrawn) {
+      // Another thread than the one drawn (a new one after a sorted one): nothing of the last one's page is kept,
+      // nor a note said under it (qa2-sdk-02).
+      _threadDrawn = thread;
+      _newAfter = null;
+      _newShown = false;
+      _sortedHere = false;
+      _note = null;
+    }
+    // What the person had read when the page opened, from the server's answer, taken before this read moves it.
     final state = widget.support.value.value.state;
-    if (_newAfter == null && state != null) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
+    if (_newAfter == null && state != null && _fresh) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
     setState(() {});
-    widget.support.read();
+    // Read once the page has what the server has, and only while the app is in front of the person (sdk-22 f).
+    final life = WidgetsBinding.instance.lifecycleState;
+    if (_fresh && (life == null || life == AppLifecycleState.resumed)) widget.support.read();
     final until = widget.support.value.value.typingUntil;
     _typingEnds?.cancel();
     if (until != null && until.isAfter(DateTime.now())) {
@@ -251,6 +308,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.support.value.removeListener(_changed);
+    _input.removeListener(_typed);
     widget.support.contactSkipped.removeListener(_redraw);
     widget.support.watch(false);
     _typingEnds?.cancel();
@@ -267,8 +325,17 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     if (text.isEmpty) return;
     _input.clear();
     final sent = await widget.support.send(text);
-    // The line waits for the address, or for the other open conversation: it goes back in the field.
-    if ((sent == 'contact_required' || sent == 'another_open') && mounted) setState(() => _input.text = text);
+    if (!mounted) return;
+    // The line waits for the address, or for the other open conversation, or was refused as too long: it goes back
+    // in the field, and a refused one says why (sdk-19).
+    if (sent == 'contact_required' || sent == 'another_open' || sent == 'too_long') {
+      setState(() {
+        _input.text = text;
+        _note = sent == 'too_long' ? RendelStringsScope.of(context).supportTooLong : null;
+      });
+    } else if (_note == RendelStringsScope.of(context).supportTooLong) {
+      setState(() => _note = null);
+    }
   }
 
   /// Picks, uploads and sends a file as its own line (K11: a picture or a PDF).
@@ -333,13 +400,22 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     final state = v.state;
     final resolved = state?.resolved ?? false;
     final asked = v.entries.any((e) => e.author == RendelSupportAuthorKind.user);
-    // The first line always goes (the server takes it); the one after it waits for an email.
-    final needsContact = (state?.contactRequired ?? false) && asked;
-    final justHanded = !resolved && !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent);
+    // The first line always goes (the server takes it); after it, the address is asked for: held for while the team
+    // is not live for the person, a request above the box while it is (K2).
+    final need = rendelSupportContactNeed(v);
+    final needsContact = need == 'required';
+    // Support switched off (K1): nothing written here reaches the team, so there is no box and nothing to sort.
+    // Once it is on again, one its switch closed is written in again like any sorted one (D4).
+    final on = widget.supportOn?.call() ?? true;
+    // Nobody from the team has started on it yet: it may have been a slip (K4). Once a teammate joined or read their
+    // account, it is the team's (qa2-sdk-05).
+    final justHanded = !resolved && !rendelSupportTeamStarted(v.entries);
+    // A first line refused because too many conversations were started from here says why (D1).
+    final note = v.pending.any((p) => p.failed && p.reason == 'rate_limited') ? strings.supportTooMany : _note;
     final typing = v.typingUntil != null && v.typingUntil!.isAfter(DateTime.now());
     final agent = state?.agentName;
     final team = strings.supportTeamOf(widget.team);
-    if (_newAfter == null && state != null) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
+    if (_newAfter == null && state != null && _fresh && v.threadId == _threadDrawn) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
     final unseen = _newAfter;
 
     // A speaker's lines within five minutes are one run, as the web SDK groups them; a marker ends one.
@@ -352,7 +428,12 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       _rateThread = state!.threadId;
     }
     final lastMarker = v.entries.where((e) => e.marker).lastOrNull;
+    RendelSupportEntry? prev;
     for (final entry in v.entries) {
+      final before = prev;
+      prev = entry;
+      // The same read of their account said twice in a row is one line (check-08).
+      if (rendelSupportSameLookup(before, entry)) continue;
       if (entry.marker) {
         run = null;
         // Sorted on this page: the card at the end says it, so the server's own line about it steps aside.
@@ -380,7 +461,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     // "Read ✓" under the person's newest run the team has read (design A).
     final readSeq = state?.teamReadSeq ?? 0;
     final readRun = items.whereType<_Run>().where((r) => r.mine && readSeq >= r.entries.last.seq).lastOrNull;
-    final column = _teamColumn(context, theme, strings, needsContact: needsContact, asked: asked);
+    final column = _teamColumn(context, theme, strings, need: need, asked: asked);
     final lines = <Widget>[
       for (final item in items)
         switch (item) {
@@ -429,7 +510,11 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
             Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              RendelLab.of('look') == 'a' ? labHead(context, theme, strings, resolved: resolved) : _head(context, theme, strings, resolved: resolved),
+              // Large text grows the lines, not the head and the box around them past a short page (sdk-17).
+              MediaQuery.withClampedTextScaling(
+                maxScaleFactor: _chromeScale,
+                child: RendelLab.of('look') == 'a' ? labHead(context, theme, strings, resolved: resolved) : _head(context, theme, strings, resolved: resolved),
+              ),
               if (RendelLab.of('look') != 'a') Container(height: 1, color: theme.colors.onSurface.withValues(alpha: 0.06)),
               Expanded(
                 child: Stack(
@@ -453,20 +538,23 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                   ],
                 ),
               ),
-              Padding(
+              MediaQuery.withClampedTextScaling(
+                maxScaleFactor: _chromeScale,
+                child: Padding(
                 padding: EdgeInsets.fromLTRB(RendelLab.of('look') == 'a' ? 15 : 12, 8, RendelLab.of('look') == 'a' ? 15 : 12, theme.space.md),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (_note case final note?)
+                    if (note != null)
                       Padding(
                         padding: EdgeInsets.only(bottom: theme.space.xs),
                         child: Semantics(liveRegion: true, child: Text(note, style: theme.text.caption)),
                       ),
                     // "I'm sorted" while the conversation is open; before the team has written, the way back (K4).
-                    // The panel's look: not while the keyboard is up, when the page is short.
-                    if (!resolved && !(lab && MediaQuery.viewInsetsOf(context).bottom > 0))
+                    // Not while the keyboard is up, when the page is short (sdk-17).
+                    // No thread yet (K3): nothing to sort or to take back, and the head's back is the way out.
+                    if (on && !resolved && v.threadId != null && MediaQuery.viewInsetsOf(context).bottom == 0)
                       Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Padding(
@@ -477,7 +565,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                             onTap: justHanded
                                 ? () async {
                                     final navigator = Navigator.of(context);
-                                    await widget.support.resolve();
+                                    await widget.support.resolve(byMistake: true);
                                     navigator.maybePop();
                                   }
                                 : () {
@@ -489,11 +577,13 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                       ),
                     // Sorted, while another of theirs is open: that one is where they write.
                     if (v.otherOpen case final other?) _otherOpen(theme, strings, other),
-                    // Closed is not the end: a line reopens the thread, in place (plan §4.2).
-                    if (!needsContact && v.otherOpen == null)
+                    // Closed is not the end: a line reopens the thread, in place (plan §4.2). While Support is off,
+                    // nothing written reaches the team (K1, D4).
+                    if (on && !needsContact && v.otherOpen == null)
                       RendelLab.of('look') == 'a' ? labComposer(theme, strings, resolved: resolved) : _composer(theme, strings, resolved: resolved),
                   ],
                 ),
+              ),
               ),
             ],
           ),
@@ -557,12 +647,14 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                         header: true,
                         child: Text(strings.supportTeamOf(widget.team), style: theme.text.body.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ),
-                      Text(
-                        resolved ? _sortedOn(context, strings) : (state?.presence ?? (here ? strings.supportHere : strings.supportAway)),
-                        style: theme.text.caption.copyWith(fontSize: 12.5, color: resolved ? theme.colors.onSurfaceSoft : tone),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      // No thread yet (K3): nothing is known of the team, so nothing is said.
+                      if (state != null)
+                        Text(
+                          _status(context, strings, state, resolved: resolved),
+                          style: theme.text.caption.copyWith(fontSize: 12.5, color: resolved ? theme.colors.onSurfaceSoft : tone),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                     ],
                   ),
                 ),
@@ -602,6 +694,13 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     );
   }
 
+  /// The line under the team's name: closed by Support's switch (K1), sorted and when, or who is here and when
+  /// they answer, with a return on the person's own clock (C4).
+  String _status(BuildContext context, RendelStrings strings, RendelSupportState state, {required bool resolved}) {
+    if (resolved) return state.closedOff ? strings.supportClosedMark : _sortedOn(context, strings);
+    return supportBackOn(context, strings, presence: state.presence, backAt: state.backAt).presence ?? (state.teamHere ? strings.supportHere : strings.supportAway);
+  }
+
   /// "Sorted on 28 Oct", from its last "sorted" line; "Sorted" when it has none.
   String _sortedOn(BuildContext context, RendelStrings strings) {
     final at = widget.support.value.value.entries.where((e) => e.markerKind?.endsWith('resolved') ?? false).lastOrNull?.createdAt;
@@ -620,9 +719,13 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       child: Row(
         children: [
           rule,
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            child: Text('${strings.supportNewMark} · ${_time(context, at)}', style: theme.text.caption.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600, color: theme.accentText)),
+          // Large text shortens the rules, never pushes the words off the side (sdk-17).
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.7),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Text('${strings.supportNewMark} · ${_time(context, at)}', style: theme.text.caption.copyWith(fontSize: 12.5, fontWeight: FontWeight.w600, color: theme.accentText), maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
           ),
           rule,
         ],
@@ -814,7 +917,23 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                 child: _bubble(theme, Text(line.text), mine: true, last: i == pending.length - 1),
               ),
             ),
-            if (line.failed)
+            // Refused because the app switched Support off: why, and no retry, which could not help (qa3-k1-01).
+            if (line.failed && line.reason == 'support_off')
+              Semantics(
+                liveRegion: true,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.error_outline_rounded, size: 13, color: theme.danger),
+                      const SizedBox(width: 4),
+                      Flexible(child: Text(strings.supportUnsentOff, style: _meta(theme).copyWith(color: theme.danger, fontWeight: FontWeight.w500))),
+                    ],
+                  ),
+                ),
+              )
+            else if (line.failed)
               Semantics(
                 button: true,
                 child: InkWell(
@@ -843,21 +962,36 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   /// The team's side at the end of the page while it waits: their auto-reply about when they answer, and what they
   /// ask of the person (where to send the reply, the code it got, a read of their account).
-  Widget? _teamColumn(BuildContext context, RendelTheme theme, RendelStrings strings, {required bool needsContact, required bool asked}) {
+  Widget? _teamColumn(BuildContext context, RendelTheme theme, RendelStrings strings, {required String? need, required bool asked}) {
     final v = widget.support.value.value;
     final state = v.state;
     final resolved = state?.resolved ?? false;
     final contact = state?.contactState ?? 'not_needed';
     // The optional box is for the wait: once the team is talking, it gives the page back. Only where the app emails
     // people, or the address would never be written to.
-    final offersContact = !needsContact &&
+    final offersContact = need == null &&
+        !resolved &&
         (state?.contactOffered ?? false) &&
         contact == 'none' &&
         asked &&
         !v.entries.any((e) => e.author == RendelSupportAuthorKind.agent) &&
         !widget.support.contactSkipped.value.contains(v.threadId);
+    // When they answer, with a time on the person's own clock (C4).
+    final said = supportBackOn(context, strings, expectation: state?.expectation, backAt: state?.backAt).expectation;
+    // Closed because the app switched Support off (K1), while it is off: the app's own ways to reach the team, each
+    // one tappable. Once Support is on again it reads as any sorted one, written in again in the box (D4).
+    // Each button says what it is and where it goes, as the assistant's contact card does (qa3-k1-02).
+    final channels = (state?.closedOff ?? false) && !(widget.supportOn?.call() ?? true) ? rendelSupportReachChannels(state!.contactChannels, strings) : const <Map<String, dynamic>>[];
+    final reach = channels.isEmpty
+        ? null
+        : WireBlock.tryParse({
+            'id': 'rd-support-off',
+            'type': 'contact',
+            'fallback_text': '',
+            'props': {'title': strings.supportReachTeam.replaceAll('{team}', widget.team), 'channels': channels},
+          });
     final items = <Widget>[
-      if (state?.expectation case final expectation? when state!.mode != 'human')
+      if (said case final expectation? when state!.mode != 'human')
         _bubble(
           theme,
           Row(
@@ -873,20 +1007,24 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           last: false,
           auto: true,
         ),
-      if (needsContact || offersContact) _contactCard(theme, strings, required: needsContact),
+      if (need != null || offersContact) _contactCard(theme, strings, kind: need ?? 'optional'),
       if (contact == 'stated' && !resolved) _codeCard(theme, strings),
-      // A read the team asked for that waits for the person's yes, in the server's words.
-      for (final ask in v.asks)
+      // The contact block is a raised plate of its own: drawn as it is, never inside a second card (qa2-k1-01).
+      if (reach != null) KeyedSubtree(key: const ValueKey('rd-support-reach'), child: ComponentRegistry.build(context, reach..ready = true, _dispatch)),
+      // A read the team asked for that waits for the person's yes, in the server's words: Allow or Not now, never
+      // "Confirm" and "Go back", which read as a card and a way out (sdk-20, check-11). An answer that did not go says so.
+      for (final ask in v.asksHere)
         _plate(theme, [
           Text(ask.text, style: _heading(theme)),
           SizedBox(height: theme.space.sm),
           Row(
             children: [
-              Expanded(child: RendelActionButton(label: strings.confirm, expand: true, onTap: () => widget.support.answerLookup(ask.lookupId, allow: true))),
+              Expanded(child: RendelActionButton(label: strings.supportAllow, expand: true, onTap: () => widget.support.answerLookup(ask.lookupId, allow: true))),
               SizedBox(width: theme.space.sm),
-              RendelActionButton(label: strings.goBack, quiet: true, onTap: () => widget.support.answerLookup(ask.lookupId, allow: false)),
+              RendelActionButton(label: strings.supportDeny, quiet: true, onTap: () => widget.support.answerLookup(ask.lookupId, allow: false)),
             ],
           ),
+          if (ask.failed) _warning(theme, strings.supportAskFailed),
         ]),
     ];
     if (items.isEmpty) return null;
@@ -1136,6 +1274,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                   minLines: 1,
                   maxLines: 5,
                   maxLength: 4000,
+                  buildCounter: _supportCount,
                   textInputAction: TextInputAction.send,
                   onChanged: (_) => widget.support.typing(),
                   onSubmitted: (_) => _send(),
@@ -1143,7 +1282,6 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                   decoration: InputDecoration(
                     isDense: true,
                     border: InputBorder.none,
-                    counterText: '',
                     // Always the team, never the one person in it (Tuna, 2026-11-03); a sorted one says a line opens it again.
                     hintText: resolved ? strings.supportReopenHint : strings.supportWriteTeamOf(widget.team),
                     hintStyle: theme.text.body.copyWith(color: theme.colors.onSurfaceFaint),
@@ -1178,11 +1316,17 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   /// Where the reply can reach the person (K14), as a card in the team's column: checked by the API's own rule,
   /// said under the field once they leave it or tap Save, and from then on with each change.
-  Widget _contactCard(RendelTheme theme, RendelStrings strings, {required bool required}) {
+  /// [kind] is `required` (the box waits for it), `request` (above the box while the team is live, K2) or
+  /// `optional`; only the optional one can be put away.
+  Widget _contactCard(RendelTheme theme, RendelStrings strings, {required String kind}) {
+    final required = kind != 'optional';
     final problem = supportEmailProblem(_email.text);
     final warning = _emailRefused ??
         (_emailWarned && problem != null ? (problem == 'empty' ? strings.supportContactEmpty : strings.supportContactInvalid) : null);
-    final title = Text(required ? strings.supportContactAsk : strings.supportContactOptional, style: _heading(theme));
+    final title = Text(
+      kind == 'required' ? strings.supportContactAsk : kind == 'request' ? strings.supportContactRequest : strings.supportContactOptional,
+      style: _heading(theme),
+    );
     final threadId = widget.support.value.value.threadId;
     return _plate(theme, [
       // Asked, not needed: a person who would rather not give one puts the card away, for this conversation.

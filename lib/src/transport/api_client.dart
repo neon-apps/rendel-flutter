@@ -618,7 +618,7 @@ class RendelApiClient {
     try {
       final token = asPerson ? await _userToken() : null;
       final request = http.Request(method, Uri.parse('${config.apiBaseUrl}/v1/support/$path'))
-        ..headers.addAll({..._personHeaders(user), if (token != null) 'X-Rendel-User-Token': token});
+        ..headers.addAll({..._supportHeaders(user), if (token != null) 'X-Rendel-User-Token': token});
       if (body != null) request.body = jsonEncode(body);
       final response = await http.Response.fromStream(
         await _http.send(request).timeout(config.requestTimeout),
@@ -638,15 +638,22 @@ class RendelApiClient {
     }
   }
 
+  /// What the support stream and count say of the person's sign-in (add-10):
+  /// true while the app hands over a token, false while it has none, and null
+  /// for an app that gave no `userToken` at all, so the server knows whether a
+  /// card or a read can run as the person.
+  Future<bool?> signedIn() async => config.userToken == null ? null : (await _userToken()) != null;
+
   /// `GET /v1/support/threads/:id/stream?after=`: the thread live, each
   /// event's JSON as it comes. The server holds it about a minute and ends it
   /// with `support.reconnect`; cancelling the subscription ends it early.
   /// Throws when the server does not open it.
   Stream<Map<String, dynamic>> supportStream(String threadId, int after, {Map<String, String>? user}) async* {
+    final signed = await signedIn();
     final request = http.Request(
       'GET',
-      Uri.parse('${config.apiBaseUrl}/v1/support/threads/${Uri.encodeComponent(threadId)}/stream?after=$after'),
-    )..headers.addAll({..._personHeaders(user), 'Accept': 'text/event-stream'});
+      Uri.parse('${config.apiBaseUrl}/v1/support/threads/${Uri.encodeComponent(threadId)}/stream?after=$after${signed == null ? '' : '&signed_in=${signed ? 1 : 0}'}'),
+    )..headers.addAll({..._supportHeaders(user), 'Accept': 'text/event-stream'});
     final response = await _http.send(request).timeout(config.requestTimeout);
     if (response.statusCode != 200) {
       await response.stream.drain<void>();
@@ -677,6 +684,10 @@ class RendelApiClient {
         if (user?['id'] case final who?) 'X-Rendel-User': who,
         if (user?['hmac'] case final hmac?) 'X-Rendel-User-Hmac': hmac,
       };
+
+  /// A `/v1/support/*` call: about the person, and saying which build calls (D3), so a person who reaches the
+  /// team before they ever ask the assistant is offered their own build's screens.
+  Map<String, String> _supportHeaders(Map<String, String>? user) => {..._personHeaders(user), 'X-Rendel-SDK': config.sdkVersion};
 
   /// POST /v1/identify. Null when it landed; otherwise its status, the
   /// server's code and message, and whether trying again can help. A busy or

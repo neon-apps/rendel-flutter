@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/strings.dart';
 import '../core/support.dart';
+import 'lab/lab.dart' show LabGlass;
 import 'renderer/blocks.dart' show RendelPressable;
 import 'theme.dart';
 
@@ -31,7 +32,7 @@ class RendelSupportRecent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final strings = RendelStringsScope.of(context);
-    final shown = threads.where((t) => t.resolved).take(3).toList();
+    final shown = threads.where((t) => t.resolved && _spoken(t)).take(3).toList();
     if (shown.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -75,16 +76,17 @@ class RendelSupportRecent extends StatelessWidget {
 }
 
 /// "With the Halden team": every conversation with the team, this week's and
-/// earlier, with a search over them. A tap closes it and opens that one.
+/// earlier, with a search over them. A tap closes it and opens that one; ✕
+/// closes it and then [onClose] (all of Rendel, as on the web).
 Future<void> showRendelSupportList(
   BuildContext context, {
   required List<RendelSupportThread> threads,
   required Future<List<RendelSupportThread>?> Function() reload,
   required String team,
-  String? assistant,
   required RendelTheme theme,
   required RendelStrings strings,
   required void Function(String threadId) onOpen,
+  VoidCallback? onClose,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -111,7 +113,7 @@ Future<void> showRendelSupportList(
                 threads: threads,
                 reload: reload,
                 team: team,
-                assistant: assistant,
+                onClose: onClose,
                 onOpen: (id) {
                   Navigator.of(sheetContext).pop();
                   onOpen(id);
@@ -128,19 +130,22 @@ Future<void> showRendelSupportList(
 String _searchFold(String s) =>
     s.replaceAll('İ', 'i').replaceAll('I', 'i').toLowerCase().replaceAll('ı', 'i');
 
+/// A conversation someone wrote in: one opened with no words (an older SDK's "Contact us") is left out of the lists.
+bool _spoken(RendelSupportThread t) => t.title.trim().isNotEmpty || t.last != null;
+
 class _SupportList extends StatefulWidget {
   const _SupportList({
     required this.threads,
     required this.reload,
     required this.team,
-    this.assistant,
+    this.onClose,
     required this.onOpen,
   });
 
   final List<RendelSupportThread> threads;
   final Future<List<RendelSupportThread>?> Function() reload;
   final String team;
-  final String? assistant;
+  final VoidCallback? onClose;
   final void Function(String threadId) onOpen;
 
   @override
@@ -174,9 +179,10 @@ class _SupportListState extends State<_SupportList> {
     final q = _searchFold(_search.text.trim());
     final all = [
       for (final t in _threads)
-        if (q.isEmpty ||
-            _searchFold('${t.title} ${t.last?.text ?? ''} ${t.agent ?? ''}')
-                .contains(q))
+        if (_spoken(t) &&
+            (q.isEmpty ||
+                _searchFold('${t.title} ${t.last?.text ?? ''} ${t.agent ?? ''}')
+                    .contains(q)))
           t,
     ];
     final weekAgo = DateTime.now().subtract(const Duration(days: 7));
@@ -200,45 +206,17 @@ class _SupportListState extends State<_SupportList> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // The team's page's own head (look A, sdk-18): 44pt round glass back and close, the title centred
+            // in all the room between them, as the support sheet draws it.
             Padding(
-              padding: const EdgeInsets.fromLTRB(6, 10, 12, 10),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
               child: Row(
                 children: [
-                  ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 110),
-                    child: Semantics(
-                      button: true,
-                      label: strings.supportBack,
-                      excludeSemantics: true,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(10),
-                        onTap: () => Navigator.of(context).maybePop(),
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(minHeight: 44),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.chevron_left_rounded,
-                                size: 24,
-                                color: theme.accentText,
-                              ),
-                              Flexible(
-                                child: Text(
-                                  widget.assistant ?? 'Rendel',
-                                  style: theme.text.body.copyWith(
-                                    color: theme.accentText,
-                                    fontSize: 15,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
+                  _roundButton(
+                    theme,
+                    icon: Icons.chevron_left_rounded,
+                    label: strings.supportBack,
+                    onTap: () => Navigator.of(context).maybePop(),
                   ),
                   Expanded(
                     child: Semantics(
@@ -256,13 +234,17 @@ class _SupportListState extends State<_SupportList> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 110),
+                  _roundButton(
+                    theme,
+                    icon: Icons.close_rounded,
+                    label: strings.closeCopilot,
+                    onTap: () {
+                      Navigator.of(context).maybePop();
+                      widget.onClose?.call();
+                    },
+                  ),
                 ],
               ),
-            ),
-            Container(
-              height: 1,
-              color: theme.colors.onSurface.withValues(alpha: 0.06),
             ),
             Expanded(
               child: ListView(
@@ -363,6 +345,19 @@ class _SupportListState extends State<_SupportList> {
   }
 }
 
+/// A 44pt round glass button, as the support sheet's head draws its own.
+Widget _roundButton(RendelTheme theme, {required IconData icon, required String label, required VoidCallback onTap}) => RendelPressable(
+  semanticLabel: label,
+  onTap: onTap,
+  child: SizedBox(
+    width: 44,
+    height: 44,
+    child: Center(
+      child: LabGlass(circle: true, width: 40, height: 40, alignment: Alignment.center, child: Icon(icon, size: 26, color: theme.colors.onSurface)),
+    ),
+  ),
+);
+
 TextStyle _kicker(RendelTheme theme) => theme.text.caption.copyWith(
   fontSize: 13,
   fontWeight: FontWeight.w600,
@@ -446,16 +441,23 @@ class RendelSupportThreadItem extends StatelessWidget {
     final theme = RendelThemeScope.of(context);
     final strings = RendelStringsScope.of(context);
     final t = thread;
+    // A conversation opened before anyone wrote in it has no first line to be named by (apps-15).
+    final title = t.title.trim().isNotEmpty ? t.title : strings.supportRowTitleOf(team);
     String said(({bool mine, String text}) last) =>
         '${last.mine ? strings.supportYou : (t.agent ?? team)}: ${last.text}';
+    // Waiting, until a time on the person's own clock (C4).
+    final waiting = supportBackOn(context, strings, waiting: t.waiting, backAt: t.backAt).waiting;
     final line =
         t.resolved
-            ? (t.agent != null
+            // Closed by Support's switch (K1): said so, never "Sorted".
+            ? (t.closedOff
+                ? strings.supportClosedMark
+                : t.agent != null
                 ? strings.supportSortedWithOf(t.agent!)
                 : strings.supportSortedMark)
             : (t.unread > 0 && t.last != null
                 ? said(t.last!)
-                : (t.waiting ?? (t.last != null ? said(t.last!) : '')));
+                : (waiting ?? (t.last != null ? said(t.last!) : '')));
     final material = MaterialLocalizations.of(context);
     final now = DateTime.now();
     final today =
@@ -468,7 +470,7 @@ class RendelSupportThreadItem extends StatelessWidget {
             : material.formatShortMonthDay(t.lastMessageAt);
     return RendelPressable(
       semanticLabel: [
-        t.title,
+        title,
         if (line.isNotEmpty) line,
         if (t.unread > 0) strings.supportUnreadOf(t.unread) else when,
       ].join('. '),
@@ -496,7 +498,7 @@ class RendelSupportThreadItem extends StatelessWidget {
                 child:
                     t.resolved
                         ? Icon(
-                          Icons.check_rounded,
+                          t.closedOff ? Icons.lock_outline_rounded : Icons.check_rounded,
                           size: 15,
                           color: theme.accentText,
                         )
@@ -516,7 +518,7 @@ class RendelSupportThreadItem extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      t.title,
+                      title,
                       style: theme.text.body.copyWith(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w600,
@@ -569,4 +571,27 @@ class RendelSupportThreadItem extends StatelessWidget {
       ),
     );
   }
+}
+
+/// [rendelSupportBack] with the page's own clock and calendar words (the host
+/// app's localizations, as every date the support pages draw): when the team
+/// is back, on the person's own clock (C4).
+({String? presence, String? waiting, String? expectation}) supportBackOn(
+  BuildContext context,
+  RendelStrings strings, {
+  String? presence,
+  String? waiting,
+  String? expectation,
+  String? backAt,
+}) {
+  final material = MaterialLocalizations.of(context);
+  return rendelSupportBack(
+    strings,
+    presence: presence,
+    waiting: waiting,
+    expectation: expectation,
+    backAt: backAt,
+    time: (at) => material.formatTimeOfDay(TimeOfDay.fromDateTime(at)),
+    day: material.formatMediumDate,
+  );
 }

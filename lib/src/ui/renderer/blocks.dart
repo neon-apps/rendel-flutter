@@ -2195,11 +2195,14 @@ Widget _confirmCard(
                       'confirmed' => Icons.check_rounded,
                       // Nobody said no; the question was left behind.
                       'abandoned' => Icons.subdirectory_arrow_right_rounded,
+                      // Confirmed, and the write then failed: never drawn as confirmed (a card the team sent, sdk-21).
+                      'failed' => Icons.error_outline_rounded,
                       _ => Icons.close_rounded,
                     },
                     label: switch (resolved) {
                       'confirmed' => RendelStringsScope.of(context).confirmed,
                       'abandoned' => RendelStringsScope.of(context).notAnswered,
+                      'failed' => RendelStringsScope.of(context).cardFailed,
                       _ => RendelStringsScope.of(context).notConfirmed,
                     },
                   ),

@@ -58,6 +58,22 @@ class _Server {
   /// How each message post is answered, in turn; 200 once they run out.
   final List<int> messageStatus = [];
 
+  /// Reads of the count that fail with these, in turn, before the count answers again.
+  final List<int> unreadStatus = [];
+
+  /// How a confirmed card's write went, and the answers to a read's run that fail before one goes.
+  Map<String, Object> continueAnswer = const {'status': 'succeeded'};
+  int continueStatus = 200;
+  final List<int> runStatus = [];
+
+  /// The phone's current thread on the server: another id once a new one opened after a sorted one.
+  String currentId = _thread;
+
+  /// The phone has no thread until a handoff opens one (K3); how each handoff is answered, in turn (200 once they run out).
+  bool noThread = false;
+  final List<int> handoffStatus = [];
+  final List<Map<String, dynamic>> handoffs = [];
+
   /// The device's conversations with the team, for Recent.
   List<Map<String, dynamic>> threads = const [];
 
@@ -70,13 +86,30 @@ class _Server {
   /// What the server says when a card is opened, when not its 200.
   int? openCard;
 
+  /// The reads the team asked for that the count brings (C6).
+  List<Map<String, dynamic>> lookups = const [];
+
+  /// How each yes or no to a card is answered, in turn (status and body); `confirmed` once they run out.
+  final List<(int, Map<String, Object>)> confirmAnswers = [];
+
+  /// Each yes or no to a card, with the headers it carried.
+  final List<({Map<String, String> headers, Map<String, dynamic>? body})> confirms = [];
+
+  /// What the count and the stream were asked with.
+  final List<String> queries = [];
+
+  /// The person's next line is held for an address (409 contact_required).
+  bool holdForContact = false;
+
   /// The stream is held open and says nothing, as a quiet thread's does, until a test [say]s something on it.
-  final StreamController<List<int>> _quiet = StreamController<List<int>>();
+  /// Broadcast, so the page opened a second time listens again.
+  final StreamController<List<int>> _quiet = StreamController<List<int>>.broadcast();
 
   void say(Map<String, dynamic> event) => _quiet.add(utf8.encode('event: ${event['type']}\ndata: ${jsonEncode(event)}\n\n'));
 
   late final client = MockClient.streaming((request, body) async {
     final path = request.url.path;
+    if (path.endsWith('/stream') || path == '/v1/support/unread') queries.add('${path.split('/').last}?${request.url.query}');
     if (path.endsWith('/stream')) return http.StreamedResponse(_quiet.stream, 200);
     Map<String, dynamic>? sent;
     final raw = await body.bytesToString();
@@ -84,11 +117,28 @@ class _Server {
     http.StreamedResponse json(Object value, [int status = 200]) =>
         http.StreamedResponse(Stream.value(utf8.encode(jsonEncode(value))), status, headers: {'content-type': 'application/json'});
     // As the server reads it: the lines after the cursor.
-    if (path == '/v1/support/current') {
-      final after = int.tryParse(request.url.queryParameters['after'] ?? '') ?? 0;
-      return json({'thread_id': _thread, 'conversation_id': 'c1', 'state': state, 'entries': [for (final e in entries) if ((e['seq'] as int) > after) e]});
+    if (path == '/v1/support/handoff') {
+      handoffs.add(sent!);
+      final status = handoffStatus.isEmpty ? 200 : handoffStatus.removeAt(0);
+      if (status != 200) return json({'error': {'code': status == 429 ? 'rate_limited' : 'internal'}}, status);
+      if (noThread) {
+        noThread = false;
+        entries = [
+          _entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'),
+          if (sent['text'] case final String text) _entry(2, text: text, client: sent['client_msg_id'] as String),
+        ];
+      }
+      return json({'thread_id': _thread, 'conversation_id': 'c1', 'state': state, 'entries': entries});
     }
-    if (path == '/v1/support/unread') return json({'unread': 2, 'open': state['state'] != 'resolved'});
+    if (path == '/v1/support/current') {
+      if (noThread) return http.StreamedResponse(const Stream.empty(), 204);
+      final after = int.tryParse(request.url.queryParameters['after'] ?? '') ?? 0;
+      return json({'thread_id': currentId, 'conversation_id': 'c1', 'state': state, 'entries': [for (final e in entries) if ((e['seq'] as int) > after) e]});
+    }
+    if (path == '/v1/support/unread') {
+      if (unreadStatus.isNotEmpty) return json({'error': {'code': 'internal'}}, unreadStatus.removeAt(0));
+      return json({'unread': 2, 'open': state['state'] != 'resolved', 'thread_id': currentId, 'lookups': lookups});
+    }
     if (path == '/v1/support/threads') return json({'threads': threads});
     if (request.method == 'GET' && path.startsWith('/v1/support/threads/') && path.split('/').length == 5) {
       final id = path.split('/').last;
@@ -102,9 +152,11 @@ class _Server {
         if (otherOpen != null) return json({'error': {'code': 'another_open', 'thread_id': otherOpen}}, 409);
         final reopened = {..._entry(known.entries.length + 1, kind: 'marker', author: 'system', text: 'Back with the Grove team.'), 'marker': 'reopened'};
         final line = _entry(known.entries.length + 2, text: sent!['text'] as String, client: sent['client_msg_id'] as String);
-        past[id] = (state: {...known.state, 'state': 'open', 'mode': 'human'}, entries: [...known.entries, reopened, line]);
+        // Open again, as the server opens it: no longer closed by Support's switch.
+        past[id] = (state: {...known.state, 'state': 'open', 'mode': 'human'}..remove('closed_reason'), entries: [...known.entries, reopened, line]);
         return json({'entry': line, 'reopened': reopened});
       }
+      if (holdForContact) return json({'error': {'code': 'contact_required'}}, 409);
       final status = messageStatus.isEmpty ? 200 : messageStatus.removeAt(0);
       if (status != 200) return json({'error': {'code': 'internal'}}, status);
       final entry = _entry(entries.length + 1, text: sent!['text'] as String, client: sent['client_msg_id'] as String);
@@ -136,8 +188,16 @@ class _Server {
       final block = entries.expand((e) => e['blocks'] as List).firstWhere((b) => (b as Map)['type'] == 'confirm_card');
       return json({'block': block});
     }
-    if (path.endsWith('/continue')) return json({'status': 'succeeded'});
-    if (path.endsWith('/confirm')) return json({'status': 'confirmed'});
+    if (path.endsWith('/continue')) return json(continueAnswer, continueStatus);
+    if (path.endsWith('/run') && runStatus.isNotEmpty) return json({'error': {'code': 'internal'}}, runStatus.removeAt(0));
+    if (path.endsWith('/confirm')) {
+      confirms.add((headers: request.headers, body: sent));
+      if (confirmAnswers.isNotEmpty) {
+        final (status, answer) = confirmAnswers.removeAt(0);
+        return json(answer, status);
+      }
+      return json({'status': 'confirmed'});
+    }
     if (path.endsWith('/contact')) {
       state = _state(contact: {'state': 'stated', 'required': false});
       return json({'state': 'stated', 'emailed': false});
@@ -145,9 +205,9 @@ class _Server {
     return http.StreamedResponse(const Stream.empty(), 204);
   });
 
-  RendelApiClient api() => RendelApiClient(appKey: 'nc_pk_test_x', deviceId: 'device-1', config: const RendelConfig(), httpClient: client);
+  RendelApiClient api({Future<String?> Function()? token}) => RendelApiClient(appKey: 'nc_pk_test_x', deviceId: 'device-1', config: RendelConfig(userToken: token), httpClient: client);
 
-  RendelSupport support() => RendelSupport(api(), user: () => null, locale: () => 'en');
+  RendelSupport support({Map<String, String>? user, Future<String?> Function()? token}) => RendelSupport(api(token: token), user: () => user, locale: () => 'en');
 }
 
 Widget _app(Widget child) => MaterialApp(
@@ -160,15 +220,19 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 400));
 }
 
-Future<void> _open(WidgetTester tester, RendelSupport support) async {
+Future<void> _open(WidgetTester tester, RendelSupport support, {List<UIAction>? actions, bool supportOn = true}) async {
   await tester.pumpWidget(_app(Builder(
     builder: (context) => TextButton(
       onPressed: () => showRendelSupport(
         context,
         support: support,
         team: 'Grove',
-        onAction: (_) async => true,
+        onAction: (action) async {
+          actions?.add(action);
+          return true;
+        },
         canHandle: (_) => true,
+        supportOn: () => supportOn,
       ),
       child: const Text('open'),
     ),
@@ -432,7 +496,60 @@ void main() {
       await _close(tester);
     });
 
-    testWidgets('says the row is waiting while the team is away, with a clock, and the reply is a line at the top of an answer', (tester) async {
+    testWidgets("says New above the team's reply on a second opening, from what the server says then (sdk-08)", (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Can I swap the Aero Glide for a 44?'), _entry(2, author: 'agent', name: 'Dana', text: 'Let me check.')],
+        state: {..._state(mode: 'human'), 'user_read_seq': 2, 'last_seq': 2},
+      );
+      final support = server.support();
+      await _open(tester, support);
+      expect(find.textContaining('New · '), findsNothing);
+      await _close(tester);
+      // While the page is closed, the team replies.
+      server.entries = [...server.entries, _entry(3, author: 'agent', name: 'Dana', text: 'The 44 is in stock.')];
+      server.state = {...server.state, 'last_seq': 3};
+      await _open(tester, support);
+      expect(find.textContaining('New · '), findsOneWidget);
+      expect(tester.getTopLeft(find.textContaining('New · ')).dy, lessThan(tester.getTopLeft(find.text('The 44 is in stock.')).dy));
+      await _close(tester);
+    });
+
+    test('reads a new thread after a sorted one from its first line, and a turn to another thread starts from nothing (sdk-02)', () async {
+      const other = '00000000-0000-4000-8000-0000000000b2';
+      final server = _Server(
+        entries: [_entry(1, text: 'Old question'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Old answer'), _entry(3, kind: 'marker', author: 'system', text: 'Sorted.')],
+        state: {..._state(mode: 'closed'), 'state': 'resolved', 'last_seq': 3},
+      );
+      final support = server.support();
+      await support.load();
+      support.handedTo(_thread);
+      expect(support.value.value.entries, hasLength(3));
+      server
+        ..currentId = other
+        ..entries = [_entry(1, kind: 'marker', author: 'system', text: 'Your message is with the Grove team.'), _entry(2, text: 'A new question')]
+        ..state = {..._state(), 'thread_id': other};
+      await support.load();
+      expect(support.value.value.threadId, other);
+      expect([for (final e in support.value.value.entries) e.seq], [1, 2]);
+      support.handedTo('00000000-0000-4000-8000-0000000000c3');
+      expect(support.value.value.threadId, isNull);
+      expect(support.value.value.entries, isEmpty);
+    });
+
+    testWidgets('drops the open conversation as soon as the team sorts it while the person watches (sdk-14)', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state(mode: 'human'));
+      final support = server.support();
+      await tester.runAsync(support.refreshUnread);
+      expect(support.open, isTrue);
+      await _open(tester, support);
+      server.say({'type': 'support.state', 'state': {..._state(mode: 'closed'), 'state': 'resolved'}});
+      await _settle(tester);
+      expect(support.open, isFalse);
+      await _close(tester);
+    });
+
+    // The reply as a line at the top of an answer has its own test (sdk-09); this one only ever held the waiting row (sdk-26).
+    testWidgets('says the row is waiting while the team is away, with a clock', (tester) async {
       final server = _Server(
         entries: [_entry(1, text: 'Can I swap the Aero Glide for a 44?')],
         state: {..._state(), 'team_here': false, 'waiting': 'Waiting for the team · back tomorrow at 09:00'},
@@ -450,6 +567,67 @@ void main() {
       expect(find.text('Waiting for the team · back tomorrow at 09:00'), findsOneWidget);
       expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
     });
+
+    testWidgets("shows the team's reply as a line at the top of one of Rendel's answers, and opens their page from it (sdk-09)", (tester) async {
+      final server = _Server(
+        entries: [_entry(1, text: 'Can I swap the Aero Glide for a 44?'), _entry(2, author: 'agent', name: 'Dana', text: 'The 44 is in stock.')],
+        state: _state(mode: 'human'),
+      );
+      final support = server.support();
+      final controller = ConversationController(api: server.api(), actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true);
+      addTearDown(controller.dispose);
+      controller.loadHistory('c1', [
+        {'id': 'm1', 'role': 'user', 'blocks': [{'id': 'b1', 'type': 'text', 'fallback_text': 'Which sizes?', 'props': {'markdown': 'Which sizes?'}}]},
+        {'id': 'm2', 'role': 'assistant', 'blocks': [{'id': 'b2', 'type': 'text', 'fallback_text': 'From 38 to 46.', 'props': {'markdown': 'From 38 to 46.'}}]},
+      ]);
+      await tester.runAsync(() async {
+        await support.load();
+        await support.refreshUnread();
+      });
+      var opened = 0;
+      await tester.pumpWidget(_app(ThreadScreen(controller: controller, support: support, supportTeam: 'Grove', onSupportOpen: () => opened++)));
+      await tester.pump();
+      expect(controller.page, 0);
+      expect(find.textContaining('Dana replied'), findsOneWidget);
+      // The full row is the opening's; on a page only the reply shows.
+      expect(find.text('Grove team'), findsNothing);
+      await tester.tap(find.textContaining('Dana replied'));
+      expect(opened, 1);
+    });
+
+    // sdk-17: at 320x568 with text at 2.0 and the keyboard up, the head, chip and box ran 83px off the bottom;
+    // at 375 with text at 2.0 the New line ran 27px off the side.
+    for (final (size, keyboard) in [(const Size(320, 568), 260.0), (const Size(375, 812), 0.0)]) {
+      testWidgets('draws nothing off the page with text at 2.0, ${size.width.toInt()} wide${keyboard > 0 ? ' with the keyboard up' : ''}', (tester) async {
+        tester.view.physicalSize = size * 3;
+        tester.view.devicePixelRatio = 3;
+        tester.view.viewInsets = FakeViewPadding(bottom: keyboard * 3);
+        addTearDown(tester.view.reset);
+        final server = _Server(
+          entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Hemen bakıyorum, sipariş numaranız nedir?')],
+          state: {..._state(mode: 'human'), 'user_read_seq': 1},
+        );
+        await tester.pumpWidget(MaterialApp(
+          builder: (context, child) => MediaQuery(data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(2)), child: child!),
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showRendelSupport(context, support: server.support(), team: 'Grove', onAction: (_) async => true, canHandle: (_) => true, strings: RendelStrings.forLocale('tr')),
+                  child: const Text('open'),
+                ),
+              ),
+            ),
+          ),
+        ));
+        await tester.tap(find.text('open'));
+        await _settle(tester);
+        expect(tester.takeException(), isNull);
+        // With the keyboard up the short list may hold only the newest lines.
+        if (keyboard == 0) expect(find.textContaining('Yeni · '), findsOneWidget);
+      });
+    }
 
     testWidgets('reads right to left in Arabic, with its words and nothing cut', (tester) async {
       final server = _Server(
@@ -662,6 +840,61 @@ void main() {
       await _close(tester);
     });
 
+    testWidgets('reads a card whose run failed as not gone through on every later load, never as confirmed (qa3-sdk-01)', (tester) async {
+      // As the server sends it once the invocation failed: `_resolved` in its props for Flutter, `resolved` for Web.
+      final server = _Server(
+        entries: [
+          _entry(1, text: 'Kargom gelmedi'),
+          _entry(2, author: 'agent', name: 'Ayşe', blocks: [
+            {
+              'id': 'card-1',
+              'type': 'confirm_card',
+              'fallback_text': 'Clip the coupon SPRING5',
+              'resolved': 'failed',
+              'props': {'invocation_id': _invocation, 'action_name': 'clip_coupon', 'summary': 'Clip the coupon SPRING5', 'params_display': <Object>[], '_resolved': 'failed'},
+            },
+          ]),
+        ],
+        state: _state(mode: 'human'),
+      );
+      await _open(tester, server.support());
+      await _settle(tester);
+      expect(find.text(const RendelStrings().cardFailed), findsOneWidget);
+      expect(find.text('Confirmed'), findsNothing);
+      expect(find.text('Confirm'), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets("tells the server a slip with By mistake, and nothing more with I'm sorted (qa3-sdk-06)", (tester) async {
+      final slip = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state());
+      await _open(tester, slip.support());
+      await tester.tap(find.textContaining('By mistake'));
+      await _settle(tester);
+      expect(slip.posts.singleWhere((p) => p.path == 'resolve').body, {'by_mistake': true});
+      final sorted = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Bakıyorum.')], state: _state(mode: 'human'));
+      await _open(tester, sorted.support());
+      await tester.tap(find.text("I'm sorted"));
+      await _settle(tester);
+      expect(sorted.posts.singleWhere((p) => p.path == 'resolve').body, isEmpty);
+    });
+
+    testWidgets('closes with nothing of the last person on it when they sign out with the page up (qa3-sdk-02)', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Bakıyorum.')], state: _state(mode: 'human'));
+      final support = server.support();
+      await _open(tester, support);
+      expect(find.text('Bakıyorum.'), findsOneWidget);
+      support.reset();
+      await _settle(tester);
+      expect(find.byType(RendelSupportSheet), findsNothing);
+      expect(find.text('Bakıyorum.'), findsNothing);
+      // A read asked for before the sign-out, answered after it, is the last person's: it is not taken.
+      server.entries = [_entry(1, text: 'Someone else')];
+      final stale = support.load();
+      support.reset();
+      expect(await tester.runAsync(() => stale), isFalse);
+      expect(support.value.value.threadId, isNull);
+    });
+
     testWidgets('draws a card the server will not open here as not answered, never loading, and asks once (Tuna, 2026-11-04)', (tester) async {
       final server = _Server(
         entries: [
@@ -697,10 +930,71 @@ void main() {
       await _settle(tester);
       expect(server.posts.singleWhere((p) => p.path == 'lookups/L1/run').body, {'allow': true});
       expect(find.text('Ayşe would like to check your account.'), findsOneWidget);
-      await tester.tap(find.text('Go back'));
+      // In plain words: a yes and a no to the read, never "Confirm" and "Go back" (sdk-20, check-11).
+      expect(find.text('Allow'), findsOneWidget);
+      expect(find.text('Go back'), findsNothing);
+      await tester.tap(find.text('Not now'));
       await _settle(tester);
       expect(server.posts.singleWhere((p) => p.path == 'lookups/L2/run').body, {'allow': false});
       expect(find.text('Ayşe would like to check your account.'), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets("keeps the team's question when the answer does not go, says so, and sends it again (sdk-20)", (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state(mode: 'human'))..runStatus.add(503);
+      await _open(tester, server.support());
+      server.say({'type': 'support.lookup', 'lookup_id': 'L2', 'action': 'Ayşe would like to check your orders.', 'ask': true});
+      await _settle(tester);
+      await tester.tap(find.text('Allow'));
+      await _settle(tester);
+      expect(find.text('Ayşe would like to check your orders.'), findsOneWidget);
+      expect(find.text("Your answer didn't reach the team. Try again."), findsOneWidget);
+      await tester.tap(find.text('Allow'));
+      await _settle(tester);
+      expect(server.posts.where((p) => p.path == 'lookups/L2/run'), hasLength(2));
+      expect(find.text('Ayşe would like to check your orders.'), findsNothing);
+      await _close(tester);
+    });
+
+    test('never says confirmed for a card whose write then failed, and keeps one with no answer open (sdk-21)', () async {
+      // A write that ran and failed is the server's answer; no answer at all asks to be tried again (qa2-sdk-03).
+      for (final (answer, status, resolved, said) in [
+        (const <String, Object>{'status': 'failed'}, 200, 'failed', 'failed'),
+        (const <String, Object>{'error': 'down'}, 503, null, 'unanswered'),
+      ]) {
+        final server = _Server(entries: [
+          _entry(1, author: 'agent', name: 'Ayşe', blocks: [
+            {'id': 'card-1', 'type': 'confirm_card', 'fallback_text': 'Send order M-2020 again', 'props': {'invocation_id': '', 'summary': 'Send order M-2020 again', 'params_display': <Object>[]}},
+          ]),
+        ], state: _state(mode: 'human'))
+          ..continueAnswer = answer
+          ..continueStatus = status;
+        final support = server.support();
+        await support.load();
+        await support.openCard(support.value.value.entries.single.id);
+        expect(await support.decideCard(_invocation, confirm: true), said);
+        final props = support.value.value.entries.single.blocks.single['props'] as Map;
+        expect(props['_resolved'], resolved);
+      }
+    });
+
+    testWidgets('puts a line the API refuses as too long back in the box, with why (sdk-19)', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state(mode: 'human'))..messageStatus.add(400);
+      final support = server.support();
+      await _open(tester, support);
+      await tester.enterText(find.byType(TextField).last, 'x' * 50);
+      await tester.runAsync(() async {
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await _settle(tester);
+      expect(find.text('x' * 50), findsOneWidget);
+      expect(find.text("That's too long to send. Shorten it and try again."), findsOneWidget);
+      expect(support.value.value.pending, isEmpty);
+      // Near the limit, how much is used.
+      await tester.enterText(find.byType(TextField).last, 'y' * 3812);
+      await tester.pump();
+      expect(find.text('3,812 / 4,000'), findsOneWidget);
       await _close(tester);
     });
 
@@ -708,6 +1002,386 @@ void main() {
       final support = _Server(entries: const []).support();
       expect(await support.refreshUnread(), 2);
       expect(support.value.value.unread, 2);
+    });
+
+    test('keeps the count and the open conversation when one read of it fails (sdk-13)', () async {
+      final server = _Server(entries: const []);
+      final support = server.support();
+      await support.refreshUnread();
+      server.unreadStatus.addAll([503, 429]);
+      expect(await support.refreshUnread(), 2);
+      expect(await support.refreshUnread(here: true), 2);
+      expect(support.value.value.unread, 2);
+      expect(support.open, isTrue);
+    });
+  });
+
+  // C6 (check-01): the reads the team asked for come with the count too, so they reach an app that is open while the
+  // conversation is not on screen; each is taken up once, whichever way it came.
+  group("the team's reads, outside the conversation's page", () {
+    const lookup = '00000000-0000-4000-8000-0000000000c1';
+    Map<String, dynamic> offer({bool ask = false, String id = lookup, String action = 'Ayşe is checking your account.', DateTime? expires}) =>
+        {'type': 'support.lookup', 'lookup_id': id, 'action': action, 'ask': ask, if (expires != null) 'expires_at': expires.toUtc().toIso8601String()};
+
+    testWidgets('runs a read the count brings while the page is closed, once, though the stream offers it again', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state(mode: 'human'))..lookups = [offer()];
+      final support = server.support();
+      await tester.runAsync(() async {
+        await support.refreshUnread(here: true);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+        await support.refreshUnread(here: true);
+        await Future<void>.delayed(const Duration(milliseconds: 20));
+      });
+      expect(server.posts.where((p) => p.path == 'lookups/$lookup/run').map((p) => p.body), [
+        {'allow': true},
+      ]);
+      await _open(tester, support);
+      server.say(offer());
+      await _settle(tester);
+      expect(server.posts.where((p) => p.path == 'lookups/$lookup/run'), hasLength(1));
+      await _close(tester);
+    });
+
+    test('offers a read again once its answer did not reach the server', () async {
+      final server = _Server(entries: const [])
+        ..lookups = [offer()]
+        ..runStatus.add(503);
+      final support = server.support();
+      for (var i = 0; i < 3; i++) {
+        await support.refreshUnread();
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(server.posts.where((p) => p.path == 'lookups/$lookup/run'), hasLength(2));
+    });
+
+    testWidgets('puts a question the count brings on the page, and takes it off when it runs out (check-11)', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state(mode: 'human'))
+        ..lookups = [offer(ask: true, action: 'Ayşe would like to check your account.', expires: DateTime.now().add(const Duration(seconds: 3)))];
+      final support = server.support();
+      await tester.runAsync(() => support.refreshUnread(here: true));
+      await _open(tester, support);
+      expect(find.text('Ayşe would like to check your account.'), findsOneWidget);
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 3200)));
+      await _settle(tester);
+      expect(find.text('Ayşe would like to check your account.'), findsNothing);
+      // Offered again by a count that is behind: it ran out, and stays off.
+      await tester.runAsync(() => support.refreshUnread(here: true));
+      await _settle(tester);
+      expect(support.value.value.asks, isEmpty);
+      await _close(tester);
+    });
+
+    test('never takes a question that already ran out, and keeps one asked in another thread off this page', () async {
+      final server = _Server(entries: const [])
+        ..currentId = _past
+        ..lookups = [
+          offer(ask: true, id: '00000000-0000-4000-8000-0000000000c2', action: 'Ayşe would like to check your orders.', expires: DateTime.now().subtract(const Duration(seconds: 1))),
+          offer(ask: true, action: 'Ayşe would like to check your account.'),
+        ];
+      final support = server.support();
+      await support.refreshUnread();
+      expect(support.value.value.asks.map((a) => a.text), ['Ayşe would like to check your account.']);
+      expect(support.value.value.asks.single.threadId, _past);
+      await support.show(_thread);
+      expect(support.value.value.asksHere, isEmpty);
+    });
+
+    test('says on the count and the stream whether the person is signed in, only when the app gave a token (add-10)', () async {
+      String? token = 'tok';
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')]);
+      final signedIn = server.support(token: () async => token);
+      await signedIn.refreshUnread(here: true);
+      token = null;
+      await signedIn.refreshUnread();
+      await server.support().refreshUnread(here: true);
+      final api = server.api(token: () async => 'tok');
+      await api.supportStream(_thread, 3).first.timeout(const Duration(milliseconds: 50), onTimeout: () => const {});
+      expect(server.queries, ['unread?here=1&signed_in=1', 'unread?signed_in=0', 'unread?here=1', 'stream?after=3&signed_in=1']);
+    });
+  });
+
+  // K1 (Tuna, 2026-11-17): switching Support off closes the conversation with a line, and the person gets the app's
+  // own channels to tap instead of a box to write in.
+  group('a conversation closed because the app switched Support off', () {
+    const closing = 'Messages here no longer reach the Grove team, so this conversation is closed. You can reach them at Customer service (+90 212 555 0101).';
+    Map<String, dynamic> closedState() => {
+          ..._state(mode: 'closed', contact: const {'state': 'none', 'required': true, 'offer': true, 'blocking': true}),
+          'state': 'resolved',
+          'closed_reason': 'support_off',
+          'contact_channels': [
+            {'kind': 'call', 'label': 'Customer service', 'value': '+90 212 555 0101'},
+            {'kind': 'url', 'label': 'Help centre', 'value': 'https://grove.example/help'},
+          ],
+        };
+    _Server closed() => _Server(
+          entries: [_entry(1, text: 'Kargom gelmedi'), {..._entry(2, kind: 'marker', author: 'system', text: closing), 'marker': 'support_off'}],
+          state: closedState(),
+        );
+
+    testWidgets("says the closing line, offers the app's own channels to tap, and has no box to write in, while Support is off", (tester) async {
+      final actions = <UIAction>[];
+      final server = closed();
+      await _open(tester, server.support(), actions: actions, supportOn: false);
+      expect(find.textContaining(closing), findsOneWidget);
+      expect(find.text('Closed'), findsOneWidget);
+      expect(find.text('Reach the Grove team'), findsOneWidget);
+      // The contact block is its own plate, never inside a second card (qa2-k1-01): nothing wraps it but the column.
+      final reach = find.byKey(const ValueKey('rd-support-reach'));
+      expect(reach, findsOneWidget);
+      expect(find.ancestor(of: reach, matching: find.byWidgetPredicate((w) => w is Container && w.decoration != null)), findsNothing);
+      // Nothing written here would reach the team: no box, no "Write to open it again", no email card, nothing to sort.
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text('Write to open it again'), findsNothing);
+      expect(find.textContaining('By mistake'), findsNothing);
+      // Nobody on the team writes in it: its stream is not asked for, again and again (qa2-k1-04).
+      expect(server.queries.where((q) => q.startsWith('stream')), isEmpty);
+      // Each button says what it is and where it goes, as the assistant's contact card does, never the app's label (qa3-k1-02).
+      expect(find.text('Call +90 212 555 0101'), findsOneWidget);
+      expect(find.text('Customer service +90 212 555 0101'), findsNothing);
+      expect(find.text('Help centre'), findsOneWidget);
+      await tester.ensureVisible(find.text('Call +90 212 555 0101'));
+      await tester.tap(find.text('Call +90 212 555 0101'));
+      await _settle(tester);
+      expect(actions.whereType<CallAction>().single.phone, '+90 212 555 0101');
+      await _close(tester);
+    });
+
+    testWidgets('reads like any sorted one once Support is on again: no channels, and writing in it opens it again and follows it (D4, qa2-k1-05)', (tester) async {
+      final server = closed();
+      server.past[_thread] = (state: server.state, entries: server.entries);
+      final support = server.support();
+      await tester.runAsync(() => support.show(_thread));
+      await _open(tester, support);
+      expect(find.text('Reach the Grove team'), findsNothing);
+      expect(find.widgetWithText(TextField, 'Write to open it again'), findsOneWidget);
+      expect(server.queries.where((q) => q.startsWith('stream')), isEmpty);
+      await tester.enterText(find.byType(TextField).last, 'Still waiting for my parcel');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      await _settle(tester);
+      expect(server.posts.where((p) => p.path.endsWith('messages')), hasLength(1));
+      expect(find.text('Closed'), findsNothing);
+      await _settle(tester);
+      expect(server.queries.where((q) => q.startsWith('stream')), isNotEmpty);
+      await _close(tester);
+    });
+
+    testWidgets('names it closed, never sorted, in Recent', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: {..._state(), 'state': 'resolved'});
+      server.threads = [
+        {'thread_id': _thread, 'state': 'resolved', 'title': 'Kargom gelmedi', 'unread': 0, 'last_message_at': DateTime.now().toUtc().toIso8601String(), 'closed_reason': 'support_off'},
+      ];
+      final controller = ConversationController(api: server.api(), actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true);
+      addTearDown(controller.dispose);
+      await tester.pumpWidget(_app(ThreadScreen(controller: controller, support: server.support(), supportTeam: 'Grove', onSupportThread: (_) {})));
+      await _settle(tester);
+      await _settle(tester);
+      expect(find.text('Closed'), findsOneWidget);
+      expect(find.textContaining('Sorted'), findsNothing);
+      expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
+    });
+
+    test('starts a new conversation from Contact us once Support is on again, never back in the closed one', () async {
+      final support = closed().support();
+      await support.load();
+      expect(support.value.value.threadId, _thread);
+      support.begin('open_support');
+      expect(support.value.value.threadId, isNull);
+      expect(await support.load(), isFalse);
+      expect(support.value.value.threadId, isNull);
+    });
+  });
+
+  // K2 (Tuna, 2026-11-17): while the team is live for the person, the email card is a request above the box.
+  group('the email card while the team is live for the person', () {
+    final asked = [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Sipariş numaranız?')];
+    const request = 'Add your email so the reply reaches you after you leave.';
+    const required = 'Where should we send the reply? Add your email to keep going.';
+    Map<String, dynamic> contact({required bool blocking}) => {'state': 'none', 'required': true, 'offer': true, 'blocking': blocking};
+
+    testWidgets('keeps the box while the team is live, with the card above it as a request and no way to put it away', (tester) async {
+      final server = _Server(entries: asked, state: _state(mode: 'human', contact: contact(blocking: false)));
+      await _open(tester, server.support());
+      expect(find.text(request), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
+      expect(find.byIcon(Icons.close_rounded), findsOneWidget); // the sheet's own close, and no ✕ on the card
+      await _close(tester);
+    });
+
+    testWidgets('holds the box for the address once the team is not live, and gives it back when the stream says they are', (tester) async {
+      final server = _Server(entries: asked, state: _state(mode: 'human', contact: contact(blocking: true)));
+      await _open(tester, server.support());
+      expect(find.text(required), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsNothing);
+      server.say({'type': 'support.state', 'state': _state(mode: 'human', contact: contact(blocking: false))});
+      await _settle(tester);
+      expect(find.text(request), findsOneWidget);
+      expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
+      await _close(tester);
+    });
+
+    testWidgets('lets a sorted conversation be written in again, and asks for the address only when the server holds the line (sdk-03)', (tester) async {
+      final server = _Server(
+        entries: [...asked, {..._entry(3, kind: 'marker', author: 'system', text: 'Sorted'), 'marker': 'resolved'}],
+        state: {..._state(mode: 'closed', contact: contact(blocking: true)), 'state': 'resolved'},
+      )..holdForContact = true;
+      await _open(tester, server.support());
+      expect(find.text(required), findsNothing);
+      expect(find.widgetWithText(TextField, 'Write to open it again'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).last, 'Bir sorum daha var');
+      await tester.runAsync(() async {
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await _settle(tester);
+      expect(find.text(required), findsOneWidget);
+      await _close(tester);
+    });
+  });
+
+  // C4 (apps-06): wherever the team's return is named, it is said on the person's own clock.
+  group("when the team is back, on the person's own clock", () {
+    String clock(DateTime at) => '${at.hour.toString().padLeft(2, '0')}:${at.minute.toString().padLeft(2, '0')}';
+    String day(DateTime at) => 'day ${at.day}';
+
+    test('says every line that names the time again on this phone, the day word included', () {
+      // Exactly a day ahead, wherever the phone is: "tomorrow" on its calendar too.
+      final now = DateTime.utc(2026, 11, 17, 12);
+      const backAt = '2026-11-18T04:00:00-08:00';
+      final mine = clock(DateTime.parse(backAt).toLocal());
+      final said = rendelSupportBack(
+        const RendelStrings(),
+        presence: 'Back tomorrow at 04:00',
+        waiting: 'Waiting for the team · back tomorrow at 04:00',
+        expectation: "The team is back tomorrow at 04:00. We'll notify you when they reply.",
+        backAt: backAt,
+        time: clock,
+        day: day,
+        now: now,
+      );
+      expect(said.presence, 'Back tomorrow at $mine');
+      expect(said.waiting, 'Waiting for the team · back tomorrow at $mine');
+      expect(said.expectation, "The team is back tomorrow at $mine. We'll notify you when they reply.");
+      expect(rendelSupportBack(RendelStrings.forLocale('tr'), presence: 'x', backAt: backAt, time: clock, day: day, now: now).presence, 'Dönüş: yarın saat $mine');
+    });
+
+    test("leaves the server's lines as they are with no time to show, or one already past", () {
+      final said = rendelSupportBack(const RendelStrings(), presence: 'Away', waiting: 'Waiting', time: clock, day: day);
+      expect(said, (presence: 'Away', waiting: 'Waiting', expectation: null));
+      final past = rendelSupportBack(const RendelStrings(), presence: 'Back today at 09:00', backAt: '2026-01-01T09:00:00+03:00', time: clock, day: day);
+      expect(past.presence, 'Back today at 09:00');
+    });
+
+    testWidgets("draws the page's head with it", (tester) async {
+      final at = DateTime.now().toUtc().add(const Duration(hours: 3));
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: {..._state(), 'team_here': false, 'presence': 'Back today at 99:99', 'back_at': at.toIso8601String()});
+      await _open(tester, server.support());
+      expect(find.textContaining('99:99'), findsNothing);
+      expect(find.textContaining(RegExp(r'^Back (today|tomorrow) at ')), findsOneWidget);
+      await _close(tester);
+    });
+  });
+
+  testWidgets('draws the same read said twice in a row once (check-08)', (tester) async {
+    const said = 'Grove QA checked your account to help.';
+    Map<String, dynamic> lookup(int seq) => {..._entry(seq, kind: 'marker', author: 'system', text: said), 'marker': 'lookup'};
+    final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), lookup(2), lookup(3), _entry(4, author: 'agent', name: 'Ayşe', text: 'Gördüm.'), lookup(5)], state: _state(mode: 'human'));
+    await _open(tester, server.support());
+    expect(find.textContaining(said), findsNWidgets(2));
+    await _close(tester);
+  });
+
+  // C8 (add-07, sdk-10): a card's yes says who the person is, with their token and what they typed; a server that
+  // runs it at the tap answers how it went, and nothing is continued after it.
+  group('a card the team sent, confirmed at the tap', () {
+    List<Map<String, dynamic>> lines({Map<String, Object> props = const {}}) => [
+          _entry(1, author: 'agent', name: 'Ayşe', blocks: [
+            {'id': 'card-1', 'type': 'confirm_card', 'fallback_text': 'Apply the code SOCKS?', 'props': {'invocation_id': '', 'summary': 'Apply the code SOCKS?', 'params_display': <Object>[], ...props}},
+          ]),
+        ];
+
+    test("sends the person and their token with a yes, and takes the server's word when it ran then and there", () async {
+      for (final (said, resolved) in [('succeeded', 'confirmed'), ('failed', 'failed')]) {
+        final server = _Server(entries: lines(), state: _state(mode: 'human'))..confirmAnswers.add((200, {'status': said}));
+        final support = server.support(user: const {'id': 'u-7', 'hmac': 'h'}, token: () async => 'tok');
+        await support.load();
+        await support.openCard(support.value.value.entries.single.id);
+        expect(await support.decideCard(_invocation, confirm: true), said);
+        final sent = server.confirms.single;
+        expect(sent.headers['x-rendel-user'] ?? sent.headers['X-Rendel-User'], 'u-7');
+        expect(sent.headers['x-rendel-user-hmac'] ?? sent.headers['X-Rendel-User-Hmac'], 'h');
+        expect(sent.headers['x-rendel-user-token'] ?? sent.headers['X-Rendel-User-Token'], 'tok');
+        expect(server.posts.any((p) => p.path == 'continue'), isFalse);
+        expect((support.value.value.entries.single.blocks.single['props'] as Map)['_resolved'], resolved);
+      }
+    });
+
+    test('sends what the person typed, and keeps the card open with why when it does not match (sdk-10)', () async {
+      final server = _Server(entries: lines(props: {'type_to_confirm': {'param': 'code', 'value': 'SOCKS'}}), state: _state(mode: 'human'))
+        ..confirmAnswers.add((422, {'error': {'code': 'typed_mismatch'}}));
+      final support = server.support();
+      await support.load();
+      await support.openCard(support.value.value.entries.single.id);
+      expect(await support.decideCard(_invocation, confirm: true, typed: 'SOCK'), 'typed_mismatch');
+      expect(server.confirms.single.body, {'decision': 'confirm', 'typed': 'SOCK'});
+      final props = support.value.value.entries.single.blocks.single['props'] as Map;
+      expect(props['_mismatch'], isTrue);
+      expect(props['_resolved'], isNull);
+    });
+  });
+
+  // K3 (Tuna, 2026-11-17): the team's page opens at once, and the thread is made by the person's first line.
+  group('the support page with no thread yet', () {
+    testWidgets('asks the team for nothing until the person writes; the first line opens the thread with its words', (tester) async {
+      final server = _Server(entries: const [])..noThread = true;
+      final support = server.support()..begin('open_support');
+      await _open(tester, support);
+      expect(server.handoffs, isEmpty);
+      expect(find.text('Grove team'), findsOneWidget);
+      // Nothing is known of the team yet, and there is nothing to sort or take back.
+      expect(find.text('Away'), findsNothing);
+      expect(find.textContaining('By mistake'), findsNothing);
+      await tester.enterText(find.byType(TextField).last, 'My order 1042 never came');
+      await tester.runAsync(() async {
+        await tester.testTextInput.receiveAction(TextInputAction.send);
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      });
+      await _settle(tester);
+      expect(server.handoffs, hasLength(1));
+      expect(server.handoffs.single, containsPair('trigger', 'open_support'));
+      expect(server.handoffs.single, containsPair('text', 'My order 1042 never came'));
+      expect(server.handoffs.single.containsKey('conversation_id'), isFalse);
+      expect(support.value.value.threadId, _thread);
+      expect(support.value.value.pending, isEmpty);
+      expect(find.text('My order 1042 never came'), findsOneWidget);
+      expect(find.text('Here'), findsOneWidget);
+      await _close(tester);
+    });
+
+    test('opens the thread from an answer rated down with its conversation, and sends a failed first line again under the same id', () async {
+      final server = _Server(entries: const [])
+        ..noThread = true
+        ..handoffStatus.add(503);
+      final support = server.support()..begin('offer', conversationId: 'c-rated');
+      expect(await support.send('That answer was wrong'), 'failed');
+      expect(support.value.value.pending.single.failed, isTrue);
+      await support.retry(support.value.value.pending.single.clientMsgId);
+      expect(server.handoffs, hasLength(2));
+      expect(server.handoffs.last, containsPair('trigger', 'offer'));
+      expect(server.handoffs.last, containsPair('conversation_id', 'c-rated'));
+      expect(server.handoffs.last['client_msg_id'], server.handoffs.first['client_msg_id']);
+      expect(support.value.value.pending, isEmpty);
+      expect(support.value.value.entries.any((e) => e.text == 'That answer was wrong'), isTrue);
+      expect(server.posts.where((p) => p.path.endsWith('messages')), isEmpty);
+    });
+
+    test('writes in the thread the phone already has, never opening a second', () async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')]);
+      final support = server.support()..begin('open_support');
+      await support.load();
+      expect(await support.send('One more thing'), 'ok');
+      expect(server.handoffs, isEmpty);
+      expect([for (final p in server.posts) if (p.path == 'messages') p.body?['text']], ['One more thing']);
     });
   });
 
@@ -750,6 +1424,100 @@ void main() {
       expect(RendelRemoteConfig.tryParse(on.toCache())!.supportTeam, 'Grove');
       final off = RendelRemoteConfig.tryParse(jsonEncode({'channel': 'published', 'config': <String, Object>{}}))!;
       expect(off.supportTeam, isNull);
+    });
+  });
+
+  // The last round before Support goes to production (support-qa2, 2026-11-18), as the web SDK does it.
+  group('the support page, after the second QA round', () {
+    test('says which build calls on every support call, the stream too (D3)', () async {
+      final seen = <String, String?>{};
+      final client = MockClient.streaming((request, body) async {
+        await body.drain<void>();
+        seen[request.url.path] = request.headers['X-Rendel-SDK'] ?? request.headers['x-rendel-sdk'];
+        return http.StreamedResponse(Stream.value(utf8.encode('{}')), 200, headers: {'content-type': 'application/json'});
+      });
+      final api = RendelApiClient(appKey: 'nc_pk_test_x', deviceId: 'device-1', config: const RendelConfig(), httpClient: client);
+      await api.support('GET', 'current?after=0');
+      await api.support('POST', 'handoff', body: {'trigger': 'open_support', 'client_msg_id': 'c1', 'text': 'Hi'});
+      await api.supportStream(_thread, 0).drain<void>();
+      expect(seen.keys, containsAll(['/v1/support/current', '/v1/support/handoff', '/v1/support/threads/$_thread/stream']));
+      expect(seen.values.toSet(), {const RendelConfig().sdkVersion});
+      expect(const RendelConfig().sdkVersion, startsWith('flutter/'));
+    });
+
+    testWidgets('says why a first line did not go when too many conversations were started from here, until it goes (D1)', (tester) async {
+      final server = _Server(entries: const [])
+        ..noThread = true
+        ..handoffStatus.add(429);
+      final support = server.support();
+      support.begin('open_support');
+      await _open(tester, support);
+      await tester.enterText(find.byType(TextField).last, 'Kargom gelmedi');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      expect(support.value.value.pending.single.reason, 'rate_limited');
+      expect(find.text(const RendelStrings().supportTooMany), findsOneWidget);
+      await tester.tap(find.text(const RendelStrings().supportUnsent));
+      await _settle(tester);
+      await _settle(tester);
+      expect(server.handoffs, hasLength(2));
+      expect(find.text(const RendelStrings().supportTooMany), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets("offers I'm sorted, never By mistake, once a teammate joined or read their account (qa2-sdk-05)", (tester) async {
+      final joined = {..._entry(2, kind: 'marker', author: 'system', text: 'Ayşe from Grove is helping you.'), 'marker': 'joined'};
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), joined], state: _state(mode: 'human'));
+      await _open(tester, server.support());
+      expect(find.text("I'm sorted"), findsOneWidget);
+      expect(find.textContaining('By mistake'), findsNothing);
+      await _close(tester);
+      final lookup = RendelSupportEntry.tryParse({..._entry(2, kind: 'marker', author: 'system', text: 'Ayşe checked your account to help.'), 'marker': 'lookup'})!;
+      expect(rendelSupportTeamStarted([RendelSupportEntry.tryParse(_entry(1, text: 'Hi'))!]), isFalse);
+      expect(rendelSupportTeamStarted([lookup]), isTrue);
+    });
+
+    testWidgets('lets go of the too-long note once the box is emptied (qa2-sdk-02)', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state(mode: 'human'))..messageStatus.add(400);
+      await _open(tester, server.support());
+      await tester.enterText(find.byType(TextField).last, 'x' * 50);
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      expect(find.text(const RendelStrings().supportTooLong), findsOneWidget);
+      await tester.enterText(find.byType(TextField).last, '');
+      await tester.pump();
+      expect(find.text(const RendelStrings().supportTooLong), findsNothing);
+      await _close(tester);
+    });
+
+    testWidgets('asks to try again under a card only when no answer came, never under one that ran and failed (qa2-sdk-03)', (tester) async {
+      for (final (answer, again) in [((200, const <String, Object>{'status': 'failed'}), false), ((503, const <String, Object>{'error': 'down'}), true)]) {
+        final server = _Server(
+          entries: [
+            _entry(1, author: 'agent', name: 'Ayşe', blocks: [
+              {'id': 'card-1', 'type': 'confirm_card', 'fallback_text': 'Send order M-2020 again', 'props': {'invocation_id': '', 'summary': 'Send order M-2020 again', 'params_display': <Object>[]}},
+            ]),
+          ],
+          state: _state(mode: 'human'),
+        )..confirmAnswers.add(answer);
+        await _open(tester, server.support());
+        await _settle(tester);
+        await tester.ensureVisible(find.text('Confirm').last);
+        await tester.tap(find.text('Confirm').last);
+        for (var i = 0; i < 4; i++) {
+          await _settle(tester);
+        }
+        expect(find.text(const RendelStrings().turnFailed), again ? findsOneWidget : findsNothing);
+        await _close(tester);
+      }
+    });
+
+    testWidgets('opens nothing new while Support is off: the page has no box and nothing to sort for a conversation of theirs (D4)', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Bakıyorum.')], state: {..._state(mode: 'human'), 'state': 'resolved'});
+      await _open(tester, server.support(), supportOn: false);
+      expect(find.byType(TextField), findsNothing);
+      expect(find.text("I'm sorted"), findsNothing);
+      expect(server.handoffs, isEmpty);
     });
   });
 }

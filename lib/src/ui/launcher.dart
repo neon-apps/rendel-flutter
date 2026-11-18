@@ -87,8 +87,6 @@ class _RendelLauncherState extends State<RendelLauncher> {
   /// The team's reply while Rendel is closed, across the top.
   OverlayEntry? _reply;
 
-  /// Every half minute while this is on screen: a reply from the team comes in as a banner.
-  Timer? _supportBeat;
   StreamSubscription<RendelEvent>? _events;
 
   /// Whether the popup and the banner were placed for the dragged launcher.
@@ -108,7 +106,6 @@ class _RendelLauncherState extends State<RendelLauncher> {
     Rendel.configRevision.addListener(_schedule);
     Rendel.supportReply.addListener(_schedule);
     _events = Rendel.events.listen((_) => _schedule());
-    _supportBeat = Timer.periodic(const Duration(seconds: 30), (_) => unawaited(Rendel.supportTick()));
     _schedule();
   }
 
@@ -132,7 +129,6 @@ class _RendelLauncherState extends State<RendelLauncher> {
     Rendel.configRevision.removeListener(_schedule);
     Rendel.supportReply.removeListener(_schedule);
     _events?.cancel();
-    _supportBeat?.cancel();
     _popup?.remove();
     _popup = null;
     _banner?.remove();

@@ -248,13 +248,18 @@ class Rendel {
   static Timer? _replyGone;
   static DateTime? _supportTicked;
 
-  /// Every half minute while [RendelLauncher] is on screen, a conversation
-  /// is open and the app is in front of the person: the team's reply is told
-  /// in the app, a banner while Rendel is closed, and the server holds its
-  /// push (`?here=1`).
+  /// The half-minute beat of [supportTick], kept by the SDK while the app has
+  /// Support on, whether or not the app shows a [RendelLauncher].
+  static Timer? _supportBeat;
+
+  /// Every half minute while the app has Support on and is in front of the
+  /// person: the team's reply is told in the app, a banner while Rendel is
+  /// closed, and the server holds its push (`?here=1`). On a fixed beat, not
+  /// only while a conversation is known to be open: a read that failed would
+  /// otherwise stop every later one.
   static Future<void> supportTick() async {
     final support = _support;
-    if (support == null || _supportTeam == null || !support.open) return;
+    if (support == null || _supportTeam == null) return;
     if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) return;
     final at = _supportTicked;
     if (at != null && DateTime.now().difference(at) < const Duration(seconds: 25)) return;
@@ -280,13 +285,65 @@ class Rendel {
   /// The team's name while Support is on, from the app's config.
   static String? _supportTeam;
 
+  /// The team's name, kept on this phone once it has had a conversation with them (D4): with Support off, that
+  /// conversation stays reachable and named, so the person reads why it closed and how to reach the team.
+  static String? _keptTeam;
+  static RendelConfigStore? _keptTeamStore;
+  static RendelConfigStore get _keptTeams => _keptTeamStore ??= _defaultStore('rendel_support_team');
+
+  /// A store that fails or hangs costs only the kept name: the conversation then waits for Support to be on.
+  static Future<void> _loadKeptTeam() async {
+    try {
+      final team = await _keptTeams.read().timeout(RendelDeviceId.storeTimeout);
+      if (team != null && team.isNotEmpty) _keptTeam ??= team;
+    } catch (_) {
+      // No storage: kept for as long as the app runs.
+    }
+  }
+
+  /// Told by the session whenever it reads a conversation of this phone's with the team.
+  static void _keepTeam() {
+    final team = _supportTeam;
+    if (team == null || _keptTeam == team) return;
+    _keptTeam = team;
+    unawaited(_keptTeams.write(team).catchError((Object _) {}));
+  }
+
+  /// The person's own conversations with the team can be reached: Support is on, or it is off and this phone has
+  /// had one (D4). Nothing new starts while it is off.
+  static String? get _reachTeam => _supportTeam ?? _keptTeam;
+
   /// This person's thread with the team, made with the client.
   static RendelSupport? _support;
+
+  /// The config is being read again because the server said Support is off: the team's page draws it as off meanwhile.
+  static bool _supportRecheck = false;
+
+  /// The conversation a read since its close found Support on for (D4): not read again for it.
+  static String? _supportCheckedFor;
+
+  /// What the team's page reads for whether Support is on: off while the config is read again (qa3-k1-01).
+  static bool _supportOnForPage() => supportOn && !_supportRecheck;
+
+  /// The server said Support is off (qa3-k1-01): a conversation its switch closed, or something refused with
+  /// `support_unavailable`. A page opened while it was on reads the config again, so it draws the app's channels and
+  /// no box. A conversation closed before Support came back on reads it once ([threadId]); a refusal always does.
+  static void _supportOffSeen(String? threadId) {
+    if (!supportOn || _supportRecheck || (threadId != null && threadId == _supportCheckedFor)) return;
+    _supportRecheck = true;
+    unawaited(_refreshConfig().whenComplete(() {
+      _supportRecheck = false;
+      if (supportOn) _supportCheckedFor = threadId;
+      _support?.redraw();
+    }));
+  }
 
   static RendelSupport _supportOf(RendelApiClient api) {
     final made = _support;
     if (made != null) return made;
-    final support = RendelSupport(api, user: () => _user, locale: () => resolveLocale(_config.locale));
+    final support = RendelSupport(api, user: () => _user, locale: () => resolveLocale(_config.locale))
+      ..onKnown = _keepTeam
+      ..onOff = _supportOffSeen;
     var open = false;
     support.value.addListener(() {
       supportUnread.value = support.value.value.unread;
@@ -464,6 +521,8 @@ class Rendel {
     // and assigned after, so an `identify` that lands during the read wins.
     final recalled = await _recallUser();
     _user ??= recalled;
+    // The team this phone has had a conversation with, for while Support is off (D4): read meanwhile, never waited on.
+    unawaited(_loadKeptTeam());
 
     if (!config.remoteConfig) {
       unawaited(_checkFollowup());
@@ -831,9 +890,10 @@ class Rendel {
           voice: _config.readAloud ? _voice : null,
           followups: RendelFollowups.instance.cards,
           onFollowupOpen: (id) => unawaited(openFollowup(context, id: id)),
-          // An open conversation with the team waits at the top, for a host whose own button opens Rendel.
-          support: _supportTeam != null ? _supportOf(api) : null,
-          supportTeam: _supportTeam,
+          // An open conversation with the team waits at the top, for a host whose own button opens Rendel. With
+          // Support off, the person's own conversations stay in Recent, to read why they closed (D4).
+          support: _reachTeam != null ? _supportOf(api) : null,
+          supportTeam: _reachTeam,
           onSupportOpen: () => unawaited(openSupport(presentation.origin)),
           onSupportThread: (id) => unawaited(openSupport(presentation.origin, thread: id)),
         ),
@@ -932,14 +992,28 @@ class Rendel {
   }
 
   /// Opens the page where the person writes to your team (human support),
-  /// for your app's own "Contact us": the thread they have, or a new one.
-  /// Works while the assistant is paused too. False, with nothing shown,
-  /// when Support is off for this app or the team could not be reached.
-  static Future<bool> openSupport(BuildContext context, {String? thread}) async {
+  /// for your app's own "Contact us": the thread they have, or, with none to
+  /// go back to, a page whose first line starts one, so nobody who only looks
+  /// leaves an empty conversation in your team's queue. Works while the
+  /// assistant is paused too. While Support is off for this app, it opens
+  /// only the conversation the person already has, to read why it closed and
+  /// how to reach you, and starts none. False, with nothing shown, when
+  /// Support is off and there is none, or the thread asked for by its id
+  /// could not be read.
+  static Future<bool> openSupport(BuildContext context, {String? thread}) => _openSupport(context, thread: thread);
+
+  /// [openSupport], and the offer under an answer rated down (`trigger: 'offer'`),
+  /// whose first line opens the thread with that answer's conversation.
+  static Future<bool> _openSupport(BuildContext context, {String? thread, String trigger = 'open_support', String? conversationId}) async {
     final api = await _whenClient();
-    final team = _supportTeam;
+    final on = _supportTeam != null;
+    // Tapped before the launch's read of the kept team came back.
+    if (!on && _keptTeam == null) await _loadKeptTeam();
+    // With Support off, only a conversation this phone already had, and never the offer, which would start one (D4).
+    final team = on || trigger == 'open_support' ? _reachTeam : null;
+    void off() => RendelLog.warn('support_off', 'openSupport() was called but Support is off for this app');
     if (api == null || team == null) {
-      RendelLog.warn('support_off', 'openSupport() was called but Support is off for this app');
+      off();
       return false;
     }
     final support = _supportOf(api);
@@ -947,12 +1021,12 @@ class Rendel {
     // One of the person's conversations by its id (Recent, a push): a sorted one opens as it was.
     if (thread != null) {
       if (!await support.show(thread)) return false;
-    } else if (!await support.load()) {
-      final done = await support.handoff('open_support');
-      if (done != 'ok') {
-        RendelLog.warn('support_handoff_failed', 'the team could not be reached ($done)');
-        return false;
-      }
+    } else if (on) {
+      // The page opens at once and reads the thread the phone has; with none, the first line opens one (K3).
+      support.begin(trigger, conversationId: conversationId);
+    } else if (!await support.load() || support.value.value.threadId == null) {
+      off();
+      return false;
     }
     final camera = _config.onPickAttachment == null && await RendelPlatform.cameraReady();
     if (!context.mounted) return false;
@@ -980,12 +1054,14 @@ class Rendel {
             ],
       theme: themeOf(context),
       strings: strings,
+      supportOn: _supportOnForPage,
     );
     // ✕ closes all of Rendel, as on the web.
     if (exit == SupportExit.closed) _presentation?.dismiss();
     // A thread opened by its id: the phone's current one is the session's again.
     await support.restore();
-    unawaited(support.refreshUnread());
+    // The count is read while Support is on; off, the server answers nothing for it.
+    if (supportOn) unawaited(support.refreshUnread());
     // The way back is to Rendel's page, as on the web: opened now when the team's page came first (the launcher, a banner, a push, the app's "Contact us").
     if (exit == SupportExit.back && _presentation == null && isEnabled && context.mounted) unawaited(open(context));
     return true;
@@ -995,11 +1071,19 @@ class Rendel {
   static void _onSupportHandoff(String threadId) {
     final presentation = _presentation;
     if (presentation == null) return;
+    // A new thread after a sorted one: the page starts from nothing, never under the last one's lines.
+    _support?.handedTo(threadId);
     unawaited(openSupport(presentation.origin));
   }
 
-  /// The team offered under an answer rated down, taken: the support page opens.
-  static void _onOpenTeam() => _onSupportHandoff('');
+  /// The team offered under an answer rated down, taken: the support page
+  /// opens, and the person's first line opens the thread with this
+  /// conversation, so the team sees the answer that failed.
+  static void _onOpenTeam() {
+    final presentation = _presentation;
+    if (presentation == null) return;
+    unawaited(_openSupport(presentation.origin, trigger: 'offer', conversationId: _controller?.conversationId));
+  }
 
   /// Call on logout: clears the thread and the user. The next turn from this
   /// phone is anonymous until the next [identify], and the server is told, so
@@ -1356,6 +1440,7 @@ class Rendel {
     _identity = null;
     // The thread with the team was this person's.
     _support?.reset();
+    _supportCheckedFor = null;
     supportUnread.value = 0;
     // And what waited for them.
     _answerUnseen = false;
@@ -1428,7 +1513,13 @@ class Rendel {
     _configEtag = null;
     // Support is off until a config says otherwise, and the thread was made with the last client.
     _supportTeam = null;
+    _keptTeam = null;
     _support = null;
+    _supportRecheck = false;
+    _supportCheckedFor = null;
+    _supportBeat?.cancel();
+    _supportBeat = null;
+    _supportTicked = null;
     rendelPublishedLanguages = const [];
     _store = RendelMemoryConfigStore();
     _theme = RendelTheme.paper();
@@ -1455,6 +1546,7 @@ class Rendel {
     // A relaunch keeps what the device kept, as for the signed-in user.
     if (!relaunch) _analyticsStore = null;
     if (!relaunch) _conversationStore = null;
+    if (!relaunch) _keptTeamStore = null;
     _restoreAsked = false;
     restoreWithin = const Duration(hours: 1);
   }
@@ -1587,8 +1679,11 @@ class Rendel {
     _supportTeam = remote.supportTeam;
     if (_supportTeam != null) {
       if (_api case final api?) unawaited(_supportOf(api).refreshUnread());
+      _supportBeat ??= Timer.periodic(const Duration(seconds: 30), (_) => unawaited(supportTick()));
     } else {
       supportUnread.value = 0;
+      _supportBeat?.cancel();
+      _supportBeat = null;
     }
     // The languages the persona answers in, which the SDK's own words follow
     // the phone into (`resolveSpokenLocale`): the launcher redraws in them.

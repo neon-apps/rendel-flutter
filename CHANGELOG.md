@@ -5,6 +5,43 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.97.0
+
+**Changed**
+
+- `Rendel.openSupport(context)` opens the team's page at once and no longer
+  waits on the network. The conversation is created by the person's first
+  message, so opening and leaving puts nothing in the team's queue.
+- A conversation closed because the app switched Support off shows the
+  closing line and the app's contact channels as rows to tap, with no
+  message box.
+- While the team is answering (a reply in the last half hour, or the person
+  on the page), someone without notifications keeps writing and the email
+  request sits above the box. Once they leave or the team is away, the
+  email is asked for first.
+- The time the team is back shows on the person's clock, in their language,
+  on the page and in Recent.
+- A read the team asks for reaches the person from the unread check, not
+  only while the support page is open; an ask-first read goes away when it
+  runs out, and the buttons say Allow and Not now.
+- A support card runs when the person taps yes, sends what they typed for a
+  card that asks for it, and keeps the card open when the words don't match.
+- While Support is off, `openSupport` opens only the person's own
+  conversation, to read why it closed and how to reach the team; it starts
+  none.
+- When too many conversations were started from one place, the page says so
+  over the box and keeps the line to send later.
+- Every Support request carries `X-Rendel-SDK`, and "By mistake? Back to the
+  assistant" tells the server, so that conversation leaves Recent.
+- A support page that is open when the app switches Support off shows the
+  closing line and the channels at once; a line sent then says it no longer
+  reaches the team. The channel buttons read "Call …" and "Email …".
+- A support card whose action failed reads "Didn't go through" every time the
+  conversation is opened again, never "Confirmed".
+- A failed unread check no longer stops the checks that follow; a reply the
+  person writes is limited to 4,000 characters, and a line that didn't send
+  keeps its words.
+
 ## 0.96.1
 
 **Changed**

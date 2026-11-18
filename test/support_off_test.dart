@@ -53,10 +53,53 @@ final _handedOff = [
   {'type': 'turn.end', 'status': 'completed', 'pending': <String>[]},
 ];
 
-class _Server {
-  _Server({required this.supportOn});
+/// The same thread once the app switched Support off: closed, with its line and the app's channels (K1).
+final _closedByOff = {
+  ..._threadBody,
+  'state': {
+    ...(_threadBody['state'] as Map<String, Object?>),
+    'mode': 'closed',
+    'state': 'resolved',
+    'closed_reason': 'support_off',
+    'contact_channels': [
+      {'kind': 'email', 'label': 'Email us', 'value': 'help@grove.example'},
+    ],
+  },
+  'entries': [
+    ...(_threadBody['entries'] as List<Object?>),
+    {
+      'id': '00000000-0000-4000-8000-000000000012',
+      'seq': 2,
+      'kind': 'marker',
+      'marker': 'support_off',
+      'author': {'kind': 'system'},
+      'text': 'Messages here no longer reach the Grove team, so this conversation is closed.',
+      'blocks': <Object>[],
+      'attachments': <Object>[],
+      'created_at': '2026-11-01T10:05:00Z',
+    },
+  ],
+};
 
-  final bool supportOn;
+class _Server {
+  _Server({required this.supportOn, this.current});
+
+  /// Whether the config says Support is on; switched by a test while the page is up.
+  bool supportOn;
+
+  /// The phone's thread, as the server reads it.
+  Map<String, Object?>? current;
+
+  /// Lines are refused with 409 support_unavailable: Support was switched off since the page opened.
+  bool refuseLines = false;
+
+  /// The open team stream, to have it say something.
+  StreamController<List<int>>? stream;
+
+  void say(List<Map<String, Object?>> events) => stream!.add(utf8.encode([for (final e in events) 'data: ${jsonEncode(e)}\n\n'].join()));
+
+  /// What each resolve asked, by its body.
+  final List<Object?> resolves = [];
   final List<String> paths = [];
 
   /// Each turn's declared capabilities.
@@ -108,9 +151,16 @@ class _Server {
       return http.StreamedResponse(Stream.value(utf8.encode(sse)), 200, headers: {'content-type': 'text/event-stream'});
     }
     if (path == '/v1/support/unread') return json({'unread': 2});
-    if (path == '/v1/support/current' || path == '/v1/support/handoff') return json(_threadBody);
-    // The team's stream, each time the page opens: held open, quiet.
-    if (path.endsWith('/stream')) return http.StreamedResponse(StreamController<List<int>>().stream, 200);
+    if (path == '/v1/support/current' || path == '/v1/support/handoff') return json(current ?? _threadBody);
+    if (path.endsWith('/messages') && refuseLines) {
+      return http.StreamedResponse(Stream.value(utf8.encode(jsonEncode({'error': {'code': 'support_unavailable'}}))), 409, headers: {'content-type': 'application/json'});
+    }
+    if (path.endsWith('/resolve')) {
+      resolves.add(jsonDecode(text));
+      return http.StreamedResponse(const Stream.empty(), 204);
+    }
+    // The team's stream, each time the page opens: held open, quiet until the test has it say something.
+    if (path.endsWith('/stream')) return http.StreamedResponse((stream = StreamController<List<int>>()).stream, 200);
     return json({'ok': true});
   });
 }
@@ -216,5 +266,137 @@ void main() {
     expect(server.supportCalls.any((p) => p.endsWith('/stream')), isTrue);
     expect(seen, (sheet: true, badge: true));
     expect(server.declared, everyElement(contains('support')));
+  });
+
+  testWidgets("reads the team's count on its beat with no launcher on screen and nothing known to be open (sdk-m1)", (tester) async {
+    final server = _Server(supportOn: true);
+    await tester.runAsync(() async {
+      await Rendel.init(appKey: _key, config: RendelConfig(httpClient: server.client));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    int reads() => server.supportCalls.where((p) => p == '/v1/support/unread').length;
+    final before = reads();
+    // The server says nothing is open; the beat reads the count all the same.
+    await tester.runAsync(Rendel.supportTick);
+    expect(reads(), before + 1);
+    expect(Rendel.supportUnread.value, 2);
+  });
+
+  testWidgets('keeps the conversation this phone already had once Support is switched off: Contact us opens it, and nothing new starts (D4)', (tester) async {
+    late BuildContext context;
+    Future<void> mount() async {
+      await tester.pumpWidget(MaterialApp(
+        home: Builder(builder: (c) {
+          context = c;
+          return const Scaffold(body: SizedBox());
+        }),
+      ));
+      await _settle(tester);
+    }
+
+    // A first launch with Support on: the person reached the team.
+    final first = _Server(supportOn: true);
+    await tester.runAsync(() async {
+      await Rendel.init(appKey: _key, config: RendelConfig(httpClient: first.client));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await mount();
+    unawaited(Rendel.openSupport(context));
+    await _settle(tester);
+    expect(find.byType(RendelSupportSheet), findsOneWidget);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _settle(tester);
+    // Support is switched off, which closes the conversation, and the app starts again, keeping what the phone kept.
+    Rendel.resetForTest(relaunch: true);
+    final second = _Server(supportOn: false, current: _closedByOff);
+    await tester.runAsync(() async {
+      await Rendel.init(appKey: _key, config: RendelConfig(httpClient: second.client));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    await mount();
+    unawaited(Rendel.openSupport(context));
+    await _settle(tester);
+    await _settle(tester);
+    expect(find.byType(RendelSupportSheet), findsOneWidget);
+    expect(find.textContaining('no longer reach the Grove team'), findsOneWidget);
+    expect(find.text('Reach the Grove team'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    // The conversation is read; nothing is opened, counted or followed.
+    expect(second.supportCalls, contains('/v1/support/current'));
+    expect(second.supportCalls.where((p) => p == '/v1/support/handoff' || p == '/v1/support/unread' || p.endsWith('/stream')), isEmpty);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _settle(tester);
+  });
+
+  /// A launch with Support on, the team's page open on the conversation.
+  Future<(_Server, BuildContext)> openOnTeamPage(WidgetTester tester) async {
+    final server = _Server(supportOn: true);
+    await tester.runAsync(() async {
+      await Rendel.init(appKey: _key, config: RendelConfig(httpClient: server.client));
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    });
+    late BuildContext context;
+    await tester.pumpWidget(MaterialApp(
+      home: Builder(builder: (c) {
+        context = c;
+        return const Scaffold(body: SizedBox());
+      }),
+    ));
+    await _settle(tester);
+    unawaited(Rendel.openSupport(context));
+    await _settle(tester);
+    await _settle(tester);
+    expect(find.byType(TextField), findsOneWidget);
+    return (server, context);
+  }
+
+  int configReads(_Server server) => server.paths.where((p) => p == '/v1/apps/config').length;
+
+  testWidgets("draws the closing line, the app's channels and no box or chip when Support is switched off with the team page open (qa3-k1-01)", (tester) async {
+    final (server, context) = await openOnTeamPage(tester);
+    final before = configReads(server);
+    // Switched off while the page is up: the stream says the conversation closed, and the config now says off.
+    server
+      ..supportOn = false
+      ..current = _closedByOff;
+    server.say([
+      {'type': 'support.entry', 'entry': (_closedByOff['entries'] as List).last},
+      {'type': 'support.state', 'state': _closedByOff['state']},
+    ]);
+    await _settle(tester);
+    await _settle(tester);
+    expect(configReads(server), before + 1);
+    expect(Rendel.supportOn, isFalse);
+    expect(find.textContaining('no longer reach the Grove team'), findsOneWidget);
+    expect(find.text('Reach the Grove team'), findsOneWidget);
+    expect(find.text('Email help@grove.example'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.text("I'm sorted"), findsNothing);
+    expect(find.textContaining('By mistake'), findsNothing);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _settle(tester);
+  });
+
+  testWidgets('says why a line did not go when the server refuses it because Support is off, and redraws the page as off (qa3-k1-01)', (tester) async {
+    final (server, context) = await openOnTeamPage(tester);
+    // Switched off since the page opened, and nothing on the stream said so.
+    server
+      ..supportOn = false
+      ..current = _closedByOff
+      ..refuseLines = true;
+    await tester.enterText(find.byType(TextField).last, 'Are you there?');
+    await tester.runAsync(() async {
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    });
+    await _settle(tester);
+    await _settle(tester);
+    expect(find.text('Not sent. Messages here no longer reach the team.'), findsOneWidget);
+    expect(find.text('Not sent. Tap to try again.'), findsNothing);
+    expect(find.text('Reach the Grove team'), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    await _settle(tester);
   });
 }
