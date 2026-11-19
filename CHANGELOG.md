@@ -5,10 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
-## Unreleased
+## 0.99.0
 
 **Added**
 
+- **A picture of the app's own launcher, for Appearance.** A launcher drawn
+  with `RendelLauncher(builder:)` is pictured once it has settled (1.5 s
+  after it is first drawn), and the PNG and where it sits, in logical points,
+  go to `POST /v1/apps/launcher-snapshot`, once a run and only when it changed
+  since this device last sent it. The console's **Appearance › Launcher**
+  then shows your button where your app draws it, instead of Rendel's.
+  Nothing changes on screen.
 - **A note from the app's team, as the assistant opens.** When the app's team
   (or Rendel's staff) blocks or warns a person in the console, Rendel asks
   `GET /v1/standing` as it opens. A block shows the team's words (or a calm

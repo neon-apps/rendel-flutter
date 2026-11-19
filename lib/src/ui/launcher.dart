@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show RenderRepaintBoundary;
 import 'package:path_parsing/path_parsing.dart';
 
 import '../core/batteries.dart' show RendelPreferencesStore;
@@ -403,7 +405,7 @@ Widget _marked(RendelTheme theme, String word, VoidCallback onTap, {required int
           builder: (context) => RendelPressable(
             semanticLabel: _spoken(word, unread, waiting),
             onTap: onTap,
-            child: builder(context, RendelLauncherStatus(label: word, unread: unread, waiting: waiting)),
+            child: _Pictured(child: builder(context, RendelLauncherStatus(label: word, unread: unread, waiting: waiting))),
           ),
         );
   if (unread <= 0 && waiting == RendelWaiting.none) return drawn;
@@ -972,4 +974,56 @@ class _Place extends SingleChildLayoutDelegate {
 
   @override
   bool shouldRelayout(_Place old) => true;
+}
+
+/// The app's own launcher ([RendelLauncher.builder]) as it is drawn, sent
+/// once it has settled so the console's Appearance shows this button rather
+/// than Rendel's ([Rendel.launcherPictured]). Changes nothing on screen.
+class _Pictured extends StatefulWidget {
+  const _Pictured({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_Pictured> createState() => _PicturedState();
+}
+
+class _PicturedState extends State<_Pictured> {
+  final GlobalKey _boundary = GlobalKey();
+  Timer? _wait;
+
+  /// Long enough for an entrance to finish and a picture in it to load.
+  static const Duration settle = Duration(milliseconds: 1500);
+
+  @override
+  void initState() {
+    super.initState();
+    // Taken at the end of a frame, so what is pictured has been painted.
+    _wait = Timer(settle, () => WidgetsBinding.instance.endOfFrame.then((_) => _take()));
+  }
+
+  Future<void> _take() async {
+    final boundary = _boundary.currentContext?.findRenderObject();
+    if (!mounted || boundary is! RenderRepaintBoundary || !boundary.attached || !boundary.hasSize) return;
+    final screen = MediaQuery.sizeOf(context);
+    final rect = boundary.localToGlobal(Offset.zero) & boundary.size;
+    try {
+      final image = await boundary.toImage(pixelRatio: 3);
+      final data = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (data == null) return;
+      await Rendel.launcherPictured(data.buffer.asUint8List(), rect, screen);
+    } catch (_) {
+      // A picture the engine would not take: Appearance keeps saying the app draws its own.
+    }
+  }
+
+  @override
+  void dispose() {
+    _wait?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(key: _boundary, child: widget.child);
 }

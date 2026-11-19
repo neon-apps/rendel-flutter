@@ -367,6 +367,60 @@ void main() {
       expect(sent, [null, 'own']);
     });
 
+    testWidgets("sends a picture of the app's own launcher and where it sits, once a run", (tester) async {
+      final pictures = <http.Request>[];
+      Future<void> run() => tester.runAsync(() => Rendel.init(
+            appKey: _key,
+            config: RendelConfig(
+              remoteConfig: false,
+              httpClient: MockClient((request) async {
+                if (request.url.path.endsWith('/v1/apps/launcher-snapshot')) pictures.add(request);
+                return http.Response('', request.url.path.endsWith('/v1/apps/launcher-snapshot') ? 201 : 200);
+              }),
+            ),
+          ));
+      Widget app() => MaterialApp(
+            home: Scaffold(
+              body: Stack(children: [
+                Positioned(
+                  right: 16,
+                  bottom: 100,
+                  child: RendelLauncher(
+                    builder: (context, status) => Container(
+                      width: 56,
+                      height: 56,
+                      decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.pink),
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          );
+      Future<void> settle() async {
+        await tester.pump(const Duration(milliseconds: 1600));
+        for (var i = 0; i < 5; i++) {
+          await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+          await tester.pump();
+        }
+      }
+
+      await run();
+      await tester.pumpWidget(app());
+      await settle();
+      expect(pictures, hasLength(1));
+      final screen = tester.view.physicalSize / tester.view.devicePixelRatio;
+      final rect = pictures.single.headers['X-Rendel-Launcher-Rect']!.split(',').map(double.parse).toList();
+      expect(rect, [screen.width - 16 - 56, screen.height - 100 - 56, 56, 56, screen.width, screen.height]);
+      expect(pictures.single.headers['Content-Type'], 'image/png');
+      expect(pictures.single.bodyBytes.take(4), [0x89, 0x50, 0x4e, 0x47]);
+
+      // Drawn again in the same run: once a run is enough.
+      await tester.pumpWidget(const SizedBox());
+      await tester.pumpWidget(app());
+      await settle();
+      expect(pictures, hasLength(1));
+    });
+
     testWidgets('each icon is drawn, and one this build lacks is the sparkle', (tester) async {
       for (final id in ['heart', 'unicorn']) {
         await _start(tester, RendelConfig(launcherIcon: id));

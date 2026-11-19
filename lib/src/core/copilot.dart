@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show ValueListenable, defaultTargetPlatform, listEquals;
@@ -1501,6 +1502,7 @@ class Rendel {
     if (!relaunch) _manifestSentStore = null;
     _launcherKind = null;
     _launcherThisRun = null;
+    _launcherPictured = false;
     // A test that ends with the sheet up never pops it, so the count stayed
     // above zero, `_endSession` kept the controller, and the next test's
     // thread talked through the previous test's client. Dropped rather than
@@ -1788,6 +1790,45 @@ class Rendel {
     _launcherKind = kind;
     unawaited(_defaultStore('rendel_launcher_kind_$key').write(kind).catchError((Object _) {}));
     unawaited(_refreshConfig());
+  }
+
+  /// Whether this run has sent, or tried to send, its own launcher's picture.
+  static bool _launcherPictured = false;
+
+  /// Called by [RendelLauncher] once a button of the app's own
+  /// ([RendelLauncher.builder]) has settled on screen: its picture and where
+  /// it sits, in logical points. Appearance shows it in place of Rendel's
+  /// button, which the app does not draw. Sent once a run, and only when it
+  /// changed since this device last sent it. You need not call it.
+  static Future<void> launcherPictured(Uint8List png, Rect rect, Size screen) async {
+    if (_launcherPictured) return;
+    _launcherPictured = true;
+    final api = _api;
+    final key = _appKey;
+    if (api == null || key == null) return;
+    final sign = _pictureSign(png, rect, screen);
+    final store = _defaultStore('rendel_launcher_snapshot_$key');
+    try {
+      if (await store.read().timeout(RendelDeviceId.storeTimeout) == sign) return;
+    } catch (_) {
+      // Unknown: sent again, and the server keeps one picture.
+    }
+    if (!await api.sendLauncherSnapshot(png, rect, screen)) return;
+    try {
+      await store.write(sign);
+    } catch (_) {
+      // Sent again next launch; the server keeps one picture.
+    }
+  }
+
+  /// A short sign of a picture and its place, to tell a changed one from the last.
+  static String _pictureSign(Uint8List png, Rect rect, Size screen) {
+    var hash = 0x811c9dc5;
+    for (final byte in png) {
+      hash = ((hash ^ byte) * 0x01000193) & 0xffffffff;
+    }
+    final place = [rect.left, rect.top, rect.width, rect.height, screen.width, screen.height].map((n) => n.toStringAsFixed(1)).join(',');
+    return '${png.length}:$hash:$place';
   }
 
   /// [_launcherKind] as the last run left it, unless this one has drawn already.

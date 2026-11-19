@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
+import 'dart:ui' show Rect, Size;
 import '../core/locale.dart';
 
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb;
@@ -275,6 +276,32 @@ class RendelApiClient {
       // Not the JSON envelope.
     }
     throw RendelUploadFailure(message);
+  }
+
+  /// POST /v1/apps/launcher-snapshot → a picture of the launcher the app
+  /// draws itself and where it sits, in logical points, for Appearance to
+  /// show in place of Rendel's own button. True once the server has it, or
+  /// already had it.
+  Future<bool> sendLauncherSnapshot(Uint8List png, Rect rect, Size screen) async {
+    String n(double value) => value.toStringAsFixed(1);
+    try {
+      final response = await _http
+          .post(
+            Uri.parse('${config.apiBaseUrl}/v1/apps/launcher-snapshot'),
+            headers: {
+              'Content-Type': 'image/png',
+              'X-Rendel-Key': appKey,
+              'X-Rendel-Device': deviceId,
+              'X-Rendel-Launcher-Rect': [rect.left, rect.top, rect.width, rect.height, screen.width, screen.height].map(n).join(','),
+            },
+            body: png,
+          )
+          .timeout(config.requestTimeout);
+      return response.statusCode == 201 || response.statusCode == 204;
+    } catch (_) {
+      // Tried again on a later launch.
+      return false;
+    }
   }
 
   Future<void> syncManifest(Map<String, dynamic> manifest, String sdkVersion) async {
