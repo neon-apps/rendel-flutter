@@ -15,7 +15,7 @@ import '../core/read_aloud.dart';
 import '../core/config.dart'
     show RendelAttachIcon, RendelAttachment, RendelAttachSource, RendelSendIcon, RendelVoiceIcon;
 import '../engine/conversation_controller.dart';
-import '../protocol/protocol.dart' show NavigateAction, OpenUrlAction, ReplyAction, UIAction;
+import '../protocol/protocol.dart' show NavigateAction, OpenUrlAction, ReplyAction, UIAction, WireBlock;
 import '../transport/api_client.dart' show RendelUploadFailure;
 import 'renderer/blocks.dart'
     show
@@ -27,6 +27,7 @@ import 'renderer/blocks.dart'
         RendelPulse,
         RendelSwap,
         balancedWidth,
+        buildNotice,
         readsFlatOnPage;
 import 'renderer/registry.dart';
 import 'memory_chips.dart';
@@ -1028,6 +1029,20 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                                   ),
                                 ),
                               ),
+                            ),
+                          // A note the app's team left for this person (0345):
+                          // the notice block a turn's limit draws, over the
+                          // composer whatever is on the page, and a ✕ on a warning.
+                          if (controller.standing case final standing?)
+                            _StandingNote(
+                              key: ValueKey('standing:${standing.kind}:${standing.message}'),
+                              notice: buildNotice(
+                                context,
+                                WireBlock(id: 'standing', type: 'notice', fallbackText: standing.message, props: {'kind': standing.kind, 'message': standing.message}),
+                                _dispatch,
+                              ),
+                              dismissLabel: standing.blocked ? null : _strings.dismissNotice,
+                              onDismiss: controller.dismissStanding,
                             ),
                           // Under a notice the composer rests: its place says
                           // when the assistant is back, and there is nothing to
@@ -2566,6 +2581,39 @@ class _ErrorSlot extends StatelessWidget {
               retryLabel: retryLabel,
               onRetry: onRetry,
             ),
+    );
+  }
+}
+
+/// A note the app's team left for this person (`GET /v1/standing`, 0345),
+/// over the composer: the notice block, and a ✕ on a warning ([dismissLabel]).
+class _StandingNote extends StatelessWidget {
+  const _StandingNote({super.key, required this.notice, required this.dismissLabel, required this.onDismiss});
+
+  final Widget notice;
+  final String? dismissLabel;
+  final VoidCallback onDismiss;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Stack(
+        children: [
+          notice,
+          if (dismissLabel != null)
+            PositionedDirectional(
+              top: 6,
+              end: 6,
+              child: IconButton(
+                tooltip: dismissLabel,
+                onPressed: onDismiss,
+                icon: Icon(Icons.close_rounded, size: 18, color: theme.colors.onSurfaceSoft),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

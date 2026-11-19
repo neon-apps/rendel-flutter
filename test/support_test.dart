@@ -833,22 +833,22 @@ void main() {
         state: _state(contact: {'state': 'stated', 'required': false}),
       );
       await _open(tester, server.support(), sandbox: true);
-      expect(find.text('Address saved. This is a test key, so no email is sent and there is no code to enter.'), findsOneWidget);
+      expect(find.text('Email address saved. This is a test key, so no email is sent and there is no code to enter.'), findsOneWidget);
       // No code box, and no code to ask for again: the only field is the one to write to the team in.
       expect(find.text('Got a code by email? Enter it here'), findsNothing);
       expect(find.text('Send the code again'), findsNothing);
       expect(find.byType(TextField), findsOneWidget);
-      await tester.tap(find.text('Change the address'));
+      await tester.tap(find.text('Change the email address'));
       await _settle(tester);
       expect(find.widgetWithText(TextField, 'you@example.com'), findsOneWidget);
-      expect(find.text('Address saved. This is a test key, so no email is sent and there is no code to enter.'), findsNothing);
+      expect(find.text('Email address saved. This is a test key, so no email is sent and there is no code to enter.'), findsNothing);
       // The new address is saved, and still nothing asks for a code or says one could not go.
       await tester.enterText(find.byType(TextField).first, 'yeni@example.com');
       server.emailed = false;
       await tester.tap(find.text('Save'));
       await _settle(tester);
       expect(server.posts.singleWhere((p) => p.path == 'contact').body, {'email': 'yeni@example.com'});
-      expect(find.text('Address saved. This is a test key, so no email is sent and there is no code to enter.'), findsOneWidget);
+      expect(find.text('Email address saved. This is a test key, so no email is sent and there is no code to enter.'), findsOneWidget);
       expect(find.text("We can't send a code right now. Try again in an hour."), findsNothing);
       await _close(tester);
     });
@@ -861,7 +861,7 @@ void main() {
       await _open(tester, server.support());
       expect(find.text('Got a code by email? Enter it here'), findsOneWidget);
       expect(find.text('Send the code again'), findsOneWidget);
-      expect(find.text('Change the address'), findsOneWidget);
+      expect(find.text('Change the email address'), findsOneWidget);
       await tester.tap(find.text('Send the code again'));
       await _settle(tester);
       expect(server.posts.singleWhere((p) => p.path == 'contact/resend').body, <String, dynamic>{});
@@ -881,17 +881,17 @@ void main() {
         state: _state(contact: {'state': 'stated', 'required': false}),
       );
       await _open(tester, server.support());
-      await tester.tap(find.text('Change the address'));
+      await tester.tap(find.text('Change the email address'));
       await _settle(tester);
       // The email card stands in for the code box, under the link's own words; its ✕ is the way back, and puts nothing away.
-      expect(find.text('Change the address'), findsOneWidget);
+      expect(find.text('Change the email address'), findsOneWidget);
       expect(find.text('Got a code by email? Enter it here'), findsNothing);
       expect(find.bySemanticsLabel('No thanks'), findsNothing);
       await tester.tap(find.bySemanticsLabel('Go back'));
       await _settle(tester);
       expect(find.text('Got a code by email? Enter it here'), findsOneWidget);
       expect(server.posts.where((p) => p.path.startsWith('contact')), isEmpty);
-      await tester.tap(find.text('Change the address'));
+      await tester.tap(find.text('Change the email address'));
       await _settle(tester);
       await tester.enterText(find.byType(TextField).first, 'zeynep.yeni@example.com');
       await tester.tap(find.text('Save'));
@@ -902,7 +902,7 @@ void main() {
       expect(find.text('Thanks. Check your inbox to confirm the address.'), findsOneWidget);
       // Saved with no email sent (too many codes this hour): the code box says a code cannot go now, never "check your inbox".
       server.emailed = false;
-      await tester.tap(find.text('Change the address'));
+      await tester.tap(find.text('Change the email address'));
       await _settle(tester);
       await tester.enterText(find.byType(TextField).first, 'zeynep.baska@example.com');
       await tester.tap(find.text('Save'));
@@ -911,12 +911,12 @@ void main() {
       expect(find.text("We can't send a code right now. Try again in an hour."), findsOneWidget);
       // Changed as often as a conversation allows: said under the field, which stays.
       server.contactRefused = 'too_many_changes';
-      await tester.tap(find.text('Change the address'));
+      await tester.tap(find.text('Change the email address'));
       await _settle(tester);
       await tester.enterText(find.byType(TextField).first, 'zeynep.son@example.com');
       await tester.tap(find.text('Save'));
       await _settle(tester);
-      expect(find.text("The address can't be changed again in this conversation."), findsOneWidget);
+      expect(find.text("The email address can't be changed again in this conversation."), findsOneWidget);
       expect(find.widgetWithText(TextField, 'zeynep.son@example.com'), findsOneWidget);
       // The page's own ✕, above the card's.
       await tester.tap(find.byIcon(Icons.close_rounded).first);

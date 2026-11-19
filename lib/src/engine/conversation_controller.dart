@@ -402,6 +402,36 @@ class ConversationController extends ChangeNotifier {
   RendelNotice? notice;
   Timer? _noticeTimer;
 
+  /// What the app's team left for this person, read as the assistant opens
+  /// (`GET /v1/standing`, 0345): a block, which rests the composer as a
+  /// turn's notice does, or a warning, shown on top until it is closed.
+  RendelStanding? standing;
+
+  /// The assistant opened and the server said where this person stands:
+  /// null is nothing in force.
+  void applyStanding(RendelStanding? next) {
+    // A block lifted since it was read: the composer is back.
+    if (next == null && standing?.blocked == true && notice?.kind == 'limit') {
+      notice = null;
+      _noticeTimer?.cancel();
+      _noticeTimer = null;
+    }
+    // A warning stays until it is closed, whatever the next open says (it is told once).
+    if (next == null && standing != null && standing?.blocked != true) return;
+    standing = next;
+    if (next != null && next.blocked) {
+      _rest(RendelNotice(kind: 'limit', message: next.message, hint: next.hint ?? '', until: next.until));
+    }
+    _notify();
+  }
+
+  /// The ✕ on a warning.
+  void dismissStanding() {
+    if (standing == null || standing!.blocked) return;
+    standing = null;
+    _notify();
+  }
+
   /// A notice is in force: nothing is sent until it lapses.
   bool get resting {
     final until = notice?.until;

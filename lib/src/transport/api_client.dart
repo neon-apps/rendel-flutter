@@ -601,6 +601,21 @@ class RendelApiClient {
     }
   }
 
+  /// `GET /v1/standing`: a block or a warning the app's team left for the
+  /// person [user] names, or this install (0345), asked as the assistant
+  /// opens. Null for nearly everyone (204), and on any failure: the turn
+  /// still refuses a blocked person itself.
+  Future<RendelStanding?> standing({Map<String, String>? user, required String locale}) async {
+    try {
+      final uri = Uri.parse('${config.apiBaseUrl}/v1/standing').replace(queryParameters: {'locale': locale});
+      final response = await _http.get(uri, headers: _personHeaders(user)).timeout(config.requestTimeout);
+      if (response.statusCode != 200) return null;
+      return RendelStanding.fromJson(jsonDecode(response.body));
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Human support (design/plans/human-support.md §9): `/v1/support/[path]`,
   /// about the person [user] names or this install. The status and the JSON
   /// body (null for 204 or a body that is not JSON); status 0 when the

@@ -82,6 +82,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'shortMonths': (s) => s.shortMonths,
   'openCopilot': (s) => s.openCopilot,
   'closeCopilot': (s) => s.closeCopilot,
+  'dismissNotice': (s) => s.dismissNotice,
   'messageField': (s) => s.messageField,
   'attachFile': (s) => s.attachFile,
   'removeFile': (s) => s.removeFile,

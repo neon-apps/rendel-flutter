@@ -821,6 +821,10 @@ class Rendel {
       },
       onResume: _resumed,
     );
+    // A block or a warning the app's team left for this person (0345), told as it opens.
+    unawaited(api.standing(user: _user, locale: resolveLocale(_config.locale)).then((standing) {
+      if (identical(api, _api)) controller.applyStanding(standing);
+    }));
     // The last conversation, if this person had one within the hour and the
     // app has been relaunched since.
     unawaited(_restoreConversation(api, controller));

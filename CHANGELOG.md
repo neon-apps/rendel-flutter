@@ -5,6 +5,26 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## Unreleased
+
+**Added**
+
+- **A note from the app's team, as the assistant opens.** When the app's team
+  (or Rendel's staff) blocks or warns a person in the console, Rendel asks
+  `GET /v1/standing` as it opens. A block shows the team's words (or a calm
+  sentence in the person's language) over the composer and rests it until
+  the block lapses; a warning shows once, over the composer, with a ✕, and
+  the assistant answers as usual. Earlier builds still see a block when they
+  next ask, in the same words. New string: `RendelStrings.dismissNotice`.
+
+## 0.98.1
+
+**Fixed**
+
+- The email step of a conversation with the team says "email address" where
+  it said "address": `supportContactChange` ("Change the email address"),
+  `supportContactTooMany` and `supportContactTest`, in all six languages.
+
 ## 0.98.0
 
 **Added**

@@ -764,6 +764,38 @@ class RendelNotice extends RendelWireEvent {
   final String? actionUrl;
 }
 
+/// `GET /v1/standing` (0345): what this person is told as the assistant
+/// opens, because the app's team labelled them. `blocked` rests the composer
+/// with [hint] until [until] (for good when it is null); `warning` is shown
+/// once, on top of the thread, until it is closed.
+class RendelStanding {
+  const RendelStanding({required this.kind, required this.message, this.hint, this.until});
+  final String kind;
+  final String message;
+  final String? hint;
+  final DateTime? until;
+
+  bool get blocked => kind == 'blocked';
+
+  /// Null for anything that is not a standing this build understands.
+  static RendelStanding? fromJson(Object? json) {
+    if (json is! Map) return null;
+    final standing = json['standing'];
+    if (standing is! Map) return null;
+    final kind = standing['kind'];
+    final message = standing['message'];
+    if ((kind != 'blocked' && kind != 'warning') || message is! String || message.trim().isEmpty) return null;
+    final hint = standing['hint'];
+    final until = standing['until'];
+    return RendelStanding(
+      kind: kind as String,
+      message: message,
+      hint: hint is String ? hint : null,
+      until: until is String ? DateTime.tryParse(until) : null,
+    );
+  }
+}
+
 /// The answer's opening, the moment it is written and ahead of the cards
 /// under it: [token] for `GET /v1/speech/:token` (MP3 in a natural voice),
 /// [text] and [lang] for reading it in the phone's own voice instead.
