@@ -5,6 +5,17 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.99.1
+
+**Changed**
+
+- Rendel's own launcher is pictured too, not only one drawn with
+  `RendelLauncher(builder:)`: its PNG and where the app placed it go to
+  `POST /v1/apps/launcher-snapshot` the same way, once a run and only when it
+  changed. Every app places `RendelLauncher` somewhere of its own, and the
+  console's **Appearance › Launcher** now draws Rendel's button there, in the
+  look being edited. Nothing changes on screen.
+
 ## 0.99.0
 
 **Added**

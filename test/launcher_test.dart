@@ -421,6 +421,32 @@ void main() {
       expect(pictures, hasLength(1));
     });
 
+    testWidgets("sends where Rendel's own launcher sits too, since every app places it somewhere of its own", (tester) async {
+      final pictures = <http.Request>[];
+      await tester.runAsync(() => Rendel.init(
+            appKey: _key,
+            config: RendelConfig(
+              remoteConfig: false,
+              httpClient: MockClient((request) async {
+                if (request.url.path.endsWith('/v1/apps/launcher-snapshot')) pictures.add(request);
+                return http.Response('', 200);
+              }),
+            ),
+          ));
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(body: Stack(children: [Positioned(left: 20, top: 120, child: RendelLauncher())])),
+      ));
+      await tester.pump(const Duration(milliseconds: 1600));
+      for (var i = 0; i < 5; i++) {
+        await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+        await tester.pump();
+      }
+      expect(pictures, hasLength(1));
+      final rect = pictures.single.headers['X-Rendel-Launcher-Rect']!.split(',').map(double.parse).toList();
+      expect(rect.take(2), [20, 120]);
+      expect(pictures.single.bodyBytes.take(4), [0x89, 0x50, 0x4e, 0x47]);
+    });
+
     testWidgets('each icon is drawn, and one this build lacks is the sparkle', (tester) async {
       for (final id in ['heart', 'unicorn']) {
         await _start(tester, RendelConfig(launcherIcon: id));

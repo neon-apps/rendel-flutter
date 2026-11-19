@@ -1795,10 +1795,10 @@ class Rendel {
   /// Whether this run has sent, or tried to send, its own launcher's picture.
   static bool _launcherPictured = false;
 
-  /// Called by [RendelLauncher] once a button of the app's own
-  /// ([RendelLauncher.builder]) has settled on screen: its picture and where
-  /// it sits, in logical points. Appearance shows it in place of Rendel's
-  /// button, which the app does not draw. Sent once a run, and only when it
+  /// Called by [RendelLauncher] once the launcher has settled on screen: its
+  /// picture and where it sits, in logical points. Appearance shows an app's
+  /// own button ([RendelLauncher.builder]) as this picture and draws Rendel's
+  /// at this place, where the app put it. Sent once a run, and only when it
   /// changed since this device last sent it. You need not call it.
   static Future<void> launcherPictured(Uint8List png, Rect rect, Size screen) async {
     if (_launcherPictured) return;

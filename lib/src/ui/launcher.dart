@@ -399,7 +399,8 @@ Widget _button(RendelTheme theme, String word, VoidCallback onTap, [RendelLaunch
 
 Widget _marked(RendelTheme theme, String word, VoidCallback onTap, {required int unread, required RendelWaiting waiting, RendelLauncherBuilder? builder}) {
   final drawn = builder == null
-      ? _plainButton(theme, word, onTap, unread: unread, waiting: waiting)
+      // Rendel's button, pictured too: Appearance draws it where the app placed it.
+      ? _Pictured(child: _plainButton(theme, word, onTap, unread: unread, waiting: waiting))
       // The host's own button, pressable and spoken as the icon-only one is.
       : Builder(
           builder: (context) => RendelPressable(
@@ -976,9 +977,11 @@ class _Place extends SingleChildLayoutDelegate {
   bool shouldRelayout(_Place old) => true;
 }
 
-/// The app's own launcher ([RendelLauncher.builder]) as it is drawn, sent
-/// once it has settled so the console's Appearance shows this button rather
-/// than Rendel's ([Rendel.launcherPictured]). Changes nothing on screen.
+/// The launcher as it is drawn and where the app placed it, sent once it has
+/// settled ([Rendel.launcherPictured]): Appearance shows an app's own button
+/// ([RendelLauncher.builder]) as this picture, and draws Rendel's at this
+/// place, since every app puts it somewhere of its own. Changes nothing on
+/// screen.
 class _Pictured extends StatefulWidget {
   const _Pictured({required this.child});
 
