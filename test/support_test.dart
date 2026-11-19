@@ -310,8 +310,9 @@ void main() {
       final width = tester.view.physicalSize.width / tester.view.devicePixelRatio;
       expect(tester.getTopRight(find.text('Kargom gelmedi')).dx, greaterThan(width * 0.8));
       expect(tester.getTopLeft(find.text('Hemen bakıyorum.')).dx, lessThan(width * 0.3));
-      // The team has answered: "I'm sorted" as the chip above the box, not "By mistake?".
+      // The team has answered: "I'm sorted", asked as the message card's first row, not "By mistake?" (draft D4).
       expect(find.text("I'm sorted"), findsOneWidget);
+      expect(find.text('Got what you needed?'), findsOneWidget);
       expect(find.textContaining('By mistake'), findsNothing);
       // The box names the team, never the person in it.
       expect(find.widgetWithText(TextField, 'Message the Grove team'), findsOneWidget);
@@ -999,7 +1000,7 @@ void main() {
     testWidgets("tells the server a slip with By mistake, and nothing more with I'm sorted (qa3-sdk-06)", (tester) async {
       final slip = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state());
       await _open(tester, slip.support());
-      await tester.tap(find.textContaining('By mistake'));
+      await tester.tap(find.text('Back to the assistant'));
       await _settle(tester);
       expect(slip.posts.singleWhere((p) => p.path == 'resolve').body, {'by_mistake': true});
       final sorted = _Server(entries: [_entry(1, text: 'Kargom gelmedi'), _entry(2, author: 'agent', name: 'Ayşe', text: 'Bakıyorum.')], state: _state(mode: 'human'));
@@ -1013,7 +1014,7 @@ void main() {
       final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state());
       final support = server.support();
       await _open(tester, support);
-      await tester.tap(find.textContaining('By mistake'));
+      await tester.tap(find.text('Back to the assistant'));
       await _settle(tester);
       expect(find.byType(RendelSupportSheet), findsNothing);
       expect(support.open, isFalse);

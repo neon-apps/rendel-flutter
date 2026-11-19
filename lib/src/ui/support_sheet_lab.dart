@@ -72,7 +72,8 @@ extension _LabSupport on _RendelSupportSheetState {
     );
   }
 
-  Widget labComposer(RendelTheme theme, RendelStrings strings, {bool resolved = false}) {
+  /// [ask] is the question and its button, drawn as the card's first row.
+  Widget labComposer(RendelTheme theme, RendelStrings strings, {bool resolved = false, Widget? ask}) {
     final canAttach = widget.onPick != null && widget.onUpload != null;
     final ink = theme.colors.onSurface;
     // As on the assistant's side, one for one: + opens the same sources over
@@ -139,11 +140,13 @@ extension _LabSupport on _RendelSupportSheetState {
           key: const ValueKey('lab-support-card'),
           child: LabGlass(
             radius: 24,
-            padding: const EdgeInsets.fromLTRB(2, 8, 2, 2),
+            padding: EdgeInsets.fromLTRB(2, ask == null ? 8 : 0, 2, 2),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // Across the card, over the words.
+                if (ask != null) Padding(padding: const EdgeInsets.only(bottom: 6), child: ask),
                 TextField(
                   controller: _input,
                   minLines: 1,

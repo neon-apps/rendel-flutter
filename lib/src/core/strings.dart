@@ -219,7 +219,9 @@ class RendelStrings {
     this.supportWhenDay = 'on {day} at {time}',
     this.supportBack = 'Back to the assistant',
     this.supportMistake = 'By mistake? Back to the assistant',
+    this.supportMistakeAsk = 'By mistake?',
     this.supportSorted = 'I\'m sorted',
+    this.supportSortedAsk = 'Got what you needed?',
     this.supportYou = 'You',
     this.supportWriteTo = 'Write to {name}…',
     this.supportWriteTeam = 'Message the {team} team',
@@ -715,8 +717,13 @@ class RendelStrings {
   final String supportWhenTomorrow;
   final String supportWhenDay;
   final String supportBack;
+  /// No longer drawn since 0.100.0: the way back is [supportMistakeAsk] beside [supportBack]. Kept so an app that sets it still builds.
   final String supportMistake;
+  /// The question beside the way back to the assistant, before the team has written (K4).
+  final String supportMistakeAsk;
   final String supportSorted;
+  /// The question beside "I'm sorted", the message card's first row.
+  final String supportSortedAsk;
   final String supportYou;
   final String supportWriteTo;
   final String supportWriteTeam;
@@ -1125,7 +1132,9 @@ class RendelStrings {
     String? supportWhenDay,
     String? supportBack,
     String? supportMistake,
+    String? supportMistakeAsk,
     String? supportSorted,
+    String? supportSortedAsk,
     String? supportYou,
     String? supportWriteTo,
     String? supportWriteTeam,
@@ -1383,7 +1392,9 @@ class RendelStrings {
       supportWhenDay: supportWhenDay ?? this.supportWhenDay,
       supportBack: supportBack ?? this.supportBack,
       supportMistake: supportMistake ?? this.supportMistake,
+      supportMistakeAsk: supportMistakeAsk ?? this.supportMistakeAsk,
       supportSorted: supportSorted ?? this.supportSorted,
+      supportSortedAsk: supportSortedAsk ?? this.supportSortedAsk,
       supportYou: supportYou ?? this.supportYou,
       supportWriteTo: supportWriteTo ?? this.supportWriteTo,
       supportWriteTeam: supportWriteTeam ?? this.supportWriteTeam,
@@ -1658,7 +1669,9 @@ const Map<String, RendelStrings> _byLocale = {
     supportWhenDay: '{day} günü saat {time}',
     supportBack: 'Asistana dön',
     supportMistake: 'Yanlışlıkla mı oldu? Asistana dön',
+    supportMistakeAsk: 'Yanlışlıkla mı oldu?',
     supportSorted: 'Sorunum çözüldü',
+    supportSortedAsk: 'Yardımcı olabildik mi?',
     supportYou: 'Siz',
     supportWriteTo: '{name} — mesajınızı yazın…',
     supportWriteTeam: '{team} ekibine yazın…',
@@ -1922,7 +1935,9 @@ const Map<String, RendelStrings> _byLocale = {
     supportWhenDay: 'am {day} um {time} Uhr',
     supportBack: 'Zurück zum Assistenten',
     supportMistake: 'Aus Versehen? Zurück zum Assistenten',
+    supportMistakeAsk: 'Aus Versehen?',
     supportSorted: 'Hat sich erledigt',
+    supportSortedAsk: 'Haben Sie, was Sie brauchten?',
     supportYou: 'Sie',
     supportWriteTo: 'Nachricht an {name}…',
     supportWriteTeam: 'Nachricht an das Team von {team}…',
@@ -2185,7 +2200,9 @@ const Map<String, RendelStrings> _byLocale = {
     supportWhenDay: '{day} à {time}',
     supportBack: 'Retour à l’assistant',
     supportMistake: 'Par erreur ? Retour à l’assistant',
+    supportMistakeAsk: 'Par erreur ?',
     supportSorted: 'C’est réglé',
+    supportSortedAsk: 'Vous avez ce qu’il vous faut ?',
     supportYou: 'Vous',
     supportWriteTo: 'Écrire à {name}…',
     supportWriteTeam: 'Écrire à l’équipe {team}…',
@@ -2447,7 +2464,9 @@ const Map<String, RendelStrings> _byLocale = {
     supportWhenDay: 'el {day} a las {time}',
     supportBack: 'Volver al asistente',
     supportMistake: '¿Por error? Volver al asistente',
+    supportMistakeAsk: '¿Por error?',
     supportSorted: 'Ya está resuelto',
+    supportSortedAsk: '¿Tienes lo que necesitabas?',
     supportYou: 'Tú',
     supportWriteTo: 'Escribe a {name}…',
     supportWriteTeam: 'Escribe al equipo de {team}…',
@@ -2708,7 +2727,9 @@ const Map<String, RendelStrings> _byLocale = {
     supportWhenDay: 'يوم {day} عند الساعة {time}',
     supportBack: 'العودة إلى المساعد',
     supportMistake: 'عن طريق الخطأ؟ العودة إلى المساعد',
+    supportMistakeAsk: 'عن طريق الخطأ؟',
     supportSorted: 'تم حل مشكلتي',
+    supportSortedAsk: 'هل حصلت على ما تحتاجه؟',
     supportYou: 'أنت',
     supportWriteTo: 'اكتب إلى {name}…',
     supportWriteTeam: 'اكتب إلى فريق {team}…',

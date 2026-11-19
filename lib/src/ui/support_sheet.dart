@@ -461,6 +461,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     // Nobody from the team has started on it yet: it may have been a slip (K4). Once a teammate joined or read their
     // account, it is the team's (qa2-sdk-05).
     final justHanded = !resolved && !rendelSupportTeamStarted(v.entries);
+    final asking = on && !resolved && v.threadId != null && MediaQuery.viewInsetsOf(context).bottom == 0;
+    final writes = on && !needsContact && v.otherOpen == null;
     // A first line refused because too many conversations were started from here says why (D1).
     final note = v.pending.any((p) => p.failed && p.reason == 'rate_limited') ? strings.supportTooMany : _note;
     final typing = v.typingUntil != null && v.typingUntil!.isAfter(DateTime.now());
@@ -614,7 +616,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     // "I'm sorted" while the conversation is open; before the team has written, the way back (K4).
                     // Not while the keyboard is up, when the page is short (sdk-17).
                     // No thread yet (K3): nothing to sort or to take back, and the head's back is the way out.
-                    if (on && !resolved && v.threadId != null && MediaQuery.viewInsetsOf(context).bottom == 0)
+                    // Look A asks it as the message card's first row, and on its own only while the box steps aside.
+                    if (asking && RendelLab.of('look') != 'a')
                       Align(
                         alignment: AlignmentDirectional.centerStart,
                         child: Padding(
@@ -622,25 +625,20 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                           child: _chip(
                             theme,
                             label: justHanded ? strings.supportMistake : strings.supportSorted,
-                            onTap: justHanded
-                                ? () async {
-                                    final navigator = Navigator.of(context);
-                                    await widget.support.resolve(byMistake: true);
-                                    navigator.maybePop();
-                                  }
-                                : () {
-                                    setState(() => _sortedHere = true);
-                                    widget.support.resolve();
-                                  },
+                            onTap: () => _answer(context, justHanded: justHanded),
                           ),
                         ),
-                      ),
+                      )
+                    else if (asking && !writes)
+                      Padding(padding: const EdgeInsets.only(bottom: 8), child: _ask(context, theme, strings, justHanded: justHanded, inCard: false)),
                     // Sorted, while another of theirs is open: that one is where they write.
                     if (v.otherOpen case final other?) _otherOpen(theme, strings, other),
                     // Closed is not the end: a line reopens the thread, in place (plan §4.2). While Support is off,
                     // nothing written reaches the team (K1, D4).
-                    if (on && !needsContact && v.otherOpen == null)
-                      RendelLab.of('look') == 'a' ? labComposer(theme, strings, resolved: resolved) : _composer(theme, strings, resolved: resolved),
+                    if (writes)
+                      RendelLab.of('look') == 'a'
+                          ? labComposer(theme, strings, resolved: resolved, ask: asking ? _ask(context, theme, strings, justHanded: justHanded, inCard: true) : null)
+                          : _composer(theme, strings, resolved: resolved),
                   ],
                 ),
               ),
@@ -1192,44 +1190,94 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
         ),
       );
 
-  /// A small chip above the box: "I'm sorted", or the way back to the assistant before the team has written.
-  Widget _chip(RendelTheme theme, {required String label, required VoidCallback onTap}) => RendelLab.of('look') == 'a'
-      // Lab · look A: a 36-point glass pill in a 44-point target, the words at 15;
-      // faded in place while + is open over it.
-      ? ValueListenableBuilder<bool>(
-          valueListenable: LabPopover.anyOpen,
-          builder: (context, menu, pill) => IgnorePointer(
-            ignoring: menu,
-            child: AnimatedOpacity(opacity: menu ? 0 : 1, duration: const Duration(milliseconds: 160), child: pill),
+  /// "I'm sorted" puts the conversation away as sorted; before the team has written, the way back puts it away as a slip.
+  void _answer(BuildContext context, {required bool justHanded}) async {
+    if (!justHanded) {
+      setState(() => _sortedHere = true);
+      widget.support.resolve();
+      return;
+    }
+    final navigator = Navigator.of(context);
+    await widget.support.resolve(byMistake: true);
+    navigator.maybePop();
+  }
+
+  /// "I'm sorted", or the way back before the team has written: a question, and a small button in the app's colour
+  /// that answers it, so it never reads as a line of the conversation (Özlem 2026-11-19, draft D4). The message
+  /// card's first row over a hairline; on its own, tinted, while the box steps aside.
+  Widget _ask(BuildContext context, RendelTheme theme, RendelStrings strings, {required bool justHanded, required bool inCard}) {
+    final label = justHanded ? strings.supportBack : strings.supportSorted;
+    final row = LayoutBuilder(
+      builder: (context, constraints) => _askRow(context, theme, strings, label: label, justHanded: justHanded, width: constraints.maxWidth),
+    );
+    return DecoratedBox(
+      decoration: inCard
+          ? BoxDecoration(border: Border(bottom: BorderSide(color: theme.hairline)))
+          : BoxDecoration(color: theme.colors.onSurface.withValues(alpha: 0.045), borderRadius: BorderRadius.circular(theme.radius.control)),
+      child: row,
+    );
+  }
+
+  Widget _askRow(BuildContext context, RendelTheme theme, RendelStrings strings, {required String label, required bool justHanded, required double width}) {
+    return Padding(
+      padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              justHanded ? strings.supportMistakeAsk : strings.supportSortedAsk,
+              style: theme.text.caption.copyWith(fontSize: 14, height: 1.3, color: theme.colors.onSurfaceSoft),
+            ),
           ),
-          child: RendelPressable(
-          semanticLabel: label,
-          onTap: onTap,
-          child: SizedBox(
-            height: 44,
-            child: Center(
-              widthFactor: 1,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 8.5),
-                decoration: LabGlass.decorationOf(theme, 18),
-                child: Text(label, style: theme.text.body.copyWith(fontSize: 15, fontWeight: FontWeight.w500, height: 1.2, color: theme.colors.onSurface)),
+          const SizedBox(width: 12),
+          // Sized to its words; with large text, at most 60% of the row, the words on two lines.
+          ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: width * 0.6),
+            child: RendelPressable(
+              semanticLabel: label,
+              onTap: () => _answer(context, justHanded: justHanded),
+              child: DecoratedBox(
+                decoration: BoxDecoration(color: theme.colors.accent, borderRadius: BorderRadius.circular(16)),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 32),
+                  child: Padding(
+                    padding: EdgeInsetsDirectional.fromSTEB(justHanded ? 14 : 10, 4, 14, 4),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!justHanded) ...[Icon(Icons.check_circle_outline_rounded, size: 16, color: theme.colors.onAccent), const SizedBox(width: 5)],
+                        Flexible(
+                          child: Text(
+                            label,
+                            maxLines: 2,
+                            style: theme.text.caption.copyWith(fontSize: 14, fontWeight: FontWeight.w600, height: 1.2, color: theme.colors.onAccent),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-        )
-      : RendelPressable(
+        ],
+      ),
+    );
+  }
+
+  /// A small chip above the box, in the looks before A: "I'm sorted", or the way back to the assistant before the team has written.
+  Widget _chip(RendelTheme theme, {required String label, required VoidCallback onTap}) => RendelPressable(
         semanticLabel: label,
         onTap: onTap,
         child: Container(
           constraints: const BoxConstraints(minHeight: 32),
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
-          decoration: RendelLab.of('look') == 'a' ? LabGlass.decorationOf(theme, 999) : BoxDecoration(
+          decoration: BoxDecoration(
             color: theme.colors.surfaceRaised,
             borderRadius: BorderRadius.circular(999),
             boxShadow: [BoxShadow(color: theme.colors.onSurface.withValues(alpha: 0.08), spreadRadius: 1)],
           ),
-          child: Text(label, style: theme.text.caption.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: RendelLab.of('look') == 'a' ? theme.colors.onSurface : theme.accentText)),
+          child: Text(label, style: theme.text.caption.copyWith(fontSize: 13.5, fontWeight: FontWeight.w600, color: theme.accentText)),
         ),
       );
 

@@ -5,6 +5,22 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.100.0
+
+**Changed**
+
+- Human support's "I'm sorted" no longer looks like a message: it is the
+  message card's first row, a question (`supportSortedAsk`, *Got what you
+  needed?*) answered by a small button in the app's colour. Before the team
+  has written, the row asks `supportMistakeAsk` (*By mistake?*) beside
+  `supportBack`. While the box steps aside for an email address, the row
+  stands on its own above it.
+
+**Deprecated**
+
+- `RendelStrings.supportMistake` is no longer drawn; it stays so an app that
+  sets it still builds.
+
 ## 0.99.1
 
 **Changed**
