@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/gestures.dart' show TapGestureRecognizer;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rendel/src/core/locale.dart' show rendelOwnSites;
 import 'package:rendel/rendel.dart';
 import 'package:rendel/src/core/batteries.dart' show openLink;
 import 'package:rendel/src/engine/conversation_controller.dart';
@@ -733,6 +734,9 @@ void main() {
     });
 
     testWidgets('a link is its words, and opens where they are tapped', (tester) async {
+      // On the app's own site, so it opens without asking (leave_sheet_test.dart asks for another).
+      rendelOwnSites = const ['cilt365.com'];
+      addTearDown(() => rendelOwnSites = const []);
       final browser = _Browser();
       UrlLauncherPlatform.instance = browser;
       final c = seeded([_text('t', 'See [the routine](https://cilt365.com/routine) today.')], onOpenUrl: openLink);

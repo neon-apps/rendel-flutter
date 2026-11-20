@@ -608,9 +608,10 @@ void main() {
       expect(voice.right, lessThanOrEqualTo(close.left));
       expect(close.left - voice.right, lessThan(1), reason: 'one capsule');
       for (final r in [voice, close]) {
-        // Inside the 40-high capsule and its 0.8 line.
-        expect(r.height, closeTo(38.4, 0.01));
-        expect(r.width, 44);
+        // 48 to the finger each way, over the 40-high capsule (Android's
+        // least target; 38.4 inside the capsule failed Apple's 44 too).
+        expect(r.height, 48);
+        expect(r.width, 48);
       }
       expect(find.bySemanticsLabel('Start a new conversation'), findsNothing, reason: 'not in the bar');
       await openMenu(tester);
@@ -636,7 +637,9 @@ void main() {
         if (cut) {
           expect(scale(name), closeTo(0.65, 0.001), reason: '$title: at the smallest');
         } else {
-          expect(scale(name), inExclusiveRange(0.65, 1), reason: '$title: smaller, and whole');
+          // Whole, and never past its own size. (It fits at 1 at 320: this
+          // read "smaller" and passed on a subpixel, 77.4 drawn of 77.5.)
+          expect(scale(name), allOf(greaterThan(0.65), lessThanOrEqualTo(1.0)), reason: '$title: whole');
         }
         await tester.pumpWidget(const SizedBox());
       }

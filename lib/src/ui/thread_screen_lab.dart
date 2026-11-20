@@ -7,10 +7,12 @@ part of 'thread_screen.dart';
 /// steps, read aloud, start over, close, field, attach menu and held mic.
 
 /// A round glass button, 40 points as in the reference, in a 44-point target.
+/// A round glass button: the glass 40 across, the target 48, Android's least
+/// (44 failed Flutter's guideline on every theme, audit 2026-11-20).
 Widget _labRound(RendelTheme theme, {required Widget child, required String label, VoidCallback? onTap}) => RendelPressable(
       semanticLabel: label,
       onTap: onTap,
-      child: SizedBox(width: 44, height: 44, child: Center(child: LabGlass(circle: true, width: 40, height: 40, alignment: Alignment.center, child: child))),
+      child: SizedBox(width: 48, height: 48, child: Center(child: LabGlass(circle: true, width: 40, height: 40, alignment: Alignment.center, child: child))),
     );
 
 /// The team's row: glass under look A, the SDK's own card otherwise.
@@ -91,7 +93,9 @@ class _LabTopState extends State<_LabTop> {
       ],
     ];
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+      // 2 less each way than the 16, 14 and 8 the glass is placed by: its
+      // targets are 4 larger than they were, and the glass has not moved.
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           _labRound(theme, label: strings.menu, onTap: () => setState(() => _menu = !_menu), child: menuMark),
@@ -133,34 +137,33 @@ class _LabTopState extends State<_LabTop> {
             ]),
           ),
           // As in the reference: read aloud and close share one glass capsule.
+          // The capsule is drawn 40 tall and 88 wide, where it was; its two
+          // buttons are 48 each way over it. In the capsule they were 40
+          // tall, under Apple's 44 as well as Android's 48 (audit 2026-11-20).
           if (widget.voice case final voice?)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 2, 2, 2),
-              child: LabGlass(
-                radius: 20,
-                height: 40,
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  ValueListenableBuilder<bool>(
-                    valueListenable: voice.on,
-                    // A switch, so a screen reader says which, as the header's always was.
-                    builder: (context, on, _) => Semantics(
-                      toggled: on,
-                      hint: strings.readAloud,
-                      child: RendelPressable(
-                        semanticLabel: strings.autoRead,
-                        onTap: () => voice.setOn(!on),
-                        child: SizedBox(width: 44, child: Icon(on ? Icons.volume_up_rounded : Icons.volume_off_rounded, size: 21, color: on ? theme.colors.accent : ink)),
-                      ),
+            Stack(alignment: Alignment.center, children: [
+              const LabGlass(radius: 20, width: 88, height: 40, child: SizedBox.shrink()),
+              Row(mainAxisSize: MainAxisSize.min, children: [
+                ValueListenableBuilder<bool>(
+                  valueListenable: voice.on,
+                  // A switch, so a screen reader says which, as the header's always was.
+                  builder: (context, on, _) => Semantics(
+                    toggled: on,
+                    hint: strings.readAloud,
+                    child: RendelPressable(
+                      semanticLabel: strings.autoRead,
+                      onTap: () => voice.setOn(!on),
+                      child: SizedBox(width: 48, height: 48, child: Icon(on ? Icons.volume_up_rounded : Icons.volume_off_rounded, size: 21, color: on ? theme.colors.accent : ink)),
                     ),
                   ),
-                  RendelPressable(
-                    semanticLabel: strings.closeCopilot,
-                    onTap: () => Navigator.of(context).maybePop(),
-                    child: SizedBox(width: 44, child: Icon(Icons.close_rounded, size: 26, color: ink)),
-                  ),
-                ]),
-              ),
-            )
+                ),
+                RendelPressable(
+                  semanticLabel: strings.closeCopilot,
+                  onTap: () => Navigator.of(context).maybePop(),
+                  child: SizedBox(width: 48, height: 48, child: Icon(Icons.close_rounded, size: 26, color: ink)),
+                ),
+              ]),
+            ])
           else
             _labRound(theme, label: strings.closeCopilot, onTap: () => Navigator.of(context).maybePop(), child: Icon(Icons.close_rounded, size: 26, color: ink)),
         ]),
@@ -171,7 +174,8 @@ class _LabTopState extends State<_LabTop> {
           child: !_menu
               ? const SizedBox(width: double.infinity)
               : Padding(
-                  padding: const EdgeInsets.only(top: 10),
+                  // Where it was before the header's targets grew by 4 (above).
+                  padding: const EdgeInsets.only(top: 8, left: 2),
                   child: LabGlass(
                     width: 290,
                     padding: const EdgeInsets.all(6),

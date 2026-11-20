@@ -66,7 +66,13 @@ class RendelRemoteConfig {
     this.capture = RendelCapture.defaults,
     this.supportTeam,
     this.publishedLanguages = const [],
+    this.ownSites = const [],
   });
+
+  /// The app's own sites (`own_sites`, security assessment 2026-11-20,
+  /// decision 9): a link anywhere else asks before it opens
+  /// (`askToLeave`). Kept in the cache like [publishedLanguages].
+  final List<String> ownSites;
 
   /// The languages the persona answers in, as published (`languages`, sent
   /// only when it names some): the SDK's own words follow the phone only
@@ -137,6 +143,7 @@ class RendelRemoteConfig {
         capture: RendelCapture.parse(map['capture']),
         supportTeam: _supportTeam(map['support']),
         publishedLanguages: _languages(map['languages']),
+        ownSites: _languages(map['own_sites']),
       );
     } catch (_) {
       return null;
@@ -153,6 +160,7 @@ class RendelRemoteConfig {
         if (!capture.isDefault) 'capture': capture.toJson(),
         if (supportTeam != null) 'support': {'enabled': true, 'team': supportTeam},
         if (publishedLanguages.isNotEmpty) 'languages': publishedLanguages,
+        if (ownSites.isNotEmpty) 'own_sites': ownSites,
         'config': {
           if (theme.isNotEmpty) 'theme': theme,
           if (themeDark.isNotEmpty) 'themeDark': themeDark,

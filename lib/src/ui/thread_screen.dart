@@ -10,7 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 import '../core/batteries.dart' show RendelDictationDenied, openAppSettings;
-import '../core/locale.dart' show resolveSpokenLocale;
+import '../core/locale.dart' show rendelOwnSites, resolveSpokenLocale;
 import '../core/read_aloud.dart';
 import '../core/config.dart'
     show RendelAttachIcon, RendelAttachment, RendelAttachSource, RendelSendIcon, RendelVoiceIcon;
@@ -32,6 +32,7 @@ import 'renderer/blocks.dart'
 import 'renderer/registry.dart';
 import 'memory_chips.dart';
 import 'memory_sheet.dart';
+import 'leave_sheet.dart';
 import '../core/log.dart';
 import '../core/followups.dart';
 import '../core/support.dart';
@@ -425,9 +426,15 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
 
   /// A tap, and a screen of the app opened the way the presentation opens
   /// one.
-  Future<bool> _act(UIAction action) {
+  Future<bool> _act(UIAction action) async {
     final navigate = widget.onNavigate;
     if (action is NavigateAction && navigate != null) return navigate(action);
+    // A link off the app's own sites asks first (decision 9); directions and
+    // a wallet pass (`external`) go to the system as they are.
+    if (action is OpenUrlAction && !action.external) {
+      final site = leavesOwnSites(action.url, rendelOwnSites);
+      if (site != null && !await askToLeave(context, site, strings: _strings)) return true;
+    }
     return widget.controller.tapAction(action);
   }
 
@@ -2291,6 +2298,8 @@ class _Header extends StatelessWidget {
             headers: logoHeaders,
             height: 20,
             fit: BoxFit.contain,
+            // Decoded 20 pt tall, the height it is drawn at, not the upload's.
+            cacheHeight: (20 * MediaQuery.devicePixelRatioOf(context)).round(),
             excludeFromSemantics: true,
             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
             loadingBuilder: (context, child, progress) => progress == null
@@ -3290,8 +3299,8 @@ class _ComposerState extends State<_Composer> {
       key: const ValueKey(_Mode.rest),
       child: Padding(
         // 2 at the sides, not 6, as on the web: the room goes to a lit
-        // action's label.
-        padding: const EdgeInsets.fromLTRB(2, 2, 2, 4),
+        // action's label. 1 here and 1 inside each control, its target's.
+        padding: const EdgeInsets.fromLTRB(1, 2, 1, 4),
         // 52 tall as it always was: voice mode writes what it hears from this height.
         child: SizedBox(
           height: 52,
@@ -3305,7 +3314,7 @@ class _ComposerState extends State<_Composer> {
                 onTap: widget.busy ? null : _plus,
               )
             else
-              const SizedBox(width: _Round.side),
+              const SizedBox(width: _Round.side + 2),
             const SizedBox(width: 8),
             // While an answer page is on its way, a pill in the field's place
             // says what the turn is doing.
@@ -3378,7 +3387,7 @@ class _ComposerState extends State<_Composer> {
     return _Arrive(
       key: const ValueKey(_Mode.rest),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(2, 2, 2, 4),
+        padding: const EdgeInsets.fromLTRB(1, 2, 1, 4),
         child: SizedBox(
           height: 52,
           child: Row(
@@ -3391,7 +3400,7 @@ class _ComposerState extends State<_Composer> {
                   onTap: widget.busy ? null : _plus,
                 )
               else
-                const SizedBox(width: _Round.side),
+                const SizedBox(width: _Round.side + 2),
               const SizedBox(width: 8),
               Flexible(
                 child: AnimatedSwitcher(
@@ -3789,16 +3798,20 @@ class _AskField extends StatelessWidget {
       style: theme.text.label.copyWith(color: theme.onComposerFaint),
     );
     // The panel's look: the same glass as its other controls, no outline.
+    // Drawn 46 tall, touched 48, as the round controls beside it.
     if (RendelLab.of('look') == 'a') {
       return RendelPressable(
         semanticLabel: label,
         onTap: onTap,
-        child: LabGlass(
-          radius: _Round.side / 2,
-          height: _Round.side,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          alignment: AlignmentDirectional.centerStart,
-          child: words,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1),
+          child: LabGlass(
+            radius: _Round.side / 2,
+            height: _Round.side,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            alignment: AlignmentDirectional.centerStart,
+            child: words,
+          ),
         ),
       );
     }
@@ -3806,6 +3819,7 @@ class _AskField extends StatelessWidget {
       semanticLabel: label,
       onTap: onTap,
       child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 1),
         height: _Round.side,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         alignment: AlignmentDirectional.centerStart,
@@ -3840,17 +3854,23 @@ class _Round extends StatelessWidget {
       color: onTap == null ? theme.onComposerFaint : theme.colors.onComposer,
     );
     // The panel's look: a glass circle, as the top bar's buttons are.
+    // Drawn 46 across, touched 48 (Android's least, Flutter's guideline):
+    // the 1 round it is inside the target (audit 2026-11-20).
     if (RendelLab.of('look') == 'a') {
       return RendelPressable(
         semanticLabel: label,
         onTap: onTap,
-        child: LabGlass(circle: true, width: side, height: side, alignment: Alignment.center, child: glyph),
+        child: Padding(
+          padding: const EdgeInsets.all(1),
+          child: LabGlass(circle: true, width: side, height: side, alignment: Alignment.center, child: glyph),
+        ),
       );
     }
     return RendelPressable(
       semanticLabel: label,
       onTap: onTap,
       child: Container(
+        margin: const EdgeInsets.all(1),
         width: side,
         height: side,
         decoration: BoxDecoration(
@@ -4014,13 +4034,16 @@ class _MicPill extends StatelessWidget {
       return TweenAnimationBuilder<double>(
         tween: Tween(begin: still ? 1 : 0, end: 1),
         duration: const Duration(milliseconds: 260),
-        builder: (context, t, child) => Transform.scale(
-          scale: 1 + 0.12 * Curves.easeOutCubic.transform(t),
-          child: Container(
-            width: width,
-            height: side,
-            decoration: _decoration(theme),
-            child: child,
+        builder: (context, t, child) => Padding(
+          padding: const EdgeInsets.all(1),
+          child: Transform.scale(
+            scale: 1 + 0.12 * Curves.easeOutCubic.transform(t),
+            child: Container(
+              width: width,
+              height: side,
+              decoration: _decoration(theme),
+              child: child,
+            ),
           ),
         ),
         child: RendelPressable(
@@ -4031,13 +4054,17 @@ class _MicPill extends StatelessWidget {
         ),
       );
     }
-    final pill = AnimatedContainer(
-      duration: still ? Duration.zero : theme.motion.settle,
-      curve: theme.motion.curve,
-      width: width,
-      height: side,
-      decoration: _decoration(theme),
-      child: glyph,
+    // Drawn 46 tall, touched 48: the 1 round it is inside its target, held or not.
+    final pill = Padding(
+      padding: const EdgeInsets.all(1),
+      child: AnimatedContainer(
+        duration: still ? Duration.zero : theme.motion.settle,
+        curve: theme.motion.curve,
+        width: width,
+        height: side,
+        decoration: _decoration(theme),
+        child: glyph,
+      ),
     );
     if (onDown == null && onUp == null) {
       return RendelPressable(semanticLabel: label, onTap: onTap, child: pill);
@@ -4520,7 +4547,8 @@ class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
                         // swells in place rather than jumping to the middle.
                         child: Container(
                           alignment: widget.wide ? Alignment.center : AlignmentDirectional.centerEnd,
-                          padding: EdgeInsetsDirectional.only(end: widget.wide ? 0 : 14),
+                          // 13 and the pill's own 1 (its target's margin).
+                          padding: EdgeInsetsDirectional.only(end: widget.wide ? 0 : 13),
                           // Let go with words heard, it thinks, as the pill
                           // in the composer will once they are sent.
                           child: ValueListenableBuilder<bool>(

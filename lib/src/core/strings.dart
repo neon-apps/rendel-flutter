@@ -192,6 +192,9 @@ class RendelStrings {
     this.con = 'Con',
     this.playVideo = 'Play video',
     this.pictureOf = 'Picture {n} of {count}',
+    this.leaveTitle = 'Open another site?',
+    this.leaveBody = 'This link goes to {site}, which is not part of this app. Open it only if you trust it.',
+    this.leaveOpen = 'Open site',
     this.copyCode = 'Copy',
     this.memorySaved = 'I\'ll remember: {label}',
     this.memorySavedUntil = 'I\'ll remember until {date}: {label}',
@@ -685,6 +688,13 @@ class RendelStrings {
   /// place: {n} of {count} (audit 2026-11-20). Use [pictureNumber].
   final String pictureOf;
 
+  /// Before a link to a site that is not one of the app's own opens
+  /// (security assessment 2026-11-20, decision 9): its title, its sentence
+  /// ({site} is the site) and its button; the other button is [goBack].
+  final String leaveTitle;
+  final String leaveBody;
+  final String leaveOpen;
+
   /// Preference memory (`design/plans/preference-memory.md` §3.7): the chips
   /// under an answer that saved, changed, forgot or relied on a note
   /// ({label} is the note's, {date} its last day, {count} how many), the mark
@@ -1111,6 +1121,9 @@ class RendelStrings {
     String? con,
     String? playVideo,
     String? pictureOf,
+    String? leaveTitle,
+    String? leaveBody,
+    String? leaveOpen,
     String? copyCode,
     String? memorySaved,
     String? memorySavedUntil,
@@ -1372,6 +1385,9 @@ class RendelStrings {
       con: con ?? this.con,
       playVideo: playVideo ?? this.playVideo,
       pictureOf: pictureOf ?? this.pictureOf,
+      leaveTitle: leaveTitle ?? this.leaveTitle,
+      leaveBody: leaveBody ?? this.leaveBody,
+      leaveOpen: leaveOpen ?? this.leaveOpen,
       copyCode: copyCode ?? this.copyCode,
       memorySaved: memorySaved ?? this.memorySaved,
       memorySavedUntil: memorySavedUntil ?? this.memorySavedUntil,
@@ -1650,6 +1666,9 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'Eksi',
     playVideo: 'Videoyu oynat',
     pictureOf: 'Resim {n}, toplam {count}',
+    leaveTitle: 'Başka bir site açılsın mı?',
+    leaveBody: 'Bu bağlantı, bu uygulamanın parçası olmayan {site} adresine gidiyor. Yalnızca güveniyorsan aç.',
+    leaveOpen: 'Siteyi aç',
     copyCode: 'Kopyala',
     memorySaved: 'Aklımda: {label}',
     memorySavedUntil: '{date} tarihine kadar aklımda: {label}',
@@ -1917,6 +1936,9 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'Contra',
     playVideo: 'Video abspielen',
     pictureOf: 'Bild {n} von {count}',
+    leaveTitle: 'Eine andere Website öffnen?',
+    leaveBody: 'Dieser Link führt zu {site}, die nicht zu dieser App gehört. Öffnen Sie ihn nur, wenn Sie der Seite vertrauen.',
+    leaveOpen: 'Website öffnen',
     copyCode: 'Kopieren',
     memorySaved: 'Ich merke mir: {label}',
     memorySavedUntil: 'Ich merke mir bis {date}: {label}',
@@ -2183,6 +2205,9 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'Contre',
     playVideo: 'Lire la vidéo',
     pictureOf: 'Image {n} sur {count}',
+    leaveTitle: 'Ouvrir un autre site ?',
+    leaveBody: 'Ce lien mène à {site}, qui ne fait pas partie de cette application. Ne l\'ouvrez que si vous lui faites confiance.',
+    leaveOpen: 'Ouvrir le site',
     copyCode: 'Copier',
     memorySaved: 'Je retiens : {label}',
     memorySavedUntil: 'Je retiens jusqu’au {date} : {label}',
@@ -2448,6 +2473,9 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'En contra',
     playVideo: 'Reproducir vídeo',
     pictureOf: 'Imagen {n} de {count}',
+    leaveTitle: '¿Abrir otro sitio?',
+    leaveBody: 'Este enlace lleva a {site}, que no forma parte de esta aplicación. Ábrelo solo si confías en él.',
+    leaveOpen: 'Abrir sitio',
     copyCode: 'Copiar',
     memorySaved: 'Lo recordaré: {label}',
     memorySavedUntil: 'Lo recordaré hasta el {date}: {label}',
@@ -2712,6 +2740,9 @@ const Map<String, RendelStrings> _byLocale = {
     con: 'عيب',
     playVideo: 'تشغيل الفيديو',
     pictureOf: 'الصورة {n} من {count}',
+    leaveTitle: 'هل تريد فتح موقع آخر؟',
+    leaveBody: 'يؤدي هذا الرابط إلى {site}، وهو ليس جزءًا من هذا التطبيق. افتحه فقط إذا كنت تثق به.',
+    leaveOpen: 'فتح الموقع',
     copyCode: 'نسخ',
     memorySaved: 'سأتذكر: {label}',
     memorySavedUntil: 'سأتذكر حتى {date}: {label}',

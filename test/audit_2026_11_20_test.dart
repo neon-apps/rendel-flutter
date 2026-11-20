@@ -127,4 +127,73 @@ void main() {
     expect(find.text('500'), findsOneWidget);
     expect(find.text('424'), findsNothing);
   });
+
+  // The second pass the same day: the boundary that says a control is one
+  // (WCAG 1.4.11). On the rail, an empty box, an unpicked star and an off
+  // switch read 1.3 to 1.4:1.
+  final faint = RendelTheme.paper().colors.onSurfaceFaint;
+
+  Iterable<BoxDecoration> decorations(WidgetTester tester) => tester
+      .widgetList<AnimatedContainer>(find.byType(AnimatedContainer))
+      .map((c) => c.decoration)
+      .whereType<BoxDecoration>();
+
+  testWidgets("a checklist's empty box is ringed in the faint ink", (tester) async {
+    await pump(tester, 'checklist', {
+      'items': [
+        {'id': 'a', 'title': 'Unplug the modem', 'done': true},
+        {'id': 'b', 'title': 'Check the light'},
+      ],
+    });
+    final rings = decorations(tester).map((d) => d.border).whereType<Border>().map((b) => b.top.color).toSet();
+    expect(rings, contains(faint));
+  });
+
+  testWidgets("a rating's unpicked stars are outlines in the faint ink", (tester) async {
+    await pump(tester, 'rating', {'question': 'How was it?', 'scale': 'stars_5'});
+    final stars = tester.widgetList<Icon>(find.byIcon(Icons.star_outline_rounded));
+    expect(stars, hasLength(5));
+    expect(stars.map((i) => i.color).toSet(), {faint});
+    expect(find.byIcon(Icons.star_rounded), findsNothing);
+  });
+
+  testWidgets("a form's switch is ringed in the faint ink when off, and its knob stays where it was", (tester) async {
+    await pump(tester, 'form', {
+      'form_id': 'f',
+      'fields': [
+        {'kind': 'toggle', 'name': 'news', 'label': 'News'},
+      ],
+      'submit_label': 'Send',
+    });
+    final track = decorations(tester).firstWhere((d) => d.borderRadius == BorderRadius.circular(999));
+    expect((track.border! as Border).top.color, faint);
+    final knob = find.byWidgetPredicate((w) => w is Container && w.decoration is BoxDecoration && (w.decoration! as BoxDecoration).shape == BoxShape.circle);
+    expect(tester.getSize(knob.first), const Size(20, 20));
+  });
+
+  // Under reduced motion a streaming answer's caret is held solid and a block
+  // on its way does not breathe; their clocks ran on regardless, asking for a
+  // frame sixty times a second for nothing.
+  for (final still in [true, false]) {
+    testWidgets('a streaming answer and a block on its way ${still ? 'ask for no frames under' : 'move without'} reduced motion', (tester) async {
+      tester.view.physicalSize = const Size(390 * 3, 1600 * 3);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.reset);
+      Widget part(String type, Map<String, dynamic> props) => Builder(
+            builder: (c) => ComponentRegistry.build(c, WireBlock(id: type, type: type, fallbackText: 'A $type block.', props: props)..ready = false, dispatch),
+          );
+      await tester.pumpWidget(MediaQuery(
+        data: MediaQueryData(size: const Size(390, 1600), devicePixelRatio: 3, disableAnimations: still),
+        child: MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(body: Column(children: [part('text', {'markdown': 'Your order left'}), part('item_list', {'items': []})])),
+          ),
+        ),
+      ));
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump(const Duration(seconds: 2));
+      expect(tester.binding.hasScheduledFrame, !still);
+    });
+  }
 }

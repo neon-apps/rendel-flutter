@@ -66,6 +66,9 @@ class RendelFollowupCard extends StatelessWidget {
                       width: followup.imageUrl != null ? 56 : 36,
                       height: followup.imageUrl != null ? 56 : 36,
                       fit: followup.imageUrl != null ? BoxFit.cover : BoxFit.contain,
+                      // Decoded near the size drawn (twice it, for a cover crop
+                      // of a wide picture), not at the upload's (audit 2026-11-20).
+                      cacheWidth: ((followup.imageUrl != null ? 112 : 36) * MediaQuery.devicePixelRatioOf(context)).round(),
                       excludeFromSemantics: true,
                       // A picture that will not load leaves the words as they were.
                       errorBuilder: (_, __, ___) => const SizedBox.shrink(),

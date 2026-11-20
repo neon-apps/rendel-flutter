@@ -905,7 +905,17 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       for (final url in entry.pictures)
         ClipRRect(
           borderRadius: BorderRadius.circular(16),
-          child: Image.network(url, width: 132, height: 99, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Icon(Icons.image_outlined, color: ink)),
+          // Decoded at twice the width drawn, not at the camera's: a phone's
+          // 12 MP photo was 48 MB in memory for a 132 pt picture; twice holds a
+          // cover crop sharp up to a 2:1 panorama (audit 2026-11-20).
+          child: Image.network(
+            url,
+            width: 132,
+            height: 99,
+            fit: BoxFit.cover,
+            cacheWidth: (264 * MediaQuery.devicePixelRatioOf(context)).round(),
+            errorBuilder: (_, __, ___) => Icon(Icons.image_outlined, color: ink),
+          ),
         ),
       for (final file in entry.files)
         Row(

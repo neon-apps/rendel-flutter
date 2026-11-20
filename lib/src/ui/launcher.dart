@@ -588,6 +588,8 @@ class _LauncherIcon extends StatelessWidget {
       width: size,
       height: size,
       fit: BoxFit.contain,
+      // Decoded at the size drawn: contained, a width that fits fits the height too.
+      cacheWidth: (size * MediaQuery.devicePixelRatioOf(context)).round(),
       color: color,
       colorBlendMode: BlendMode.srcIn,
       excludeFromSemantics: true,

@@ -14,6 +14,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:rendel/rendel.dart';
+import 'package:rendel/src/core/locale.dart' show rendelOwnSites;
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
 
@@ -305,6 +306,9 @@ void main() {
   // button was drawn and did nothing: opening it needed `onOpenUrl`, which
   // the quickstart never mentions.
   testWidgets("a card's link opens with nothing but init", (tester) async {
+    // On the app's own site, so it opens without asking (leave_sheet_test.dart asks for another).
+    rendelOwnSites = const ['shop.example.com'];
+    addTearDown(() => rendelOwnSites = const []);
     final browser = _Browser();
     UrlLauncherPlatform.instance = browser;
     String sse(String event, Map<String, Object?> data) =>

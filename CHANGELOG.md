@@ -5,6 +5,21 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## Unreleased
+
+## 0.103.0
+
+### Security
+
+- A link in an answer to a site that is not one of the app's own (`own_sites` on its config) opens only after the person says so: "Open another site?" names the site, with Go back and Open site (`askToLeave`). The thread declares `leave_check`, so the server sends such a link as written; an older build is sent it with the site's name beside its words.
+
+### Fixed
+
+- An empty checkbox or radio, an unpicked star and a switch that is off read as controls (3:1 and more): stars are outlines until picked, the off switch has a ring, and the on switch's track darkens a light brand colour until it reads.
+- The header's buttons and the composer's controls are 48 to the finger, Android's least, with their glass where it was; read aloud and close in the voice capsule were 40 tall, under Apple's 44 as well.
+- Under reduced motion the streaming caret and a block's loading placeholder no longer keep the app drawing frames while nothing moves.
+- Support photos, a follow-up's picture, the launcher icon and the header logo are decoded at the size they are drawn: a phone's 12 MP photo took about 48 MB of memory for a 132 pt picture.
+
 ## 0.102.0
 
 **Added**

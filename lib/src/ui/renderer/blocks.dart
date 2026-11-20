@@ -543,15 +543,18 @@ class _CaretState extends State<_Caret> with SingleTickerProviderStateMixin {
   late final Animation<double> _fade =
       Tween<double>(begin: 0.15, end: 0.99).animate(_blink);
 
-  bool _started = false;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     _blink.duration = RendelThemeScope.of(context).motion.caret;
-    if (_started) return;
-    _started = true;
-    _blink.repeat(reverse: true);
+    // Under reduced motion the caret is held solid, so its clock is stopped
+    // too: running, it asked for a frame sixty times a second for nothing
+    // for as long as the answer streamed (audit 2026-11-20).
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _blink.stop();
+    } else if (!_blink.isAnimating) {
+      _blink.repeat(reverse: true);
+    }
   }
 
   @override
@@ -6433,9 +6436,14 @@ class _SwitchMark extends StatelessWidget {
         curve: theme.motion.curve,
         width: 44,
         height: 26,
-        padding: const EdgeInsets.all(3),
+        // The ring is inside the 3 round the knob, so the knob does not move.
+        padding: EdgeInsets.all(on ? 3 : 1.5),
+        // Off, the track is ringed in the faint ink (its fill alone read 1.3:1);
+        // on, the accent darkened where it would not read 3:1 on the page, as
+        // the web's (WCAG 1.4.11, audit 2026-11-20).
         decoration: BoxDecoration(
-          color: on ? theme.colors.accent : theme.colors.lineStrong,
+          color: on ? theme.accentEdge : theme.colors.lineStrong,
+          border: on ? null : Border.all(color: theme.colors.onSurfaceFaint, width: 1.5),
           borderRadius: BorderRadius.circular(999),
         ),
         child: AnimatedAlign(
@@ -7756,17 +7764,19 @@ class _RendelPulseState extends State<RendelPulse> with SingleTickerProviderStat
   late final Animation<double> _fade =
       Tween<double>(begin: 0.55, end: 0.99).animate(_curve);
 
-  bool _started = false;
-
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     final motion = RendelThemeScope.of(context).motion;
     _controller.duration = motion.breath;
     _curve.curve = motion.breathCurve;
-    if (_started) return;
-    _started = true;
-    _controller.repeat(reverse: true);
+    // Still under reduced motion, its clock stopped as well as unseen (the
+    // caret's, above).
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _controller.stop();
+    } else if (!_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    }
   }
 
   @override
@@ -10909,8 +10919,10 @@ class _ChoiceTick extends StatelessWidget {
         color: multi && on ? ink : ink.withValues(alpha: 0),
         borderRadius: BorderRadius.circular(multi ? 7 : 11),
         // A picked radio is a thick ring of ink round a hole; a picked box is
-        // filled, so it has no ring at all.
-        border: multi && on ? null : Border.all(color: on ? ink : theme.rail, width: on ? 7 : 2),
+        // filled, so it has no ring at all. An empty one is ringed in the
+        // faint ink, 4.5:1 and more in every theme: on the rail it read 1.4:1
+        // and said nothing could be ticked (WCAG 1.4.11, audit 2026-11-20).
+        border: multi && on ? null : Border.all(color: on ? ink : theme.colors.onSurfaceFaint, width: on ? 7 : 2),
       ),
       child: multi && on
           ? Icon(Icons.check_rounded, size: 15, color: theme.colors.surfaceRaised)
@@ -12054,11 +12066,12 @@ class _RatingState extends State<_Rating> {
                   width: _starWidth,
                   height: _minTarget,
                   child: Icon(
-                    Icons.star_rounded,
+                    // Filled in ink up to the score, as the web draws them; the
+                    // rest their outline in the faint ink: filled on the rail,
+                    // the five read 1.4:1 (WCAG 1.4.11, audit 2026-11-20).
+                    shown != null && score <= shown ? Icons.star_rounded : Icons.star_outline_rounded,
                     size: 40,
-                    // In ink up to the score, as the web draws them; the rest
-                    // on the rail.
-                    color: shown != null && score <= shown ? theme.colors.onSurface : theme.rail,
+                    color: shown != null && score <= shown ? theme.colors.onSurface : theme.colors.onSurfaceFaint,
                   ),
                 ),
               ),
@@ -12313,7 +12326,12 @@ class _RatingThanks extends StatelessWidget {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              for (var n = 1; n <= 5; n++) Icon(Icons.star_rounded, size: 16, color: n <= score ? ink : theme.rail),
+              for (var n = 1; n <= 5; n++)
+                Icon(
+                  n <= score ? Icons.star_rounded : Icons.star_outline_rounded,
+                  size: 16,
+                  color: n <= score ? ink : theme.colors.onSurfaceFaint,
+                ),
             ],
           ),
           strings.ratingStarsOf(score),

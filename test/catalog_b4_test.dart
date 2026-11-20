@@ -355,8 +355,11 @@ void main() {
       tester.view.devicePixelRatio = 3;
       addTearDown(tester.view.reset);
       await pump(tester, [_rating('stars_5'), _rating('thumbs'), _rating('nps_11')]);
-      expect(find.byIcon(Icons.star_rounded), findsNWidgets(5));
-      expect(tester.widget<Icon>(find.byIcon(Icons.star_rounded).first).size, 40);
+      // Nothing picked yet: five outlines, in the faint ink (WCAG 1.4.11).
+      expect(find.byIcon(Icons.star_outline_rounded), findsNWidgets(5));
+      final star = tester.widget<Icon>(find.byIcon(Icons.star_outline_rounded).first);
+      expect(star.size, 40);
+      expect(star.color, RendelTheme.paper().colors.onSurfaceFaint);
       final thumb = find.ancestor(of: find.byIcon(Icons.thumb_up_outlined), matching: find.byType(AnimatedContainer));
       expect(tester.getSize(thumb), const Size(52, 52));
       // 0–10 on a phone: two rows, 0–5 over 6–10, and the ends labelled.

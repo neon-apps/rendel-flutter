@@ -1538,6 +1538,7 @@ class Rendel {
     _supportBeat = null;
     _supportTicked = null;
     rendelPublishedLanguages = const [];
+    rendelOwnSites = const [];
     _store = RendelMemoryConfigStore();
     _theme = RendelTheme.paper();
     _codeTheme = _theme;
@@ -1728,6 +1729,8 @@ class Rendel {
       rendelPublishedLanguages = remote.publishedLanguages;
       configRevision.value++;
     }
+    // The app's own sites: a link anywhere else asks before it opens (decision 9).
+    rendelOwnSites = remote.ownSites;
     if (remote.isEmpty) return;
     // Compared by PAYLOAD, not by object identity. `copyWith` always
     // allocates, so an identity check never held and the launcher rebuilt on

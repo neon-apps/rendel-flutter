@@ -104,6 +104,8 @@ const List<String> clientCapabilities = [
   'card_fill',
   'card_pictures',
   'support',
+  // The thread asks before a link leaves the app's own sites (`askToLeave`, decision 9).
+  'leave_check',
 ];
 
 /// The kinds of action this build carries out when a control is tapped,

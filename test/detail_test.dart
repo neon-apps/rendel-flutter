@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:rendel/src/core/locale.dart' show rendelOwnSites;
 import 'package:rendel/rendel.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/protocol/protocol.dart';
@@ -264,6 +265,9 @@ void main() {
     });
 
     testWidgets('an item that is a link still opens the link', (tester) async {
+      // On the app's own site, so it opens without asking (leave_sheet_test.dart asks for another).
+      rendelOwnSites = const ['example.com'];
+      addTearDown(() => rendelOwnSites = const []);
       final opened = <String>[];
       final (c, api) = await shoes(tester, onOpenUrl: (url) async => opened.add(url));
       await tester.drag(find.bySemanticsLabel(RegExp('^Aero Glide 2')), const Offset(-500, 0));

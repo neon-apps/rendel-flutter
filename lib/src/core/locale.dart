@@ -28,6 +28,11 @@ String resolveLocale(String? hostLocale) {
 /// (`Rendel._apply`), empty until then and for a persona that names none.
 List<String> rendelPublishedLanguages = const [];
 
+/// The app's own sites, as its config says (`own_sites`): set when a config
+/// is applied, empty until then. A link anywhere else asks before it opens
+/// (`askToLeave`, decision 9).
+List<String> rendelOwnSites = const [];
+
 /// The language of the SDK's own words (Tuna, 2026-11-14): the app's locale
 /// when it gives one; else the phone's language, when it is one the
 /// assistant answers in; else English, when the assistant answers in
