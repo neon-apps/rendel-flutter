@@ -1020,8 +1020,28 @@ class RendelTheme {
   late final Gradient litFill = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
-    colors: [Color.lerp(colors.surfaceRaised, colors.accent, 0.82)!, colors.accent],
+    colors: [Color.lerp(colors.surfaceRaised, colors.accent, litMix)!, colors.accent],
   );
+
+  /// How far the primary's light from above may reach: the accent at 82% of
+  /// its top, more (to 1, flat) where [RendelColors.onAccent] would read under
+  /// 4.5:1 a quarter of the way down the fill, above the top of the words
+  /// (audit 2026-11-20: Klinik's teal at 4.26, a dark Drivo's orange at 3.94;
+  /// measured at the middle, Flutter's contrast guideline still read Klinik at
+  /// 4.42 and Derma at 4.17). `litMix` in the web SDK's config.ts, value for
+  /// value.
+  late final double litMix = () {
+    var share = 0.82;
+    while (share < 1 &&
+        contrastRatio(
+              colors.onAccent,
+              Color.lerp(Color.lerp(colors.surfaceRaised, colors.accent, share)!, colors.accent, 0.25)!,
+            ) <
+            4.5) {
+      share = math.min(1, share + 0.02);
+    }
+    return share;
+  }();
 
   /// The 1px highlight along the top of a lit fill.
   static const Color litEdge = Color(0x29FFFFFF);

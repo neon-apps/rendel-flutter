@@ -1124,13 +1124,14 @@ Widget buildItemList(BuildContext context, WireBlock block, RendelDispatcher dis
 /// never left to a colour.
 String _signed(Map amount) {
   final value = (_str(amount['value']) ?? '').trim();
+  // The sign the model wrote, wherever it put it before the figure ("€-4.20",
+  // "US$ +2,450"): the tone gives it once, in front (audit 2026-11-20).
+  final bare = value.replaceFirstMapped(RegExp(r'^([^\d]*?)(\s*)[-−–+]\s*'), (m) => '${m[1]}${m[2]}');
   switch (_str(amount['tone'])) {
     case 'positive':
-      return value.startsWith('+') ? value : '+$value';
+      return '+$bare';
     case 'negative':
-      if (value.startsWith('−')) return value;
-      if (value.startsWith('-')) return '−${value.substring(1)}';
-      return '−$value';
+      return '−$bare';
   }
   return value;
 }
@@ -3849,12 +3850,17 @@ class _Plot extends StatelessWidget {
       }
     }
     if (maxValue == minValue) maxValue = minValue + 1;
+    // Round gridlines, the top one named: "500", not the peak's own "424".
+    final scale = chartScale(math.min(0, minValue), maxValue);
+    final locale = RendelStringsScope.of(context).numberLocale;
+    final top = scale.hi;
+    final tenths = top * 10;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          _withUnit(_num(maxValue, RendelStringsScope.of(context).numberLocale), unit),
+          _withUnit((tenths - tenths.roundToDouble()).abs() < 1e-9 ? _num(top, locale) : rendelNumber(top, locale, digits: 2), unit),
           style: theme.text.captionTabular,
           // The two axis labels below this are capped; this was the only
           // caption in the catalog that could wrap to three lines and push
@@ -3891,8 +3897,9 @@ class _Plot extends StatelessWidget {
                   stacked: stacked,
                   area: kind == 'area',
                   series: [for (final s in series) s.data],
-                  minValue: math.min(0, minValue),
-                  maxValue: maxValue,
+                  minValue: scale.lo,
+                  maxValue: scale.hi,
+                  step: scale.step,
                   // The v6 hairline. A single series of bars is drawn by
                   // `_Bars`; what reaches here is a line, an area, or grouped
                   // or stacked bars, which keep their structure and only
@@ -3998,6 +4005,33 @@ List<String> chartAxisLabels(List<String> labels) {
 }
 
 final RegExp _yearAtEnd = RegExp(r'^(.*\S)\s+(\d{4})$');
+
+/// A chart's value scale on round numbers: a step of 1, 2, 2.5 or 5 times a
+/// power of ten, two to four bands of it, the one that leaves the least room
+/// over the data. The top was the peak itself, so a peak of 424 was named
+/// "424" over gridlines at its thirds (audit 2026-11-20); now 0, 250, 500.
+///
+/// Mirrors `niceScale` in the Web SDK's `blocks.ts`.
+@visibleForTesting
+({double lo, double hi, double step}) chartScale(double min, double max) {
+  if (max <= min) max = min + 1;
+  final power = math.pow(10, (math.log(max - min) / math.ln10).floor()).toDouble();
+  ({double lo, double hi, double step})? best;
+  for (final p in [power / 10, power]) {
+    for (final m in const [1.0, 2.0, 2.5, 5.0, 10.0]) {
+      final step = m * p;
+      // + 0.0: a scale that ends at zero from below ends at 0, not -0.
+      final lo = (min / step + 1e-9).floorToDouble() * step + 0.0;
+      final hi = (max / step - 1e-9).ceilToDouble() * step + 0.0;
+      final bands = ((hi - lo) / step).round();
+      if (bands < 2 || bands > 4) continue;
+      // The least room over the data; of two as tight, the rounder step.
+      final room = hi - lo - (best == null ? double.infinity : best.hi - best.lo);
+      if (room < -1e-9 || (room.abs() <= 1e-9 && step > best!.step)) best = (lo: lo, hi: hi, step: step);
+    }
+  }
+  return best!;
+}
 
 class _BarsState extends State<_Bars> {
   /// The bar read out; null is the latest.
@@ -4152,6 +4186,7 @@ class _PlotPainter extends CustomPainter {
     required this.series,
     required this.minValue,
     required this.maxValue,
+    required this.step,
     required this.grid,
     required this.colors,
   });
@@ -4166,6 +4201,9 @@ class _PlotPainter extends CustomPainter {
   final List<List<double>> series;
   final double minValue;
   final double maxValue;
+
+  /// The gap between two gridlines, a round number ([chartScale]).
+  final double step;
   final Color grid;
   final List<Color> colors;
 
@@ -4174,8 +4212,9 @@ class _PlotPainter extends CustomPainter {
     final gridPaint = Paint()
       ..color = grid
       ..strokeWidth = 1;
-    for (var i = 0; i <= 2; i++) {
-      final y = size.height * i / 2;
+    final bands = ((maxValue - minValue) / step).round();
+    for (var i = 0; i <= bands; i++) {
+      final y = size.height * i / bands;
       canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
     }
 
@@ -4299,6 +4338,7 @@ class _PlotPainter extends CustomPainter {
       old.area != area ||
       old.minValue != minValue ||
       old.maxValue != maxValue ||
+      old.step != step ||
       old.grid != grid ||
       !_sameColors(old.colors, colors) ||
       !_sameSeries(old.series, series);
@@ -4770,14 +4810,20 @@ Widget buildMediaGallery(
   final carousel = block.props['layout'] == 'carousel';
   if (images.isEmpty) return buildFallback(context, block);
 
+  // A picture with no words of its own is named by its caption, else by its
+  // place, in the panel's language (audit 2026-11-20: it was English only).
   String altFor(int i) =>
-      _str(images[i]['alt']) ?? 'Image ${i + 1} of ${images.length}';
+      _str(images[i]['alt']) ??
+      _str(images[i]['caption']) ??
+      RendelStringsScope.of(context).pictureNumber(i + 1, images.length);
 
   // A picture, as a video's poster when it is one, with its caption under it
   // (`design/CATALOG-B6.md`).
   Widget tile(int i, {required double width, required double height}) => _GalleryTile(
         url: _str(images[i]['url']),
         alt: altFor(i),
+        // One video alone is just "Play video"; among several, which one it is.
+        sayAlt: _str(images[i]['alt']) != null || _str(images[i]['caption']) != null || images.length > 1,
         caption: _str(images[i]['caption']),
         video: _str(images[i]['video_url']),
         width: width,
@@ -6067,9 +6113,12 @@ class _Field extends StatelessWidget {
         final multiline = kind == 'multiline';
         // A text field has no name of its own, so the visible label above it
         // merges into its node. The row around it hands a tap anywhere on it
-        // to the field.
+        // to the field. Only for a finger: a screen reader reaches the field
+        // itself, and the row as a second, nameless button was announced as
+        // just "button" (labeledTapTargetGuideline, audit 2026-11-20).
         content = GestureDetector(
           behavior: HitTestBehavior.translucent,
+          excludeFromSemantics: true,
           onTap: enabled ? () => focusNode?.requestFocus() : null,
           child: row(
             switch (kind) {
@@ -14115,12 +14164,14 @@ class _GalleryTile extends StatelessWidget {
     required this.width,
     required this.height,
     required this.dispatch,
+    this.sayAlt = true,
     this.caption,
     this.video,
   });
 
   final String? url;
   final String alt;
+  final bool sayAlt;
   final double width;
   final double height;
   final RendelDispatcher dispatch;
@@ -14133,7 +14184,7 @@ class _GalleryTile extends StatelessWidget {
     Widget picture = _Thumbnail(url: url, width: width, height: height, alt: alt);
     if (video case final video?) {
       picture = RendelPressable(
-        semanticLabel: '${RendelStringsScope.of(context).playVideo}, $alt',
+        semanticLabel: sayAlt ? '${RendelStringsScope.of(context).playVideo}, $alt' : RendelStringsScope.of(context).playVideo,
         pressedScale: 0.98,
         onTap: _external(dispatch, video),
         child: Stack(
@@ -15232,10 +15283,12 @@ class _Ticket extends StatelessWidget {
                   Text(
                     unit,
                     textAlign: TextAlign.center,
+                    // In the ink: the soft ink on the stub's wash read
+                    // at 4.4:1 on dark themes (audit 2026-11-20).
                     style: theme.text.caption.copyWith(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: theme.colors.onSurfaceSoft,
+                      color: theme.colors.onSurface,
                     ),
                   ),
                 ],

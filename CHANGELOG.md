@@ -5,6 +5,28 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.102.0
+
+**Added**
+
+- `RendelStrings.pictureOf` (*Picture {n} of {count}*) and
+  `pictureNumber(n, count)`: a gallery picture with no `alt` and no caption
+  is read by its place, in the panel's language. A lone video stays
+  *Play video*.
+
+**Fixed**
+
+- An amount with a tone showed two signs when the model wrote its own
+  (*−€-4.20*); it shows the tone's, in front.
+- The primary's lit fill kept the light from above at 82% for every accent,
+  so white words read under 4.5:1 on accents that pass flat (a teal at 4.42,
+  a rose at 4.17). The light now gives way until a quarter of the way down
+  holds 4.5:1.
+- An offer's unit is drawn in the ink; on dark themes it read 4.4:1.
+- A form's text row was a second, nameless button to a screen reader.
+- A line, area or grouped chart named its peak over gridlines at its halves;
+  it names a round top over round gridlines (0, 250, 500).
+
 ## 0.101.0
 
 **Added**

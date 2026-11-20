@@ -191,6 +191,7 @@ class RendelStrings {
     this.pro = 'Pro',
     this.con = 'Con',
     this.playVideo = 'Play video',
+    this.pictureOf = 'Picture {n} of {count}',
     this.copyCode = 'Copy',
     this.memorySaved = 'I\'ll remember: {label}',
     this.memorySavedUntil = 'I\'ll remember until {date}: {label}',
@@ -680,6 +681,10 @@ class RendelStrings {
   final String playVideo;
   final String copyCode;
 
+  /// A gallery picture with no description of its own, read out by its
+  /// place: {n} of {count} (audit 2026-11-20). Use [pictureNumber].
+  final String pictureOf;
+
   /// Preference memory (`design/plans/preference-memory.md` §3.7): the chips
   /// under an answer that saved, changed, forgot or relied on a note
   /// ({label} is the note's, {date} its last day, {count} how many), the mark
@@ -889,6 +894,7 @@ class RendelStrings {
       choiceCount.replaceAll('{n}', '$n').replaceAll('{m}', '$m');
   String showMoreCount(int n) => showMore.replaceAll('{n}', '$n');
   String asOfTime(String time) => asOf.replaceAll('{time}', time);
+  String pictureNumber(int n, int count) => pictureOf.replaceAll('{n}', '$n').replaceAll('{count}', '$count');
   String arrivesAt(String time) => arrives.replaceAll('{time}', time);
   String inMinutesCount(int n) => inMinutes.replaceAll('{n}', '$n');
   String inHoursCount(int n) => inHours.replaceAll('{n}', '$n');
@@ -1104,6 +1110,7 @@ class RendelStrings {
     String? pro,
     String? con,
     String? playVideo,
+    String? pictureOf,
     String? copyCode,
     String? memorySaved,
     String? memorySavedUntil,
@@ -1364,6 +1371,7 @@ class RendelStrings {
       pro: pro ?? this.pro,
       con: con ?? this.con,
       playVideo: playVideo ?? this.playVideo,
+      pictureOf: pictureOf ?? this.pictureOf,
       copyCode: copyCode ?? this.copyCode,
       memorySaved: memorySaved ?? this.memorySaved,
       memorySavedUntil: memorySavedUntil ?? this.memorySavedUntil,
@@ -1641,6 +1649,7 @@ const Map<String, RendelStrings> _byLocale = {
     pro: 'Artı',
     con: 'Eksi',
     playVideo: 'Videoyu oynat',
+    pictureOf: 'Resim {n}, toplam {count}',
     copyCode: 'Kopyala',
     memorySaved: 'Aklımda: {label}',
     memorySavedUntil: '{date} tarihine kadar aklımda: {label}',
@@ -1907,6 +1916,7 @@ const Map<String, RendelStrings> _byLocale = {
     pro: 'Pro',
     con: 'Contra',
     playVideo: 'Video abspielen',
+    pictureOf: 'Bild {n} von {count}',
     copyCode: 'Kopieren',
     memorySaved: 'Ich merke mir: {label}',
     memorySavedUntil: 'Ich merke mir bis {date}: {label}',
@@ -2172,6 +2182,7 @@ const Map<String, RendelStrings> _byLocale = {
     pro: 'Pour',
     con: 'Contre',
     playVideo: 'Lire la vidéo',
+    pictureOf: 'Image {n} sur {count}',
     copyCode: 'Copier',
     memorySaved: 'Je retiens : {label}',
     memorySavedUntil: 'Je retiens jusqu’au {date} : {label}',
@@ -2436,6 +2447,7 @@ const Map<String, RendelStrings> _byLocale = {
     pro: 'A favor',
     con: 'En contra',
     playVideo: 'Reproducir vídeo',
+    pictureOf: 'Imagen {n} de {count}',
     copyCode: 'Copiar',
     memorySaved: 'Lo recordaré: {label}',
     memorySavedUntil: 'Lo recordaré hasta el {date}: {label}',
@@ -2699,6 +2711,7 @@ const Map<String, RendelStrings> _byLocale = {
     pro: 'ميزة',
     con: 'عيب',
     playVideo: 'تشغيل الفيديو',
+    pictureOf: 'الصورة {n} من {count}',
     copyCode: 'نسخ',
     memorySaved: 'سأتذكر: {label}',
     memorySavedUntil: 'سأتذكر حتى {date}: {label}',
