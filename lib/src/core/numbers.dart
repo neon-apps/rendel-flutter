@@ -30,3 +30,21 @@ String rendelNumber(num value, String locale, {int? digits}) {
   final negative = value < 0 && double.parse(fixed) != 0;
   return '${negative ? '-' : ''}$grouped${fraction.isEmpty ? '' : '$decimal$fraction'}';
 }
+
+/// [amount] of [currency] (an ISO 4217 code) as the panel's language writes
+/// money, a whole amount without its zeros: "$149" and "$204.50" in English,
+/// "₺1.299,90" in Turkish, "149 €" in German, French and Spanish. The web SDK
+/// writes it through `Intl.NumberFormat`; with no intl package here, the
+/// currencies the shipped languages meet have their signs by hand and any
+/// other is written as its code after the number.
+String rendelMoney(num amount, String currency, String locale) {
+  const signs = {'USD': r'$', 'EUR': '€', 'GBP': '£', 'TRY': '₺', 'JPY': '¥', 'AUD': r'A$', 'CAD': r'CA$'};
+  final language = locale.trim().toLowerCase().split(RegExp('[-_]')).first;
+  final number = rendelNumber(amount, locale, digits: amount == amount.roundToDouble() ? 0 : 2);
+  final sign = signs[currency];
+  if (sign == null) return '$number $currency';
+  return switch (language) {
+    'de' || 'fr' || 'es' || 'ar' => '$number $sign',
+    _ => '$sign$number',
+  };
+}

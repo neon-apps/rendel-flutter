@@ -7558,6 +7558,10 @@ Widget buildSkeleton(BuildContext context, String type) {
     'map' => const _SkBox(width: double.infinity, height: 200),
     // Catalog wave 6: code as its plate, a head and a few lines tall.
     'code' => const _SkBox(width: double.infinity, height: 112),
+    // Catalog wave 7: each as the ground it hydrates onto, about as tall.
+    'steps' || 'offers' => const _SkBox(width: double.infinity, height: 176),
+    'cart' || 'journey' => const _SkBox(width: double.infinity, height: 220),
+    'gauge' => const _SkBox(width: double.infinity, height: 196),
     'key_points' => plated([
         for (var i = 0; i < 3; i++) ...[
           if (i > 0) const SizedBox(height: 16),
@@ -14778,4 +14782,1477 @@ class _ActionDoneState extends State<_ActionDone> {
       ),
     );
   }
+}
+
+// ————————————————————————— catalog wave 7 —————————————————————————
+//
+// steps, offers, cart, journey and gauge: the catalog review of 2026-11-20,
+// as Tuna picked them in /lab/catalog-next. The web SDK draws the same five
+// in `sdk/web/src/ui/blocks.ts`; the numbers here are its numbers.
+
+/// Instructions read in order (pick A): on the page, the numbers joined by a
+/// rail as the tracker's line is, and nothing to tick. The numbers run
+/// through the groups. A step that uses one thing has its picture at the end
+/// of the row and a line naming it; a step with an action answers a tap.
+Widget buildSteps(
+  BuildContext context,
+  WireBlock block,
+  RendelDispatcher dispatch,
+) {
+  final theme = RendelThemeScope.of(context);
+  final items = [
+    for (final item in _maps(block.props['items']))
+      if (_str(item['title']) != null) item,
+  ];
+  if (items.isEmpty) return buildFallback(context, block);
+  final groups = [
+    for (final group in _maps(block.props['groups']))
+      _str(group['label']) ?? '',
+  ];
+  // A step with no group, or naming a heading that is not there, comes
+  // before the first heading rather than being dropped.
+  final loose = <Map>[];
+  final grouped = [for (final _ in groups) <Map>[]];
+  for (final item in items) {
+    final at = item['group_index'];
+    if (at is int && at >= 0 && at < groups.length) {
+      grouped[at].add(item);
+    } else {
+      loose.add(item);
+    }
+  }
+  final title = _str(block.props['title']);
+  final cta = _map(block.props['cta']);
+  final label = _str(cta?['label']);
+  var n = 0;
+  final rows = <Widget>[];
+  void run(List<Map> steps) {
+    for (final (i, step) in steps.indexed) {
+      rows.add(
+        _StepRow(
+          number: ++n,
+          item: step,
+          last: i == steps.length - 1,
+          dispatch: dispatch,
+        ),
+      );
+    }
+  }
+
+  run(loose);
+  for (final (i, group) in groups.indexed) {
+    if (grouped[i].isEmpty) continue;
+    if (group.isNotEmpty) {
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(top: rows.isEmpty ? 0 : 16, bottom: 10),
+          // As the words came, not in capitals: Dart's toUpperCase knows no Turkish.
+          child: Semantics(
+            header: true,
+            child: Text(
+              group,
+              style: theme.text.caption.copyWith(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 12 * 0.06,
+                color: theme.colors.onSurfaceSoft,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    run(grouped[i]);
+  }
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (title != null && title.isNotEmpty) ...[
+        Semantics(header: true, child: Text(title, style: _wave4Title(theme))),
+        const SizedBox(height: 12),
+      ],
+      ...rows,
+      if (cta != null && label != null && label.isNotEmpty) ...[
+        const SizedBox(height: 18),
+        _actionButton(
+          context,
+          label: label,
+          action: cta['action'],
+          dispatch: dispatch,
+          expand: true,
+        ),
+      ],
+    ],
+  );
+}
+
+class _StepRow extends StatelessWidget {
+  const _StepRow({
+    required this.number,
+    required this.item,
+    required this.last,
+    required this.dispatch,
+  });
+
+  final int number;
+  final Map item;
+
+  /// The last of its run: no rail under its number, and no gap after it.
+  final bool last;
+  final RendelDispatcher dispatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final title = _str(item['title'])!;
+    final body = _str(item['body']);
+    final caption = _str(item['caption']);
+    final picture = _str(item['image_url']);
+    final words = Padding(
+      padding: EdgeInsets.only(top: 3, bottom: last ? 0 : 20),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.text.label.copyWith(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    height: 1.35,
+                  ),
+                ),
+                if (body != null && body.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    body,
+                    style: theme.text.body.copyWith(
+                      fontSize: 13.5,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+                if (caption != null && caption.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    caption,
+                    style: theme.text.labelTabular.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          if (picture != null && picture.startsWith('https://')) ...[
+            const SizedBox(width: 12),
+            _Thumbnail(
+              url: picture,
+              width: 52,
+              height: 52,
+              radius: theme.radius.sm,
+              collapse: true,
+            ),
+          ],
+        ],
+      ),
+    );
+    final onTap = _tap(dispatch, item['action']);
+    final row = IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Column(
+            children: [
+              // Drawn, not read: the row's own label says which step it is.
+              ExcludeSemantics(
+                child: Container(
+                  width: 28,
+                  height: 28,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: theme.colors.surfaceRaised,
+                    border: Border.all(
+                      color: theme.colors.onSurface.withValues(alpha: 0.22),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Text(
+                    '$number',
+                    style: theme.text.labelTabular.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              if (!last)
+                Expanded(
+                  child: Container(
+                    width: 1.5,
+                    margin: const EdgeInsets.symmetric(vertical: 4),
+                    decoration: BoxDecoration(
+                      color: theme.rail,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(child: words),
+        ],
+      ),
+    );
+    final said = _joinParts(['$number', title, body, caption]);
+    if (onTap == null) {
+      return Semantics(
+        label: said,
+        container: true,
+        excludeSemantics: true,
+        child: row,
+      );
+    }
+    return RendelPressable(
+      semanticLabel: said,
+      pressedScale: 0.985,
+      onTap: onTap,
+      child: row,
+    );
+  }
+}
+
+/// The coupons and campaigns a person holds (pick A): a ticket each, what it
+/// is worth on the stub, the tear between the stub and the rest, then what
+/// it is for, when it ends and its code, which a tap copies. One already
+/// used or expired is struck through and says so in the code's place.
+Widget buildOffers(
+  BuildContext context,
+  WireBlock block,
+  RendelDispatcher dispatch,
+) {
+  final theme = RendelThemeScope.of(context);
+  final offers = [
+    for (final offer in _maps(block.props['items']))
+      if (_str(offer['value']) != null && _str(offer['title']) != null) offer,
+  ];
+  if (offers.isEmpty) return buildFallback(context, block);
+  final title = _str(block.props['title']);
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (title != null && title.isNotEmpty) ...[
+        Semantics(header: true, child: Text(title, style: _wave4Title(theme))),
+        const SizedBox(height: 12),
+      ],
+      for (final (i, offer) in offers.indexed) ...[
+        if (i > 0) const SizedBox(height: 10),
+        _Ticket(offer: offer, dispatch: dispatch),
+      ],
+    ],
+  );
+}
+
+/// A ticket's outline: a rounded box with a bite out of its top and bottom
+/// edges where the stub tears off, [tear] from its start edge.
+Path _ticketPath(Size size, double tear, TextDirection direction) {
+  final x = direction == TextDirection.rtl ? size.width - tear : tear;
+  final box =
+      Path()..addRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(18)),
+      );
+  final bites =
+      Path()
+        ..addOval(Rect.fromCircle(center: Offset(x, 0), radius: 7))
+        ..addOval(Rect.fromCircle(center: Offset(x, size.height), radius: 7));
+  return Path.combine(PathOperation.difference, box, bites);
+}
+
+class _TicketClip extends CustomClipper<Path> {
+  const _TicketClip(this.direction);
+
+  final TextDirection direction;
+
+  @override
+  Path getClip(Size size) => _ticketPath(size, _Ticket.stub, direction);
+
+  @override
+  bool shouldReclip(_TicketClip old) => old.direction != direction;
+}
+
+/// The ticket's shadow under it and its hairline over it, both along its cut
+/// outline: a [BoxShadow] and a [Border] know only boxes.
+class _TicketEdge extends CustomPainter {
+  const _TicketEdge({required this.direction, required this.line, this.shadow});
+
+  final TextDirection direction;
+  final Color line;
+
+  /// Null for the hairline alone, painted over the ticket.
+  final Color? shadow;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cast = shadow;
+    if (cast != null) {
+      // The plates' own shadow (`_choiceShadow`): narrow, soft and under the
+      // ticket only. Kept off the ticket's own box, so a bite shows the page
+      // through it and not the shadow.
+      final box = Offset.zero & size;
+      canvas.save();
+      canvas.clipPath(
+        Path.combine(
+          PathOperation.difference,
+          Path()..addRect(box.inflate(60)),
+          Path()..addRRect(RRect.fromRectAndRadius(box, const Radius.circular(18))),
+        ),
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(box.shift(const Offset(0, 12)).deflate(20), const Radius.circular(18)),
+        Paint()
+          ..color = cast
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15),
+      );
+      canvas.restore();
+      return;
+    }
+    canvas.drawPath(
+      _ticketPath(size, _Ticket.stub, direction),
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1
+        ..color = line,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_TicketEdge old) =>
+      old.direction != direction || old.line != line || old.shadow != shadow;
+}
+
+/// The tear: a dashed line down the stub's end edge.
+class _TearPainter extends CustomPainter {
+  const _TearPainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint =
+        Paint()
+          ..color = color
+          ..strokeWidth = 1.5;
+    for (var y = 9.0; y < size.height - 9; y += 7) {
+      canvas.drawLine(
+        Offset(size.width / 2, y),
+        Offset(size.width / 2, math.min(y + 4, size.height - 9)),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_TearPainter old) => old.color != color;
+}
+
+class _Ticket extends StatelessWidget {
+  const _Ticket({required this.offer, required this.dispatch});
+
+  /// The stub's width, and so where the ticket tears.
+  static const double stub = 88;
+
+  final Map offer;
+  final RendelDispatcher dispatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final direction = Directionality.of(context);
+    final value = _str(offer['value'])!;
+    final unit = _str(offer['unit']);
+    final title = _str(offer['title'])!;
+    final terms = _str(offer['terms']);
+    final ends = _str(offer['ends_label']);
+    final code = _str(offer['code']);
+    final note = _str(offer['note']);
+    final spent = _str(offer['spent_label']);
+    final gone = spent != null && spent.isNotEmpty;
+    final struck = gone ? TextDecoration.lineThrough : null;
+    final faint = gone ? theme.colors.onSurfaceFaint : null;
+
+    final Widget? end =
+        gone
+            ? _TonePill(label: spent)
+            : code != null && code.isNotEmpty
+            ? _OfferCode(code: code, dispatch: dispatch)
+            : note != null && note.isNotEmpty
+            ? Text(note, style: theme.text.body.copyWith(fontSize: 13))
+            : null;
+    final when =
+        !gone && ends != null && ends.isNotEmpty
+            ? _TonePill(
+              label: ends,
+              tone: offer['ending_soon'] == true ? 'warning' : null,
+            )
+            : null;
+
+    final ticket = IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            width: stub,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 14),
+            decoration: BoxDecoration(
+              color: gone ? theme.highlight : null,
+              gradient: gone ? null : theme.wash,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: theme.text.labelTabular.copyWith(
+                    fontSize: 23,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.46,
+                    height: 1,
+                    color: faint,
+                    decoration: struck,
+                  ),
+                ),
+                if (unit != null && unit.isNotEmpty) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    unit,
+                    textAlign: TextAlign.center,
+                    style: theme.text.caption.copyWith(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colors.onSurfaceSoft,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          SizedBox(
+            width: 1.5,
+            child: CustomPaint(painter: _TearPainter(theme.rail)),
+          ),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(14, 12, 12, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.text.label.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      height: 1.35,
+                      color: faint,
+                      decoration: struck,
+                    ),
+                  ),
+                  if (terms != null && terms.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      terms,
+                      style: theme.text.body.copyWith(
+                        fontSize: 13,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
+                  if (when != null || end != null) ...[
+                    const SizedBox(height: 6),
+                    // The date at the start and the code at the end of one line; on a
+                    // narrow ticket the code goes under the date rather than off the edge.
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: 40,
+                        minWidth: double.infinity,
+                      ),
+                      child:
+                          when != null && end != null
+                              ? Wrap(
+                                alignment: WrapAlignment.spaceBetween,
+                                crossAxisAlignment: WrapCrossAlignment.center,
+                                spacing: 8,
+                                runSpacing: 6,
+                                children: [when, end],
+                              )
+                              : Align(
+                                alignment:
+                                    when != null
+                                        ? AlignmentDirectional.centerStart
+                                        : AlignmentDirectional.centerEnd,
+                                child: when ?? end,
+                              ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    return CustomPaint(
+      painter: _TicketEdge(
+        direction: direction,
+        line: theme.hairline,
+        shadow: theme.colors.shadow.withValues(alpha: 0.45),
+      ),
+      foregroundPainter: _TicketEdge(
+        direction: direction,
+        line: theme.hairline,
+      ),
+      child: ClipPath(
+        clipper: _TicketClip(direction),
+        child: ColoredBox(color: theme.colors.surfaceRaised, child: ticket),
+      ),
+    );
+  }
+}
+
+/// An offer's code as a button that copies it: the code in a fixed face on a
+/// white pill, the copy glyph after it, "Copied" for a moment once it has.
+/// The code alone where this build cannot copy.
+class _OfferCode extends StatelessWidget {
+  const _OfferCode({required this.code, required this.dispatch});
+
+  final String code;
+  final RendelDispatcher dispatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    return _Acting(
+      action: {'kind': 'copy', 'text': code},
+      dispatch: dispatch,
+      builder: (context, onTap, copied) {
+        final pill = Container(
+          constraints: const BoxConstraints(minHeight: 40),
+          padding: const EdgeInsetsDirectional.fromSTEB(14, 0, 12, 0),
+          decoration:
+              copied
+                  ? BoxDecoration(
+                    color: theme.highlight,
+                    borderRadius: BorderRadius.circular(theme.radius.control),
+                  )
+                  : _white(theme, theme.radius.control),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(
+                child: Text(
+                  copied ? strings.copied : code,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      copied
+                          ? theme.text.label.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          )
+                          : theme.text.label.copyWith(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'monospace',
+                            // iOS has no face by that name; these are its own.
+                            fontFamilyFallback: const ['Menlo', 'Courier'],
+                            letterSpacing: 0.78,
+                          ),
+                ),
+              ),
+              if (onTap != null) ...[
+                const SizedBox(width: 8),
+                Icon(
+                  copied ? Icons.check_rounded : Icons.content_copy_rounded,
+                  size: 16,
+                  color: theme.colors.onSurfaceSoft,
+                ),
+              ],
+            ],
+          ),
+        );
+        if (onTap == null) return pill;
+        return RendelPressable(
+          semanticLabel: copied ? strings.copied : '${strings.copy} $code',
+          onTap: onTap,
+          child: pill,
+        );
+      },
+    );
+  }
+}
+
+/// A basket changed in place (pick A): one panel, a line an item with its
+/// stepper, the subtotal following the quantities, one button. A line at
+/// zero stays, struck through, until the button is pressed. The card buys
+/// nothing: the button sends the quantities as a form's submission
+/// (`cart_id` the form, a value a line), and what the answer does with them
+/// is the app's own action behind its confirm card.
+Widget buildCart(
+  BuildContext context,
+  WireBlock block,
+  RendelDispatcher dispatch,
+) {
+  final lines = [
+    for (final line in _maps(block.props['lines']))
+      if (_str(line['id']) != null &&
+          _str(line['title']) != null &&
+          line['unit_price'] is num)
+        line,
+  ];
+  if (lines.isEmpty || _str(block.props['cart_id']) == null) {
+    return buildFallback(context, block);
+  }
+  return _Cart(block: block, lines: lines, dispatch: dispatch);
+}
+
+class _Cart extends StatefulWidget {
+  const _Cart({
+    required this.block,
+    required this.lines,
+    required this.dispatch,
+  });
+
+  final WireBlock block;
+  final List<Map> lines;
+  final RendelDispatcher dispatch;
+
+  @override
+  State<_Cart> createState() => _CartState();
+}
+
+class _CartState extends State<_Cart> {
+  bool _sending = false;
+  String? _error;
+
+  Map<String, dynamic> get _props => widget.block.props;
+
+  /// The quantities as the user has them: on the block, so a page stepped
+  /// away from and back to keeps them; the lines' own until the first change.
+  Map<String, int> get _quantities => switch (_props[RendelLocalKeys.values]) {
+    final Map kept => {
+      for (final entry in kept.entries)
+        if (entry.key is String && entry.value is int)
+          entry.key as String: entry.value as int,
+    },
+    _ => {
+      for (final line in widget.lines)
+        _str(line['id'])!: math.max(
+          0,
+          (line['quantity'] is num ? line['quantity'] as num : 0).toInt(),
+        ),
+    },
+  };
+
+  bool get _sent => _props[RendelLocalKeys.submitted] == true;
+
+  void _change(String id, int to) {
+    final next = _quantities..[id] = to;
+    setState(() => _props[RendelLocalKeys.values] = next);
+  }
+
+  Future<void> _submit() async {
+    setState(() {
+      _sending = true;
+      _error = null;
+    });
+    final outcome = await widget.dispatch.onSubmitForm(
+      _str(_props['cart_id'])!,
+      {..._quantities},
+    );
+    if (!mounted) return;
+    final strings = RendelStringsScope.of(context);
+    setState(() {
+      _sending = false;
+      if (outcome == RendelSubmitOutcome.sent) {
+        _props[RendelLocalKeys.submitted] = true;
+      } else {
+        _error =
+            outcome == RendelSubmitOutcome.busy
+                ? strings.formBusy
+                : strings.formFailedWith(
+                  _str(_props['submit_label']) ?? strings.send,
+                );
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final title = _str(_props['title']);
+    final note = _str(_props['note']);
+    final currency = _str(_props['currency']) ?? '';
+    final label = _str(_props['submit_label']) ?? strings.send;
+    final quantities = _quantities;
+    final locked = _sending || _sent;
+    String money(num amount) =>
+        rendelMoney(amount, currency, strings.numberLocale);
+    num sum = 0;
+    for (final line in widget.lines) {
+      sum += (line['unit_price'] as num) * (quantities[_str(line['id'])] ?? 0);
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: _thingPlate(theme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (title != null && title.isNotEmpty) ...[
+            Semantics(
+              header: true,
+              child: Text(title, style: _wave4Title(theme)),
+            ),
+            const SizedBox(height: 10),
+          ],
+          for (final (i, line) in widget.lines.indexed) ...[
+            if (i > 0) Divider(height: 1, thickness: 1, color: theme.hairline),
+            _CartLine(
+              line: line,
+              quantity: quantities[_str(line['id'])] ?? 0,
+              first: i == 0,
+              locked: locked,
+              money: money,
+              onChange: (to) => _change(_str(line['id'])!, to),
+            ),
+          ],
+          Divider(height: 1, thickness: 1, color: theme.hairline),
+          const SizedBox(height: 10),
+          MergeSemantics(
+            child: Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.end,
+              spacing: 12,
+              children: [
+                Text(
+                  strings.subtotal,
+                  style: theme.text.title.copyWith(fontSize: 17),
+                ),
+                Text(
+                  money(sum),
+                  style: theme.text.labelTabular.copyWith(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (note != null && note.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              note,
+              style: theme.text.body.copyWith(fontSize: 13, height: 1.4),
+            ),
+          ],
+          const SizedBox(height: 14),
+          RendelActionButton(
+            label: '$label · ${money(sum)}',
+            onTap: locked ? null : _submit,
+            expand: true,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Semantics(
+              liveRegion: true,
+              child: Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: theme.text.body.copyWith(fontSize: 13, height: 1.4),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CartLine extends StatelessWidget {
+  const _CartLine({
+    required this.line,
+    required this.quantity,
+    required this.first,
+    required this.locked,
+    required this.money,
+    required this.onChange,
+  });
+
+  final Map line;
+  final int quantity;
+  final bool first;
+  final bool locked;
+  final String Function(num amount) money;
+  final void Function(int to) onChange;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    final title = _str(line['title'])!;
+    final detail = _str(line['detail']);
+    final picture = _str(line['image_url']);
+    final most = math.min(
+      99,
+      line['max'] is num ? (line['max'] as num).toInt() : 99,
+    );
+    final none = quantity == 0;
+    final struck = none ? TextDecoration.lineThrough : null;
+    final faint = none ? theme.colors.onSurfaceFaint : null;
+    final amount = money((line['unit_price'] as num) * quantity);
+
+    Widget step(IconData icon, String name, int to, bool allowed) =>
+        RendelPressable(
+          semanticLabel: '$name, $title',
+          onTap: allowed && !locked ? () => onChange(to) : null,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(
+              icon,
+              size: 16,
+              color:
+                  allowed && !locked
+                      ? theme.colors.onSurface
+                      : theme.colors.onSurfaceFaint,
+            ),
+          ),
+        );
+
+    return Padding(
+      padding: EdgeInsets.only(top: first ? 0 : 12, bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (picture != null && picture.startsWith('https://')) ...[
+            Opacity(
+              opacity: none ? 0.45 : 1,
+              child: _Thumbnail(
+                url: picture,
+                width: 56,
+                height: 56,
+                radius: theme.radius.sm,
+                collapse: true,
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                MergeSemantics(
+                  child: LayoutBuilder(
+                    builder:
+                        (context, box) => Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    title,
+                                    style: theme.text.label.copyWith(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.35,
+                                      color: faint,
+                                      decoration: struck,
+                                    ),
+                                  ),
+                                  if (detail != null && detail.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      detail,
+                                      style: theme.text.body.copyWith(
+                                        fontSize: 13,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // No more than half the row: a long amount wraps under itself, never off the card.
+                            ConstrainedBox(
+                              constraints: BoxConstraints(
+                                maxWidth: box.maxWidth / 2,
+                              ),
+                              child: Text(
+                                amount,
+                                textAlign: TextAlign.end,
+                                style: theme.text.labelTabular.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: faint,
+                                  decoration: struck,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: Container(
+                    constraints: const BoxConstraints(minHeight: 40),
+                    decoration: BoxDecoration(
+                      color: theme.tint,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        step(
+                          Icons.remove_rounded,
+                          strings.cardLess,
+                          quantity - 1,
+                          quantity > 0,
+                        ),
+                        SizedBox(
+                          width: 28,
+                          child: Semantics(
+                            liveRegion: true,
+                            // At the largest text the two digits shrink into their place rather than out of the pill.
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                '$quantity',
+                                textAlign: TextAlign.center,
+                                style: theme.text.labelTabular.copyWith(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        step(
+                          Icons.add_rounded,
+                          strings.cardMore,
+                          quantity + 1,
+                          quantity < most,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A trip's legs (pick A): a card a leg, who runs it and how it stands at
+/// the top, the two ends across a line that says how long it takes, up to
+/// three facts under them; the wait before the next leg on the line between
+/// the two cards.
+Widget buildJourney(
+  BuildContext context,
+  WireBlock block,
+  RendelDispatcher dispatch,
+) {
+  final theme = RendelThemeScope.of(context);
+  final legs = [
+    for (final leg in _maps(block.props['legs']))
+      if (_str(_map(leg['from'])?['place']) != null &&
+          _str(_map(leg['to'])?['place']) != null)
+        leg,
+  ];
+  if (legs.isEmpty) return buildFallback(context, block);
+  final title = _str(block.props['title']);
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      if (title != null && title.isNotEmpty) ...[
+        Semantics(header: true, child: Text(title, style: _wave4Title(theme))),
+        const SizedBox(height: 12),
+      ],
+      for (final (i, leg) in legs.indexed) ...[
+        _Leg(leg: leg),
+        if (i < legs.length - 1)
+          switch (_map(leg['change_after'])) {
+            final Map change when _str(change['label']) != null => Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: _TonePill(
+                  label: _str(change['label'])!,
+                  tone: _str(change['tone']),
+                ),
+              ),
+            ),
+            _ => const SizedBox(height: 10),
+          },
+      ],
+    ],
+  );
+}
+
+/// The line a leg's two ends stand across: a rule with a ring at each end.
+class _SpanPainter extends CustomPainter {
+  const _SpanPainter({
+    required this.line,
+    required this.ring,
+    required this.ground,
+  });
+
+  final Color line;
+  final Color ring;
+  final Color ground;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final y = size.height / 2;
+    canvas.drawLine(
+      Offset(4, y),
+      Offset(size.width - 4, y),
+      Paint()
+        ..color = line
+        ..strokeWidth = 1.5,
+    );
+    for (final x in [4.0, size.width - 4]) {
+      canvas.drawCircle(Offset(x, y), 4, Paint()..color = ground);
+      canvas.drawCircle(
+        Offset(x, y),
+        3.25,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.5
+          ..color = ring,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SpanPainter old) =>
+      old.line != line || old.ring != ring || old.ground != ground;
+}
+
+class _Leg extends StatelessWidget {
+  const _Leg({required this.leg});
+
+  final Map leg;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final carrier = _str(leg['carrier']);
+    final status = _map(leg['status']);
+    final state = _str(status?['label']);
+    final length = _str(leg['duration_label']);
+    final facts = [
+      for (final fact in _maps(leg['facts']))
+        if ((_str(fact['label']), _str(fact['value'])) case (
+          final label?,
+          final value?,
+        ))
+          (label, value),
+    ];
+
+    Widget end(Map stop, {required bool to, required double most}) {
+      final code = _str(stop['code']);
+      final place = _str(stop['place'])!;
+      final time = _str(stop['time_label']) ?? '';
+      final was = _str(stop['was_label']);
+      final align = to ? CrossAxisAlignment.end : CrossAxisAlignment.start;
+      return MergeSemantics(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: most),
+          child: Column(
+            crossAxisAlignment: align,
+            children: [
+              Text(
+                code ?? place,
+                textAlign: to ? TextAlign.end : TextAlign.start,
+                style:
+                    code != null
+                        ? theme.text.title.copyWith(
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.26,
+                          height: 1.1,
+                        )
+                        : theme.text.title.copyWith(fontSize: 17, height: 1.3),
+              ),
+              const SizedBox(height: 2),
+              Wrap(
+                spacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.end,
+                alignment: to ? WrapAlignment.end : WrapAlignment.start,
+                children: [
+                  Text(
+                    time,
+                    style: theme.text.labelTabular.copyWith(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (was != null && was.isNotEmpty)
+                    Text(
+                      was,
+                      style: theme.text.labelTabular.copyWith(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w400,
+                        color: theme.colors.onSurfaceFaint,
+                        decoration: TextDecoration.lineThrough,
+                      ),
+                    ),
+                ],
+              ),
+              if (code != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  place,
+                  textAlign: to ? TextAlign.end : TextAlign.start,
+                  style: theme.text.body.copyWith(fontSize: 13),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: _thingPlate(theme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if ((carrier != null && carrier.isNotEmpty) || state != null) ...[
+            Wrap(
+              alignment: WrapAlignment.spaceBetween,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 10,
+              runSpacing: 6,
+              children: [
+                if (carrier != null && carrier.isNotEmpty)
+                  Text(
+                    carrier,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.text.caption.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: theme.colors.onSurfaceSoft,
+                    ),
+                  ),
+                if (state != null)
+                  _TonePill(label: state, tone: _str(status?['tone'])),
+              ],
+            ),
+            const SizedBox(height: 14),
+          ],
+          LayoutBuilder(
+            builder: (context, box) {
+              // 132 as on the web, less on a card too narrow for two of them and the line between.
+              final most = math.min(
+                132.0,
+                math.max(0.0, (box.maxWidth - 64) / 2),
+              );
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  end(_map(leg['from'])!, to: false, most: most),
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 9, 12, 0),
+                      child: Column(
+                        children: [
+                          SizedBox(
+                            height: 10,
+                            width: double.infinity,
+                            child: CustomPaint(
+                              painter: _SpanPainter(
+                                line: theme.rail,
+                                ring: theme.colors.onSurface.withValues(
+                                  alpha: 0.30,
+                                ),
+                                ground: theme.colors.surfaceRaised,
+                              ),
+                            ),
+                          ),
+                          if (length != null && length.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              length,
+                              maxLines: 1,
+                              softWrap: false,
+                              style: theme.text.body.copyWith(fontSize: 12.5),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  end(_map(leg['to'])!, to: true, most: most),
+                ],
+              );
+            },
+          ),
+          if (facts.isNotEmpty) ...[
+            const SizedBox(height: 14),
+            Divider(height: 1, thickness: 1, color: theme.hairline),
+            const SizedBox(height: 12),
+            _PassFields(fields: facts),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// One reading on a scale of named bands (pick B): a half dial of the bands,
+/// darker as they rise, a knob where the reading falls, the reading and its
+/// band's name inside. The knob never leaves the band the block names, so
+/// the two cannot disagree. Read as its words: the band is always written,
+/// never colour alone.
+Widget buildGauge(
+  BuildContext context,
+  WireBlock block,
+  RendelDispatcher dispatch,
+) {
+  final theme = RendelThemeScope.of(context);
+  final strings = RendelStringsScope.of(context);
+  final props = block.props;
+  final bands = [
+    for (final band in _maps(props['bands'])) _str(band['label']) ?? '',
+  ];
+  final value = _str(props['value']);
+  final title = _str(props['title']) ?? '';
+  if (bands.length < 2 || value == null || value.isEmpty) {
+    return buildFallback(context, block);
+  }
+  final index = (props['band_index'] is num
+          ? (props['band_index'] as num).toInt()
+          : 0)
+      .clamp(0, bands.length - 1);
+  final edge = 0.2 / bands.length;
+  final asked =
+      props['position'] is num
+          ? (props['position'] as num).toDouble()
+          : (index + 0.5) / bands.length;
+  final at = asked.clamp(
+    index / bands.length + edge,
+    (index + 1) / bands.length - edge,
+  );
+  final asOf = _instant(props['as_of']);
+  final note = _str(props['note']);
+  final band = bands[index];
+
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: _thingPlate(theme),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.end,
+          spacing: 12,
+          runSpacing: 2,
+          children: [
+            Semantics(
+              header: true,
+              child: Text(title, style: _wave4Title(theme)),
+            ),
+            if (asOf != null)
+              Text(
+                strings.asOfTime(_clock(context, asOf)),
+                style: theme.text.captionSoft,
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Semantics(
+          label: '$title: $value, $band',
+          container: true,
+          excludeSemantics: true,
+          child: Center(
+            child: SizedBox(
+              width: 220,
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 220,
+                    height: 122,
+                    child: CustomPaint(
+                      painter: _DialPainter(
+                        bands: bands.length,
+                        at: at,
+                        ink: theme.colors.onSurface,
+                        ground: theme.colors.surfaceRaised,
+                      ),
+                      child: Align(
+                        alignment: const Alignment(0, 0.64),
+                        // A long reading, a long band name or the largest text shrinks into the dial, never over its arc.
+                        child: SizedBox(
+                          width: 150,
+                          height: 72,
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.bottomCenter,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  value,
+                                  style: theme.text.labelTabular.copyWith(
+                                    fontSize: 44,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: -1.32,
+                                    height: 1,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  band,
+                                  textAlign: TextAlign.center,
+                                  style: theme.text.title.copyWith(
+                                    fontSize: 17,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          bands.first,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.text.caption.copyWith(
+                            fontSize: 12,
+                            color: theme.colors.onSurfaceFaint,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          bands.last,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.end,
+                          style: theme.text.caption.copyWith(
+                            fontSize: 12,
+                            color: theme.colors.onSurfaceFaint,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (note != null && note.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Divider(height: 1, thickness: 1, color: theme.hairline),
+          const SizedBox(height: 12),
+          Text(
+            note,
+            style: theme.text.body.copyWith(fontSize: 14, height: 1.45),
+          ),
+        ],
+      ],
+    ),
+  );
+}
+
+/// The half dial: an arc a band, from the start of the scale at nine o'clock
+/// over the top to its end at three, each darker than the one before, and a
+/// ringed knob at [at] (0 to 1 along the whole scale).
+class _DialPainter extends CustomPainter {
+  const _DialPainter({
+    required this.bands,
+    required this.at,
+    required this.ink,
+    required this.ground,
+  });
+
+  final int bands;
+  final double at;
+  final Color ink;
+  final Color ground;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Drawn in the web SDK's 220 × 122 box, the centre at (110, 112) and the arc 96 out.
+    final scale = size.width / 220;
+    final centre = Offset(110 * scale, 112 * scale);
+    final radius = 96 * scale;
+    final rect = Rect.fromCircle(center: centre, radius: radius);
+    const gap = 0.012;
+    for (var i = 0; i < bands; i++) {
+      final from = i / bands + gap;
+      final to = (i + 1) / bands - gap;
+      canvas.drawArc(
+        rect,
+        math.pi * (1 + from),
+        math.pi * (to - from),
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 10 * scale
+          ..strokeCap = StrokeCap.round
+          ..color = ink.withValues(
+            alpha: 0.12 + (bands > 1 ? i / (bands - 1) : 0) * 0.60,
+          ),
+      );
+    }
+    final angle = math.pi * (1 + at);
+    final knob = centre + Offset(math.cos(angle), math.sin(angle)) * radius;
+    canvas.drawCircle(knob, 8 * scale, Paint()..color = ground);
+    canvas.drawCircle(
+      knob,
+      8 * scale,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4 * scale
+        ..color = ink,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_DialPainter old) =>
+      old.bands != bands ||
+      old.at != at ||
+      old.ink != ink ||
+      old.ground != ground;
 }

@@ -5,6 +5,19 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.101.0
+
+**Added**
+
+- Five components, each offered only to a build that declares it:
+  `steps` (instructions read in order, numbered on a rail, with nothing to
+  tick), `offers` (the coupons a person holds, a ticket each, the code
+  copied on a tap), `cart` (a basket changed in place: a stepper a line and
+  a subtotal that follows; its button sends the quantities as a form
+  submission for its `cart_id`), `journey` (a trip's legs, a card each, the
+  wait between two on the line between them) and `gauge` (one reading on a
+  half dial of named bands).
+
 ## 0.100.0
 
 **Changed**

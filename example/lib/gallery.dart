@@ -1455,4 +1455,131 @@ List<(String, WireBlock)> _wave6() => [
           'caption': 'Your test key is under Settings → Keys.',
         }),
       ),
+      (
+        'steps · a return',
+        _block('g-steps', 'steps', 'Returning a pair: start it in your orders, print the label, hand it in within 14 days, and the refund follows.', {
+          'title': 'Returning a pair',
+          'items': [
+            {'title': 'Start the return in your orders', 'body': 'Open the order, choose the pair and say why it is going back.'},
+            {'title': 'Print the label, or show the QR code', 'body': 'We email both. A drop-off point can print the label for you.'},
+            {'title': 'Hand the parcel in within 14 days', 'body': 'Any Neon Kicks store or a parcel locker.'},
+            {'title': 'Get your refund', 'body': 'Back on the card you paid with, within 3 working days of the drop-off.'},
+          ],
+          'cta': {
+            'label': 'Start a return',
+            'action': {'kind': 'reply', 'text': 'Start a return'},
+          },
+        }),
+      ),
+      (
+        'steps · a thing on each, in groups',
+        _block('g-steps-kit', 'steps', 'A race-day kit in order: socks, then shoes, then the belt.', {
+          'title': 'Race-day kit',
+          'groups': [
+            {'label': 'The night before'},
+            {'label': 'On the morning'},
+          ],
+          'items': [
+            {
+              'group_index': 0,
+              'title': 'Lay out your socks',
+              'body': 'The pair you have already run long in.',
+              'caption': r'Crew Socks · $18',
+              'action': {'kind': 'reply', 'text': 'Show me the Crew Socks'},
+            },
+            {'group_index': 0, 'title': 'Pin your bib', 'body': 'Four pins, on the front of your top.'},
+            {'group_index': 1, 'title': 'Lace up', 'body': 'A runner\'s knot keeps the heel from lifting.', 'caption': r'Aero Glide 2 · $129'},
+          ],
+        }),
+      ),
+      (
+        'offers · tickets',
+        _block('g-offers', 'offers', 'Three offers: 15% off outerwear with RAIN15 until Sunday, free express delivery over \$80, and a welcome offer already used.', {
+          'items': [
+            {
+              'value': '15%',
+              'unit': 'off',
+              'title': 'Outerwear',
+              'terms': r'Orders over $120',
+              'ends_label': 'Ends Sunday',
+              'ending_soon': true,
+              'code': 'RAIN15',
+            },
+            {
+              'value': 'Free',
+              'unit': 'delivery',
+              'title': 'Express delivery',
+              'terms': r'Orders over $80',
+              'ends_label': 'Until 30 Nov',
+              'note': 'Applied at checkout',
+            },
+            {'value': '10%', 'unit': 'off', 'title': 'Welcome offer', 'terms': 'First order', 'spent_label': 'Used 12 Nov'},
+          ],
+        }),
+      ),
+      (
+        'cart · three lines',
+        _block('g-cart', 'cart', 'Your cart: Aero Glide 2, two packs of Crew Socks and a Rain Shell.', {
+          'cart_id': 'cart',
+          'title': 'Your cart',
+          'lines': [
+            {'id': 'aero-glide-2', 'title': 'Aero Glide 2', 'detail': 'Size 43 · Sand', 'unit_price': 129, 'quantity': 1},
+            {'id': 'crew-socks', 'title': 'Crew Socks', 'detail': '3-pack · Grey', 'unit_price': 18, 'quantity': 2, 'max': 6},
+            {'id': 'rain-shell', 'title': 'Rain Shell', 'detail': 'M · Moss', 'unit_price': 189, 'quantity': 1},
+          ],
+          'currency': 'USD',
+          'note': r'Delivery is free over $80.',
+          'submit_label': 'Review order',
+        }),
+      ),
+      (
+        'journey · two legs and a tight change',
+        _block('g-journey', 'journey', 'AE 417 Istanbul to Frankfurt leaves 35 minutes late at 14:55, which leaves 40 minutes to change for AE 902 to Lisbon at 16:45.', {
+          'title': 'Istanbul to Lisbon, Thu 26 Nov',
+          'legs': [
+            {
+              'carrier': 'AE 417 · Aerlune',
+              'from': {'place': 'Istanbul', 'code': 'IST', 'time_label': '14:55', 'was_label': '14:20'},
+              'to': {'place': 'Frankfurt', 'code': 'FRA', 'time_label': '16:05', 'was_label': '15:30'},
+              'duration_label': '3 h 10 min',
+              'status': {'label': '35 min late', 'tone': 'warning'},
+              'facts': [
+                {'label': 'Terminal', 'value': '1'},
+                {'label': 'Gate', 'value': 'B14'},
+                {'label': 'Seat', 'value': '14C'},
+              ],
+              'change_after': {'label': '40 min to change in Frankfurt', 'tone': 'warning'},
+            },
+            {
+              'carrier': 'AE 902 · Aerlune',
+              'from': {'place': 'Frankfurt', 'code': 'FRA', 'time_label': '16:45'},
+              'to': {'place': 'Lisbon', 'code': 'LIS', 'time_label': '18:50'},
+              'duration_label': '3 h 05 min',
+              'status': {'label': 'On time'},
+              'facts': [
+                {'label': 'Terminal', 'value': '1'},
+                {'label': 'Gate', 'value': 'A22'},
+                {'label': 'Seat', 'value': '9A'},
+              ],
+            },
+          ],
+        }),
+      ),
+      (
+        'gauge · a UV index',
+        _block('g-gauge', 'gauge', 'The UV index is 7, high, as of 13:00: SPF 50 and shade at noon.', {
+          'title': 'UV index now',
+          'value': '7',
+          'bands': [
+            {'label': 'Low'},
+            {'label': 'Moderate'},
+            {'label': 'High'},
+            {'label': 'Very high'},
+            {'label': 'Extreme'},
+          ],
+          'band_index': 2,
+          'position': 0.52,
+          'note': 'SPF 50, and again every two hours. Shade from 11:00 to 15:00 if you can.',
+        }),
+      ),
     ];

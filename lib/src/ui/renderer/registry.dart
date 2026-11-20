@@ -197,6 +197,11 @@ class ComponentRegistry {
     'map': buildMap,
     'pass': buildPass,
     'code': buildCode,
+    'steps': buildSteps,
+    'offers': buildOffers,
+    'cart': buildCart,
+    'journey': buildJourney,
+    'gauge': buildGauge,
     'action_done': buildActionDone,
   };
 

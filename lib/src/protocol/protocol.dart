@@ -48,6 +48,11 @@ const List<String> supportedComponents = [
   'map',
   'pass',
   'code',
+  'steps',
+  'offers',
+  'cart',
+  'journey',
+  'gauge',
   'action_done',
 ];
 

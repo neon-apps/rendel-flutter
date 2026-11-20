@@ -1564,6 +1564,215 @@ final fixtures = <String, ({String type, Map<String, dynamic> props})>{
     type: 'code',
     props: {'language': rtl(24), 'code': rtl(4000), 'caption': rtl(120)}
   ),
+  // ---- catalog wave 7 (the catalog review of 2026-11-20): steps, offers,
+  // cart, journey and gauge, each at its schema's limits.
+  'steps/min': (
+    type: 'steps',
+    props: {
+      'items': [
+        {'title': 'a'},
+        {'title': 'b'},
+      ],
+    }
+  ),
+  'steps/max': (
+    type: 'steps',
+    props: {
+      'title': solid(80),
+      'groups': [
+        for (var i = 0; i < 4; i++) {'label': solid(40)}
+      ],
+      'items': [
+        for (var i = 0; i < 10; i++)
+          {
+            if (i > 1) 'group_index': i % 4,
+            'title': solid(80),
+            'body': solid(300),
+            'image_url': broken,
+            'caption': solid(60),
+            if (i.isEven) 'action': act,
+          }
+      ],
+      'cta': {'label': solid(60), 'action': act},
+    }
+  ),
+  'steps/rtl': (
+    type: 'steps',
+    props: {
+      'groups': [
+        {'label': rtl(40)},
+      ],
+      'items': [
+        for (var i = 0; i < 3; i++) {'group_index': 0, 'title': rtl(80), 'body': rtl(300), 'caption': rtl(60)}
+      ],
+    }
+  ),
+  'offers/min': (
+    type: 'offers',
+    props: {
+      'items': [
+        {'value': 'a', 'title': 'b'},
+      ],
+    }
+  ),
+  'offers/max': (
+    type: 'offers',
+    props: {
+      'title': solid(80),
+      'items': [
+        for (var i = 0; i < 8; i++)
+          {
+            'value': solid(12),
+            'unit': solid(16),
+            'title': solid(60),
+            'terms': solid(100),
+            'ends_label': solid(30),
+            'ending_soon': i.isEven,
+            if (i % 3 == 0) 'code': solid(32),
+            if (i % 3 == 1) 'note': solid(40),
+            if (i % 3 == 2) 'spent_label': solid(30),
+          }
+      ],
+    }
+  ),
+  'offers/rtl': (
+    type: 'offers',
+    props: {
+      'items': [
+        {'value': rtl(12), 'unit': rtl(16), 'title': rtl(60), 'terms': rtl(100), 'ends_label': rtl(30), 'code': 'RAIN15'},
+        {'value': rtl(12), 'title': rtl(60), 'spent_label': rtl(30)},
+      ],
+    }
+  ),
+  'cart/min': (
+    type: 'cart',
+    props: {
+      'cart_id': 'c',
+      'lines': [
+        {'id': 'a', 'title': 'a', 'unit_price': 0, 'quantity': 0},
+      ],
+      'currency': 'USD',
+      'submit_label': 'a',
+    }
+  ),
+  'cart/max': (
+    type: 'cart',
+    props: {
+      'cart_id': solid(64),
+      'title': solid(80),
+      'lines': [
+        for (var i = 0; i < 12; i++)
+          {
+            'id': 'line$i',
+            'title': solid(80),
+            'detail': solid(80),
+            'image_url': broken,
+            'unit_price': 1000000000,
+            'quantity': 99,
+            'max': 99,
+          }
+      ],
+      'currency': 'TRY',
+      'note': solid(120),
+      'submit_label': solid(30),
+    }
+  ),
+  'cart/rtl': (
+    type: 'cart',
+    props: {
+      'cart_id': 'c',
+      'title': rtl(80),
+      'lines': [
+        {'id': 'a', 'title': rtl(80), 'detail': rtl(80), 'unit_price': 1299.9, 'quantity': 2},
+      ],
+      'currency': 'SAR',
+      'note': rtl(120),
+      'submit_label': rtl(30),
+    }
+  ),
+  'journey/min': (
+    type: 'journey',
+    props: {
+      'legs': [
+        {
+          'from': {'place': 'a', 'time_label': 'b'},
+          'to': {'place': 'c', 'time_label': 'd'},
+        },
+      ],
+    }
+  ),
+  'journey/max': (
+    type: 'journey',
+    props: {
+      'title': solid(80),
+      'legs': [
+        for (var i = 0; i < 4; i++)
+          {
+            'carrier': solid(60),
+            'from': {'place': solid(60), if (i.isEven) 'code': solid(8), 'time_label': solid(24), 'was_label': solid(24)},
+            'to': {'place': solid(60), if (i.isEven) 'code': solid(8), 'time_label': solid(24), 'was_label': solid(24)},
+            'duration_label': solid(24),
+            'status': {'label': solid(30), 'tone': 'warning'},
+            'facts': [
+              for (var j = 0; j < 3; j++) {'label': solid(20), 'value': solid(24)}
+            ],
+            'change_after': {'label': solid(60), 'tone': 'warning'},
+          }
+      ],
+    }
+  ),
+  'journey/rtl': (
+    type: 'journey',
+    props: {
+      'legs': [
+        {
+          'carrier': rtl(60),
+          'from': {'place': rtl(60), 'code': 'IST', 'time_label': '14:55', 'was_label': '14:20'},
+          'to': {'place': rtl(60), 'time_label': '16:05'},
+          'duration_label': rtl(24),
+          'status': {'label': rtl(30)},
+        },
+      ],
+    }
+  ),
+  'gauge/min': (
+    type: 'gauge',
+    props: {
+      'title': 'a',
+      'value': 'b',
+      'bands': [
+        {'label': 'c'},
+        {'label': 'd'},
+      ],
+      'band_index': 0,
+    }
+  ),
+  'gauge/max': (
+    type: 'gauge',
+    props: {
+      'title': solid(80),
+      'value': solid(12),
+      'bands': [
+        for (var i = 0; i < 6; i++) {'label': solid(20)}
+      ],
+      'band_index': 5,
+      'position': 1,
+      'as_of': '2026-10-14T10:00:00+02:00',
+      'note': solid(200),
+    }
+  ),
+  'gauge/rtl': (
+    type: 'gauge',
+    props: {
+      'title': rtl(80),
+      'value': '7',
+      'bands': [
+        for (var i = 0; i < 5; i++) {'label': rtl(20)}
+      ],
+      'band_index': 2,
+      'note': rtl(200),
+    }
+  ),
 };
 
 void main() {
