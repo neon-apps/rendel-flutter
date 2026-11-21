@@ -17,6 +17,7 @@ import '../core/route.dart';
 import '../core/screens.dart';
 import '../protocol/protocol.dart';
 import '../transport/api_client.dart';
+import 'fit_result.dart';
 
 /// What the copilot is actually doing right now.
 ///
@@ -317,12 +318,6 @@ class ConversationController extends ChangeNotifier {
   /// At most this many providers or reads at once: one app's handlers share
   /// its network.
   static const _parallel = 4;
-
-  /// The largest result the server accepts, as JSON characters
-  /// (`packages/protocol/src/chat.ts`). It refuses the whole turn over one
-  /// that is larger, so a handler that returns a big list ended the turn
-  /// rather than reporting a failed action the model can talk about.
-  static const _maxResultChars = 16384;
 
   final List<RendelMessage> messages = [];
 
@@ -2101,13 +2096,17 @@ class ConversationController extends ChangeNotifier {
       // Not JSON at all: left to fail where it always has.
       return outcome;
     }
-    if (length <= _maxResultChars) return outcome;
+    if (length <= maxResultChars) return outcome;
+    // Its start goes, marked as cut (`fit_result.dart`): it used to fail, and
+    // the assistant said it could not read the data at all (Helix, 2026-11-21).
+    final fitted = fitResult(data);
+    if (fitted == null) return outcome;
     RendelLog.warn(
       'result_too_large',
-      '"${action.name}" returned $length bytes; the limit is $_maxResultChars. '
-          'Return only the fields Rendel needs.',
+      '"${action.name}" returned $length bytes; Rendel passed on the start of it '
+          '(the limit is $maxResultChars). Return only the fields Rendel needs, or take a limit.',
     );
-    return RendelResult.fail('result was $length bytes, over the $_maxResultChars byte limit');
+    return RendelResult.ok(fitted);
   }
 
   WireBlock? _cardFor(String invocationId) {

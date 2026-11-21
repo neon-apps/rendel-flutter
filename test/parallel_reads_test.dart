@@ -161,18 +161,21 @@ void main() {
     expect(logs.map((r) => r.code), contains('context_provider_timeout'));
   });
 
-  test('a result over 16,384 characters fails the action, not the turn', () async {
+  test('a result over 32,768 characters goes as its start, marked cut, not as a failure (Helix, 2026-11-21)', () async {
     final api = _Turns([_reads(['huge', 'fits']), _answer]);
+    final events = List.generate(400, (i) => {'id': i, 'notes': 'x' * 120});
     final c = build(api, {
-      'huge': _read('huge', () async => RendelResult.ok({'blob': 'x' * 20000})),
+      'huge': _read('huge', () async => RendelResult.ok({'week': 'W47', 'events': events})),
       // Exactly at the limit: {"blob":"…"} is 11 characters around the text.
-      'fits': _read('fits', () async => RendelResult.ok({'blob': 'x' * (16384 - 11)})),
+      'fits': _read('fits', () async => RendelResult.ok({'blob': 'x' * (32768 - 11)})),
     });
     await c.send('big').timeout(const Duration(seconds: 5));
     final results = (api.sent[1]['tool_results'] as List).cast<Map<String, dynamic>>();
-    expect(results[0]['status'], 'error');
-    expect(results[0]['error'], contains('16384'));
-    expect(results[0].containsKey('data'), isFalse);
+    expect(results[0]['status'], 'success');
+    final data = results[0]['data'] as Map<String, dynamic>;
+    expect(data['week'], 'W47');
+    expect((data['events'] as List).length, inInclusiveRange(10, 399));
+    expect(data['_cut'], contains('Only the start of this result fit'));
     expect(results[1]['status'], 'success');
     expect(logs.map((r) => r.code), contains('result_too_large'));
   });

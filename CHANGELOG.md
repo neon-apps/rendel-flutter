@@ -7,6 +7,12 @@ asks of you.
 
 ## Unreleased
 
+## 0.107.0
+
+### Changed
+
+- A handler's result over 32,768 characters of JSON (it was 16,384) no longer fails the action: its start goes, its longest list cut to its first items, with `_cut` telling the assistant there is more (`fit_result.dart`, held to the protocol's `fitResult`). The log still says `result_too_large`, with the action's name.
+
 ## 0.106.0
 
 ### Added
