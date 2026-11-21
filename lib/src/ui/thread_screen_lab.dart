@@ -362,7 +362,8 @@ class _LabList extends StatelessWidget {
               child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(card?.title ?? s, maxLines: card == null ? 2 : 1, overflow: TextOverflow.ellipsis, style: theme.text.label.copyWith(fontSize: 17, fontWeight: FontWeight.w600, height: 1.2)),
                 if (card?.line case final line?) ...[
-                  const SizedBox(height: 2),
+                  // 4 between the title and its line, as the web panel (Helix, 2026-11-21: 2 read cramped).
+                  const SizedBox(height: 4),
                   Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.text.body.copyWith(fontSize: 15, color: theme.colors.onSurfaceSoft, height: 1.2)),
                 ],
               ]),

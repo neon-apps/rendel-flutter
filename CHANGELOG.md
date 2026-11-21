@@ -7,6 +7,12 @@ asks of you.
 
 ## Unreleased
 
+## 0.109.0
+
+### Changed
+
+- A suggestion's line sits 4 points under its title on the opening's list, not 2.
+
 ## 0.108.0
 
 ### Added
