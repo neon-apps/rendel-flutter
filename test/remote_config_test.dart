@@ -636,4 +636,14 @@ void main() {
       expect(again.applyTo(_base()).style.button, RendelButtonStyle.outlined);
     });
   });
+
+  // Tuna 2026-11-21 (B7): the console's switch for the team's row in the menu during a conversation.
+  test('the team stays in the menu unless the config says menu: false, through the cache too', () {
+    final on = RendelRemoteConfig.tryParse('{"config":{},"support":{"enabled":true,"team":"Grove"}}')!;
+    expect(on.supportMenu, isTrue);
+    final off = RendelRemoteConfig.tryParse('{"config":{},"support":{"enabled":true,"team":"Grove","menu":false}}')!;
+    expect(off.supportMenu, isFalse);
+    expect(RendelRemoteConfig.tryParse(off.toCache())!.supportMenu, isFalse);
+    expect(RendelRemoteConfig.tryParse(on.toCache())!.supportMenu, isTrue);
+  });
 }

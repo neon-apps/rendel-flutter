@@ -286,6 +286,9 @@ class Rendel {
   /// The team's name while Support is on, from the app's config.
   static String? _supportTeam;
 
+  /// Whether the menu offers the team during a conversation, from the app's config (the console's switch, B7).
+  static bool _supportMenu = true;
+
   /// The team's name, kept on this phone once it has had a conversation with them (D4): with Support off, that
   /// conversation stays reachable and named, so the person reads why it closed and how to reach the team.
   static String? _keptTeam;
@@ -911,6 +914,7 @@ class Rendel {
           // Support off, the person's own conversations stay in Recent, to read why they closed (D4).
           support: _reachTeam != null ? _supportOf(api) : null,
           supportTeam: _reachTeam,
+          supportMenu: supportOn && _supportMenu,
           onSupportOpen: () => unawaited(openSupport(presentation.origin)),
           onSupportThread: (id) => unawaited(openSupport(presentation.origin, thread: id)),
         ),
@@ -1731,6 +1735,7 @@ class Rendel {
     // The launcher's count is read with the config: at launch and when the app comes back.
     final wasOn = _supportTeam != null;
     _supportTeam = remote.supportTeam;
+    _supportMenu = remote.supportMenu;
     // On again after this app saw it switched off: the team's page draws the box again (qa4-k1-02).
     if (_supportTeam != null && _supportWentOff) _support?.redraw();
     _supportWentOff = _supportTeam == null && (wasOn || _supportWentOff);

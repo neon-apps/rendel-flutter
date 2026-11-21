@@ -65,6 +65,7 @@ class RendelRemoteConfig {
     this.parallelReads = true,
     this.capture = RendelCapture.defaults,
     this.supportTeam,
+    this.supportMenu = true,
     this.publishedLanguages = const [],
     this.ownSites = const [],
   });
@@ -84,6 +85,11 @@ class RendelRemoteConfig {
   /// then: null means people cannot reach the team from inside the app. Kept
   /// in the cache like [parallelReads], so a 304 keeps it too.
   final String? supportTeam;
+
+  /// Whether the menu offers the team during a conversation while Support is
+  /// on: the console's switch under Support, sent only when off (`menu: false`,
+  /// Tuna 2026-11-21). Kept in the cache like [supportTeam].
+  final bool supportMenu;
 
   /// What the server says about tap capture (`capture`, sent only when it is
   /// not the default): kept in the cache like [parallelReads], so a 304 keeps
@@ -142,6 +148,7 @@ class RendelRemoteConfig {
         parallelReads: map['parallel_reads'] != false,
         capture: RendelCapture.parse(map['capture']),
         supportTeam: _supportTeam(map['support']),
+        supportMenu: (map['support'] as Object?) is! Map || (map['support'] as Map)['menu'] != false,
         publishedLanguages: _languages(map['languages']),
         ownSites: _languages(map['own_sites']),
       );
@@ -158,7 +165,7 @@ class RendelRemoteConfig {
         if (etag != null) '_etag': etag,
         if (!parallelReads) 'parallel_reads': false,
         if (!capture.isDefault) 'capture': capture.toJson(),
-        if (supportTeam != null) 'support': {'enabled': true, 'team': supportTeam},
+        if (supportTeam != null) 'support': {'enabled': true, 'team': supportTeam, if (!supportMenu) 'menu': false},
         if (publishedLanguages.isNotEmpty) 'languages': publishedLanguages,
         if (ownSites.isNotEmpty) 'own_sites': ownSites,
         'config': {

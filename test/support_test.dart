@@ -608,6 +608,25 @@ void main() {
       expect(find.byIcon(Icons.schedule_rounded), findsOneWidget);
     });
 
+    // Tuna 2026-11-21 (B7): during a conversation the team is a row of the menu, unless the console took it out.
+    for (final inMenu in [true, false]) {
+      testWidgets('${inMenu ? 'offers' : 'leaves out'} the team in the menu during a conversation with none open with them', (tester) async {
+        final server = _Server(entries: []);
+        final support = server.support();
+        final controller = ConversationController(api: server.api(), actions: const {}, sdkVersion: 'flutter/test', onOpenUrl: (_) async => true);
+        addTearDown(controller.dispose);
+        controller.loadHistory('c1', [
+          {'id': 'm1', 'role': 'user', 'blocks': [{'id': 'b1', 'type': 'text', 'fallback_text': 'Which sizes?', 'props': {'markdown': 'Which sizes?'}}]},
+        ]);
+        expect(support.open, isFalse);
+        await tester.pumpWidget(_app(ThreadScreen(controller: controller, support: support, supportTeam: 'Grove', supportMenu: inMenu, onSupportOpen: () {})));
+        await tester.pump();
+        await tester.tap(find.bySemanticsLabel('Menu'));
+        await tester.pump();
+        expect(find.text('Grove team'), inMenu ? findsOneWidget : findsNothing);
+      });
+    }
+
     testWidgets("shows the team's reply as a line at the top of one of Rendel's answers, and opens their page from it (sdk-09)", (tester) async {
       final server = _Server(
         entries: [_entry(1, text: 'Can I swap the Aero Glide for a 44?'), _entry(2, author: 'agent', name: 'Dana', text: 'The 44 is in stock.')],

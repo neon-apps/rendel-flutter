@@ -7,6 +7,12 @@ asks of you.
 
 ## Unreleased
 
+## 0.105.0
+
+### Changed
+
+- While Support is on, the team is a row of the top bar's menu for as long as a conversation lasts ("{team} team"), not only once a conversation with them is open: in the middle of a conversation, the only way back to the team had been to close the assistant and open it again. The console's switch under Support, "In the assistant's menu, during a conversation" (on by default), takes the row out; the config then says `menu: false` under `support`, kept in the cache with the team's name. With Support off the row is not drawn.
+
 ## 0.104.0
 
 ### Added

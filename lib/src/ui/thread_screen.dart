@@ -87,6 +87,7 @@ class ThreadScreen extends StatefulWidget {
     this.onFollowupOpen,
     this.support,
     this.supportTeam,
+    this.supportMenu = false,
     this.onSupportOpen,
     this.onSupportThread,
   });
@@ -196,6 +197,10 @@ class ThreadScreen extends StatefulWidget {
 
   /// The team's name, while Support is on.
   final String? supportTeam;
+
+  /// The menu offers the team during a conversation, not only once one with them is open: Support is on and the
+  /// console did not take it out of the menu (Tuna 2026-11-21).
+  final bool supportMenu;
   final VoidCallback? onSupportOpen;
 
   /// One of the person's conversations with the team, from Recent under the
@@ -1528,7 +1533,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   logoHeaders: widget.logoHeaders,
                   sandbox: controller.sandbox,
                   fresh: controller.messages.isEmpty,
-                  team: widget.support != null && widget.supportTeam != null && widget.support!.open && controller.messages.isNotEmpty
+                  team: widget.support != null && widget.supportTeam != null && (widget.support!.open || widget.supportMenu) && controller.messages.isNotEmpty
                       ? (_strings.supportTeamOf(widget.supportTeam!), () => widget.onSupportOpen?.call())
                       : null,
                   onReset: idle && controller.messages.isNotEmpty ? controller.reset : null,
