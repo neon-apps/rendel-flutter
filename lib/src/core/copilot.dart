@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../engine/conversation_controller.dart';
 import '../protocol/protocol.dart';
 import '../transport/api_client.dart';
+import '../ui/lab/lab.dart' show RendelLook;
 import '../ui/memory_sheet.dart';
 import '../ui/support_sheet.dart';
 import '../ui/presentation.dart';
@@ -1571,6 +1572,7 @@ class Rendel {
     _appliedSignature = null;
     _parallelReads = true;
     _config = const RendelConfig();
+    RendelLook.consoleLines = const {};
     _logoAssetId = null;
     _launcherIconAssetId = null;
     _codeConfig = _config;
@@ -1766,6 +1768,7 @@ class Rendel {
     _theme = remote.applyTo(_codeTheme);
     _darkTheme = remote.applyToDark(_codeTheme, _codeDarkTheme);
     _config = remote.applyToConfig(_codeConfig);
+    RendelLook.consoleLines = remote.suggestionLines;
     _logoAssetId = remote.logoAssetId;
     _launcherIconAssetId = remote.launcherIconAssetId;
     rendelCardTemplates = remote.cardTemplates;

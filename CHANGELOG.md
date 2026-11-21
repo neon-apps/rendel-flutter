@@ -7,6 +7,12 @@ asks of you.
 
 ## Unreleased
 
+## 0.108.0
+
+### Added
+
+- The console's line under each opening suggestion (Persona › Opening, `copilot.suggestionLines`) is drawn under the suggestion's words; a card in `RendelLook.suggestionCards` still wins (`RendelLook.cardFor`).
+
 ## 0.107.0
 
 ### Changed

@@ -38,6 +38,19 @@ abstract final class RendelLook {
   /// picture (an asset path, or an https URL), keyed by the suggestion's text. A suggestion
   /// without one is drawn with its own words.
   static Map<String, RendelSuggestionCard> suggestionCards = const {};
+
+  /// The console's line under a suggestion (Persona › Opening), keyed by its
+  /// words; set from the published config. A card in [suggestionCards] wins.
+  static Map<String, String> consoleLines = const {};
+
+  /// The card a suggestion is drawn as: the app's own, else one of its own
+  /// words over the console's line (Helix, 2026-11-21), else none.
+  static RendelSuggestionCard? cardFor(String suggestion) {
+    final own = suggestionCards[suggestion];
+    if (own != null) return own;
+    final line = consoleLines[suggestion];
+    return line == null ? null : RendelSuggestionCard(title: suggestion, line: line);
+  }
 }
 
 /// Whether the theme draws light on dark.

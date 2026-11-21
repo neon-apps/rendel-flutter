@@ -697,6 +697,22 @@ class RendelRemoteConfig {
     'to-top-left': (Alignment.bottomRight, Alignment.topLeft),
   };
 
+  /// The console's line under each suggestion, keyed by its words (Persona ›
+  /// Opening): at most four, sixty characters each; anything else is dropped.
+  Map<String, String> get suggestionLines {
+    final raw = copilot['suggestionLines'];
+    if (raw is! Map) return const {};
+    final out = <String, String>{};
+    for (final entry in raw.entries.take(4)) {
+      final text = entry.key;
+      final line = entry.value;
+      if (text is String && text.trim().isNotEmpty && text.length <= 60 && line is String && line.trim().isNotEmpty && line.length <= 60) {
+        out[text] = line;
+      }
+    }
+    return out;
+  }
+
   /// The host's `RendelConfig` with the published opening surface layered over it.
   RendelConfig applyToConfig(RendelConfig base) {
     if (copilot.isEmpty) return base;

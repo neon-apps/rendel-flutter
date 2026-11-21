@@ -318,7 +318,7 @@ class _LabOpening extends StatelessWidget {
 
 /// True when no suggestion has a picture from the app: then they are a list
 /// under the greeting (`_LabList`), not the row over the message card.
-bool _noPictures(List<String> suggestions) => suggestions.every((s) => RendelLook.suggestionCards[s]?.image == null);
+bool _noPictures(List<String> suggestions) => suggestions.every((s) => RendelLook.cardFor(s)?.image == null);
 
 /// Suggestions with no picture (Tuna, 2026-11-17, B5 of the suggestions lab):
 /// one glass card under the greeting, 22 round, a row 70 tall for each, the
@@ -349,7 +349,7 @@ class _LabList extends StatelessWidget {
   }
 
   Widget _row(RendelTheme theme, String s) {
-    final card = RendelLook.suggestionCards[s];
+    final card = RendelLook.cardFor(s);
     return RendelPressable(
       semanticLabel: s,
       onTap: () => onPick(s),
@@ -411,7 +411,7 @@ class _LabCards extends StatelessWidget {
         separatorBuilder: (_, _) => const SizedBox(width: 9),
         itemBuilder: (context, i) {
           final s = suggestions[i];
-          final card = RendelLook.suggestionCards[s];
+          final card = RendelLook.cardFor(s);
           return RendelPressable(
             semanticLabel: s,
             onTap: () => onPick(s),
