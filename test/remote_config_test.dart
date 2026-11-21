@@ -525,6 +525,45 @@ void main() {
     });
   });
 
+  group('the ground light', () {
+    test('takes two colours and a strength, each on its own', () {
+      final theme = _parse(
+              '{"config":{"theme":{"groundLight":{"colors":["#4F5CFF","#8B5CF6"],"strength":"soft"}}}}')!
+          .applyTo(_base());
+      expect(theme.groundLight?.colors, (const Color(0xFF4F5CFF), const Color(0xFF8B5CF6)));
+      expect(theme.groundLight?.strength, RendelGroundStrength.soft);
+      final off = _parse('{"config":{"theme":{"groundLight":{"strength":"off"}}}}')!.applyTo(_base());
+      expect(off.groundLight?.colors, isNull);
+      expect(off.groundLight?.strength, RendelGroundStrength.off);
+    });
+
+    test('says nothing it cannot read', () {
+      for (final raw in [
+        '{"colors":["#4F5CFF"]}',
+        '{"colors":["#4F5CFF","#804F5CFF"]}',
+        '{"strength":"loud"}',
+        '"soft"',
+      ]) {
+        final theme = _parse('{"config":{"theme":{"groundLight":$raw}}}')!.applyTo(_base());
+        expect(theme.groundLight, isNull, reason: raw);
+      }
+    });
+
+    test('comes through a payload that re-derives the colours too', () {
+      final theme = _parse('''
+        {"config":{"theme":{
+          "surface":"#FFFFFF","onSurface":"#111111",
+          "accent":"#2E40EA","onAccent":"#FFFFFF",
+          "groundLight":{"strength":"strong"}
+        }}}
+      ''')!
+          .applyTo(_base());
+      expect(theme.colors.accent, const Color(0xFF2E40EA));
+      expect(theme.groundLight?.strength, RendelGroundStrength.strong);
+      expect(RendelTheme.darkFrom(theme).groundLight?.strength, RendelGroundStrength.strong);
+    });
+  });
+
   group('the look', () {
     test('is what every build drew before it existed when the payload says '
         'nothing', () {

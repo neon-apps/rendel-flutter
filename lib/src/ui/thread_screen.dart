@@ -937,7 +937,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                   // Lab · look A: on the opening only, the page's colour warmed and cooled at its sides.
                   // Lab · look A: the same soft light on every page and while a question is asked,
                   // never the busy wash: the glass needs a little colour behind it.
-                  if (RendelLab.of('look') == 'a') Positioned.fill(child: LabWash(ground: theme.colors.surface, accent: theme.colors.accent, faint: controller.messages.isNotEmpty)),
+                  // Not over a backdrop: the host's own gradient is the ground, as on the web.
+                  if (RendelLab.of('look') == 'a' && theme.backdrop == null) Positioned.fill(child: LabWash(ground: theme.colors.surface, accent: theme.colors.accent, faint: controller.messages.isNotEmpty)),
                   // A page draws its own opening screen, which only dissolves
                   // when the first question is asked.
                   Positioned.fill(child: _pageBody(theme, controller)),

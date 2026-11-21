@@ -204,9 +204,17 @@ class LabWash extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (left, right) = RendelLook.groundLight ?? (accent, accent);
-    final dark = _darkOf(RendelThemeScope.of(context));
-    final lightness = dark ? 0.26 : 0.84;
+    final theme = RendelThemeScope.of(context);
+    // The console's ground light (Appearance › Ground): its colours over the
+    // host's own, and how strongly — off is the plain ground, soft half of
+    // it, strong a deeper pastel of the same hue.
+    final published = theme.groundLight;
+    final strength = published?.strength ?? RendelGroundStrength.normal;
+    if (strength == RendelGroundStrength.off) return const SizedBox.shrink();
+    final strong = strength == RendelGroundStrength.strong;
+    final (left, right) = published?.colors ?? RendelLook.groundLight ?? (accent, accent);
+    final dark = _darkOf(theme);
+    final lightness = dark ? (strong ? 0.34 : 0.26) : (strong ? 0.76 : 0.84);
     Color pastel(Color c) {
       final hsl = HSLColor.fromColor(c);
       return hsl.withLightness(lightness).withSaturation(hsl.saturation.clamp(0.4, 0.7)).toColor();
@@ -214,7 +222,7 @@ class LabWash extends StatelessWidget {
 
     final l = pastel(left), r = pastel(right);
     // On a dark ground the same light reads twice as strong: half of it.
-    final k = (faint ? 0.45 : 1.0) * (dark ? 0.5 : 1.0);
+    final k = (faint ? 0.45 : 1.0) * (dark ? 0.5 : 1.0) * (strength == RendelGroundStrength.soft ? 0.5 : 1.0);
     return IgnorePointer(
       child: DecoratedBox(
         decoration: BoxDecoration(

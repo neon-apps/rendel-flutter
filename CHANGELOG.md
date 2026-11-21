@@ -7,6 +7,16 @@ asks of you.
 
 ## Unreleased
 
+## 0.106.0
+
+### Added
+
+- The light behind the panel is set from the console: Appearance › Assistant screen › Behind the assistant publishes `theme.groundLight`, two colours (left, right) and a strength (`normal`, `soft`, `strong` or `off`). Soft is half of it, strong a deeper pastel of the same hue, off the plain ground. Its colours only give the hue, so a dark theme takes the light one's unless `themeDark` states its own; they win over `RendelLook.groundLight`. On `RendelTheme` as `groundLight` (`RendelGroundLight`, `RendelGroundStrength`).
+
+### Changed
+
+- No light over a backdrop: the host's own gradient is the ground, as the web SDK has drawn it.
+
 ## 0.105.0
 
 ### Changed

@@ -125,4 +125,48 @@ void main() {
     expect(left.r, greaterThan(left.b));
     expect(right.g, greaterThan(right.r));
   });
+
+  LinearGradient washOf(WidgetTester tester) => tester
+      .widgetList<DecoratedBox>(find.descendant(of: find.byType(LabWash), matching: find.byType(DecoratedBox)))
+      .map((box) => box.decoration)
+      .whereType<BoxDecoration>()
+      .map((d) => d.gradient)
+      .whereType<LinearGradient>()
+      .firstWhere((g) => g.begin == Alignment.centerLeft);
+
+  RendelTheme withGround(RendelGroundLight? ground, {RendelBackdrop? backdrop}) => RendelTheme.fromTokens(
+        surface: const Color(0xFFFFFFFF),
+        onSurface: const Color(0xFF111318),
+        accent: const Color(0xFF4F5CFF),
+        onAccent: const Color(0xFFFFFFFF),
+        groundLight: ground,
+        backdrop: backdrop,
+      );
+
+  testWidgets("the console's ground light: its colours over the host's, soft is half, off is none (§2)", (tester) async {
+    RendelLook.groundLight = (const Color(0xFFD9A43A), const Color(0xFF1E3B2F));
+    await pump(tester, withGround(const RendelGroundLight(colors: (Color(0xFF1E3B2F), Color(0xFFD9A43A)))));
+    final swapped = washOf(tester);
+    // Spruce now on the left, gold on the right.
+    expect(swapped.colors.first.g, greaterThan(swapped.colors.first.r));
+    expect(swapped.colors.last.r, greaterThan(swapped.colors.last.b));
+
+    RendelLook.groundLight = null;
+    await pump(tester, withGround(null));
+    final normal = washOf(tester).colors.first;
+    await pump(tester, withGround(const RendelGroundLight(strength: RendelGroundStrength.soft)));
+    final soft = washOf(tester).colors.first;
+    // Soft is nearer the white ground than normal.
+    expect(soft.computeLuminance(), greaterThan(normal.computeLuminance()));
+    await pump(tester, withGround(const RendelGroundLight(strength: RendelGroundStrength.strong)));
+    expect(washOf(tester).colors.first.computeLuminance(), lessThan(normal.computeLuminance()));
+
+    await pump(tester, withGround(const RendelGroundLight(strength: RendelGroundStrength.off)));
+    expect(find.descendant(of: find.byType(LabWash), matching: find.byType(DecoratedBox)), findsNothing);
+  });
+
+  testWidgets('no ground light over a backdrop, as on the web', (tester) async {
+    await pump(tester, withGround(null, backdrop: const RendelBackdrop(colors: [Color(0xFFE8E2D2), Color(0xFFF1F7EE)])));
+    expect(find.byType(LabWash), findsNothing);
+  });
 }

@@ -88,6 +88,8 @@ export 'src/ui/theme.dart'
         RendelTrackerStyle,
         RendelArrowStyle,
         RendelBackdrop,
+        RendelGroundLight,
+        RendelGroundStrength,
         rendelEase,
         contrastRatio,
         auditContrast;

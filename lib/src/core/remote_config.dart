@@ -483,6 +483,7 @@ class RendelRemoteConfig {
     final fontFamily = _font(theme['fontFamily']) ?? base.fontFamily;
     final displayFontFamily =
         _font(theme['displayFontFamily']) ?? base.displayFontFamily;
+    final groundLight = _groundLight(theme['groundLight']) ?? base.groundLight;
     RendelTheme build(RendelBackdrop? backdrop) => _built(
           base,
           surface: surface,
@@ -497,6 +498,7 @@ class RendelRemoteConfig {
           fontFamily: fontFamily,
           displayFontFamily: displayFontFamily,
           backdrop: backdrop,
+          groundLight: groundLight,
         );
     if (!theme.containsKey('backdrop')) return build(base.backdrop);
     final backdrop = _backdrop(theme['backdrop']);
@@ -531,6 +533,7 @@ class RendelRemoteConfig {
     required String? fontFamily,
     required String? displayFontFamily,
     required RendelBackdrop? backdrop,
+    required RendelGroundLight? groundLight,
   }) {
     if (!touchesColour) {
       // The accent roles come across too.
@@ -560,6 +563,7 @@ class RendelRemoteConfig {
         fontFamily: fontFamily,
         displayFontFamily: displayFontFamily,
         backdrop: backdrop,
+        groundLight: groundLight,
         accentText: base.accentText,
         accentEdge: base.accentEdge,
       );
@@ -589,6 +593,7 @@ class RendelRemoteConfig {
       fontFamily: fontFamily,
       displayFontFamily: displayFontFamily,
       backdrop: backdrop,
+      groundLight: groundLight,
     );
   }
 
@@ -607,6 +612,28 @@ class RendelRemoteConfig {
       }
     }
     return true;
+  }
+
+  /// `theme.groundLight`: two opaque colours and a strength from the closed
+  /// set, each optional. Null when it says nothing this build can read, so
+  /// the theme keeps the one it had.
+  static RendelGroundLight? _groundLight(Object? value) {
+    final map = _submap(value);
+    (Color, Color)? colors;
+    final raw = map['colors'];
+    if (raw is List && raw.length == 2) {
+      final a = _color(raw[0]), b = _color(raw[1]);
+      if (a != null && b != null && a.a == 1 && b.a == 1) colors = (a, b);
+    }
+    final strength = switch (map['strength']) {
+      'soft' => RendelGroundStrength.soft,
+      'strong' => RendelGroundStrength.strong,
+      'off' => RendelGroundStrength.off,
+      'normal' => RendelGroundStrength.normal,
+      _ => null,
+    };
+    if (colors == null && strength == null) return null;
+    return RendelGroundLight(colors: colors, strength: strength ?? RendelGroundStrength.normal);
   }
 
   /// `theme.backdrop`: two to four opaque colours, a direction from the

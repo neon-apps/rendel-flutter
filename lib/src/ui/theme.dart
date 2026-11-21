@@ -570,6 +570,25 @@ class RendelBackdrop {
       LinearGradient(begin: begin, end: end, colors: colors, stops: stops);
 }
 
+/// How strongly the light behind the panel is drawn: `theme.groundLight.strength`.
+/// [normal] is what every build drew before the console could set it, [off]
+/// the plain ground.
+enum RendelGroundStrength { normal, soft, strong, off }
+
+/// The light behind the panel when there is no [RendelBackdrop] (Tuna,
+/// 2026-11-21): two colours, left then right, made pale pastels, and how
+/// strongly. `theme.groundLight` on the wire.
+///
+/// The colours only give the hue — each brightness makes its own pastel of
+/// them — so unlike a backdrop a dark theme takes the light one's. Null
+/// colours are [RendelLook.groundLight], else the accent.
+class RendelGroundLight {
+  const RendelGroundLight({this.colors, this.strength = RendelGroundStrength.normal});
+
+  final (Color, Color)? colors;
+  final RendelGroundStrength strength;
+}
+
 /// One kind of card set apart from the rest: `theme.cards` in the console.
 ///
 /// Every field is optional and a null one is the theme's own, so an empty
@@ -819,6 +838,7 @@ class RendelTheme {
     this.fontFamily,
     this.displayFontFamily,
     this.backdrop,
+    this.groundLight,
     Color? accentText,
     Color? accentEdge,
     Color? danger,
@@ -845,6 +865,10 @@ class RendelTheme {
   /// The page's ground, where the host paints its screens with a gradient.
   /// Null is the plain [RendelColors.surfaceRaised] it has always been.
   final RendelBackdrop? backdrop;
+
+  /// The light behind the panel, from the console. Null draws it as every
+  /// build did: [RendelLook.groundLight] or the accent, at full strength.
+  final RendelGroundLight? groundLight;
 
   /// Kinds of card set apart from the rest, by catalog type
   /// (`product_cards`, `info_card`, …). See [forCard].
@@ -900,6 +924,7 @@ class RendelTheme {
       fontFamily: fontFamily,
       displayFontFamily: displayFontFamily,
       backdrop: backdrop,
+      groundLight: groundLight,
       // A literal accent pair stays; a derived one is derived again against
       // this card's plate, so an outlined button's word still reads on it.
       parts: look.parts,
@@ -1348,6 +1373,7 @@ class RendelTheme {
               fontFamily: family ?? fontFamily,
               displayFontFamily: display ?? displayFontFamily,
               backdrop: backdrop,
+              groundLight: groundLight,
               accentText: _accentText,
               accentEdge: _accentEdge,
               danger: _danger,
@@ -1382,6 +1408,7 @@ class RendelTheme {
     String? fontFamily,
     String? displayFontFamily,
     RendelBackdrop? backdrop,
+    RendelGroundLight? groundLight,
   }) {
     Color blend(Color a, Color b, double t) => Color.lerp(a, b, t)!;
     const white = Color(0xFFFFFFFF);
@@ -1525,6 +1552,7 @@ class RendelTheme {
       fontFamily: fontFamily,
       displayFontFamily: displayFontFamily,
       backdrop: backdrop,
+      groundLight: groundLight,
     );
   }
 
@@ -1574,6 +1602,8 @@ class RendelTheme {
       },
       fontFamily: light.fontFamily,
       displayFontFamily: light.displayFontFamily,
+      // Its colours only give the hue; the dark pastel is made from them.
+      groundLight: light.groundLight,
     );
   }
 }
