@@ -76,6 +76,14 @@ class RendelApiClient {
   final String deviceId;
   final RendelConfig config;
 
+  /// The language the SDK's own words are drawn in once a conversation has
+  /// one, when it is not the phone's: the server's lines on the team's page
+  /// follow `Accept-Language`, so they read in it too. Over a Turkish
+  /// conversation on an English phone the team's page said "Away" and "The
+  /// team will reply as soon as they can…" under its Turkish header (Yusuf,
+  /// F2150). Null: the spoken locale, as before.
+  String? Function()? drawnLanguage;
+
   /// Injectable so the SSE parser can be driven from a test. It is the one
   /// piece of this SDK that turns bytes into protocol, and it had no coverage
   /// at all: the scripted client every other suite uses replaces `chat`
@@ -89,7 +97,7 @@ class RendelApiClient {
         // The language the chrome is drawn in, so a sentence the server puts
         // in the error bar arrives in it too. The turn body already carries
         // `client.locale`; an upload has no body of ours, only the file.
-        'Accept-Language': resolveSpokenLocale(config.locale, config.languages),
+        'Accept-Language': drawnLanguage?.call() ?? resolveSpokenLocale(config.locale, config.languages),
       };
 
   /// The signed-in person's token from the host, asked for fresh each turn.
@@ -204,12 +212,21 @@ class RendelApiClient {
          network error on the first question. */
       if (response.statusCode == 401) {
         RendelLog.error('invalid_key', 'The Rendel server does not know this appKey. $rendelKeyHelp');
+        // Hidden, as for a refusal: the developer's to fix, never a box in
+        // the sheet for the person (Kaan, a mistyped key, F1386).
+        return const RendelConfigAnswer.refused('invalid_key');
       }
       if (response.statusCode == 304) return const RendelConfigAnswer.unchanged();
       if (response.statusCode == 403) {
         final code = _errorCode(response.body);
         if (code == 'app_not_live' || code == 'app_suspended') {
           return RendelConfigAnswer.refused(code!);
+        }
+        // A web build on a website the key does not list: hidden too, with the server's sentence naming the site
+        // and where to add it, for the developer and never the person (Melek F2380, Mira F2220).
+        if (code == 'origin_not_allowed') {
+          RendelLog.error(code!, '${_errorText(response.body) ?? ''} Rendel is hidden on this page.'.trim());
+          return RendelConfigAnswer.refused(code);
         }
       }
       if (response.statusCode >= 500) return const RendelConfigAnswer.unreachable();
@@ -221,10 +238,14 @@ class RendelApiClient {
     }
   }
 
-  static String? _errorCode(String body) {
+  static String? _errorCode(String body) => _errorField(body, 'code');
+
+  static String? _errorText(String body) => _errorField(body, 'message');
+
+  static String? _errorField(String body, String field) {
     try {
       final error = (jsonDecode(body) as Map<String, dynamic>)['error'];
-      return error is Map && error['code'] is String ? error['code'] as String : null;
+      return error is Map && error[field] is String ? error[field] as String : null;
     } catch (_) {
       return null;
     }
@@ -360,13 +381,16 @@ class RendelApiClient {
   /// Returns the status the server recorded, or null when the call could not
   /// be made at all. Null is not the same as a refusal: a customer who has not
   /// turned server-mediated confirmation on is served exactly as before, so a
-  /// network blip here must not cost the user their tap.
+  /// network blip here must not cost the user their tap. A 429 or a 5xx is
+  /// null too, as pressing again can help; any other answer is the server's
+  /// word on the card, for good (the app suspended, its key revoked, the card
+  /// unknown here), and comes back as a [RendelError] (night review 5).
   ///
   /// A yes carries the signed-in person ([user]) and their token, as a turn
   /// does, in headers only: a write the server makes as them then runs at
   /// the tap (`succeeded` or `failed`), and is made even if the app is put
   /// away before the turn is continued.
-  Future<String?> recordDecision(
+  Future<Object?> recordDecision(
     String invocationId, {
     required bool confirm,
     String? typed,
@@ -386,15 +410,25 @@ class RendelApiClient {
             }),
           )
           .timeout(config.requestTimeout);
-      // What the user typed did not match the stored value: the card stays open.
-      if (response.statusCode == 422) {
-        final refused = jsonDecode(response.body);
-        final code = refused is Map ? (refused['error'] is Map ? refused['error']['code'] : refused['code']) : null;
-        if (code == 'typed_mismatch') return 'typed_mismatch';
+      if (response.statusCode == 200) {
+        final parsed = jsonDecode(response.body) as Map<String, dynamic>;
+        return parsed['status'] as String?;
       }
-      if (response.statusCode != 200) return null;
-      final parsed = jsonDecode(response.body) as Map<String, dynamic>;
-      return parsed['status'] as String?;
+      if (response.statusCode == 429 || response.statusCode >= 500) return null;
+      Object? refused;
+      try {
+        refused = jsonDecode(response.body);
+      } catch (_) {
+        // Not the JSON envelope: the plain failure is all there is to say.
+      }
+      final error = refused is Map && refused['error'] is Map ? refused['error'] as Map : null;
+      final code = error?['code'] ?? (refused is Map ? refused['code'] : null);
+      // What the user typed did not match the stored value: the card stays open.
+      if (code == 'typed_mismatch') return 'typed_mismatch';
+      final message = error?['message'];
+      return message is String
+          ? RendelError(code: code is String ? code : 'turn_failed', message: message, retryable: false)
+          : const RendelError(code: 'turn_failed', message: 'The server refused the confirmation.', retryable: false);
     } catch (_) {
       return null;
     }
@@ -503,7 +537,7 @@ class RendelApiClient {
   }
 
   /// POST /v1/events with one event: a contact channel tapped, Rendel opened
-  /// (analytics-roi T3, T4). Never a throw, and nothing the user sees waits
+  /// (analytics-roi T3, T4), a request's timing (optimisation 6.1). Never a throw, and nothing the user sees waits
   /// on it; the server ignores an event it does not know.
   Future<void> sendEvent(Map<String, dynamic> event) => sendEvents([event]);
 
@@ -744,18 +778,25 @@ class RendelApiClient {
         )
         .timeout(config.requestTimeout);
     final status = response.statusCode;
-    if (status >= 200 && status < 300) return null;
+    // A 200 that bound nobody says why, as a refusal does: an unsigned id on an install that has not been that
+    // person left a signed-in customer anonymous with nothing in the log (Mira F2348).
+    final ok = status >= 200 && status < 300;
     String? code;
     String? message;
     try {
       final error = jsonDecode(response.body);
-      if (error is Map && error['error'] is Map) {
+      if (ok) {
+        if (error is! Map || !error.containsKey('end_user_id') || error['end_user_id'] != null) return null;
+        if (error['code'] is String) code = error['code'] as String;
+        if (error['message'] is String) message = error['message'] as String;
+      } else if (error is Map && error['error'] is Map) {
         final e = error['error'] as Map;
         if (e['code'] is String) code = e['code'] as String;
         if (e['message'] is String) message = e['message'] as String;
       }
     } catch (_) {
       // Not the JSON the API answers with: the status says enough.
+      if (ok) return null;
     }
     return (status: status, retry: status == 408 || status == 429 || status >= 500, code: code, message: message);
   }

@@ -7,6 +7,51 @@ asks of you.
 
 ## Unreleased
 
+## 0.104.0
+
+### Added
+
+- After each request the SDK sends one `turn_timing` event to `/v1/events`:
+  the request's id and how many milliseconds each step took on the device
+  (until the request left, its first event, first block, first words and end,
+  and how long the device's own reads then took). Numbers only. Rendel keeps
+  them beside its server's own, to see where a person waits.
+
+### Fixed
+
+- A message sent while an answer is still being written goes once that answer is done; Send stays live for it. Pressed then, Send and Enter did nothing, and the person had to send it again. What is typed and not sent stays in the box, and at rest the field shows it. A suggestion tapped, or words heard, no longer wipe what was typed in the box.
+- The team's page reads in one language. Over a conversation answered in Turkish on an English phone, the page's own words were Turkish and the server's lines on it English ("Away", "The team will reply as soon as they can…"), its times on a 12-hour clock. The SDK's requests now name the language its words are drawn in, and the page's times follow that language's clock and the phone's own 24-hour setting.
+- An `identify` the server took and bound to nobody is logged as `identify_refused`, with the server's reason (`identify_unsigned`): an id without `userHmac` on an install that has not been that person. The person had become an anonymous visitor, held to the anonymous limit, with nothing in the log.
+- A question refused for the key (`invalid_key`) or, in a web build, the website (`origin_not_allowed`) reads "The assistant stopped responding." in the person's language and stays on screen, with no Try again; the server's sentence for the developer goes to the log only. A web build on a website the key does not list hides the launcher, as an unknown key does.
+- The log line for a key that is refused says where the keys are (Settings → Keys & environments) and no longer "Copy beside Test": a release build carries the live key, and the line sent a developer to the other one.
+- A page whose first line runs past 200 characters sets no lede: it is read at the body's size from the start, as on the web. Two hundred words filled a phone at 21pt, and a card's long summary was five lines centred.
+- The opening's day is in the language the SDK's words are in, as the web's is: with `languages: ['tr']` on an English phone it read "Fri, Nov 20" over Turkish words. English words keep the phone's own date.
+- The line a write leaves with no card (action_done) is a soft white line with a card's shadow, and its Undo a soft fill; neither has an outline any more.
+- A list row whose status pill says 'On the way' no longer opens its line with 'On the way ·' as well.
+- A suggestion card at the foot of a page no longer writes its emoji twice: at the end of its words and again in the round beside them. An icon's name (cart) is left in the words.
+- The Test mode badge is one look in both SDKs: the theme's soft tone with its words in ink. The web SDK drew it beige, against a lilac or green theme; Flutter drew an outline in the accent.
+- A card's detail no longer draws its first action twice: lit beside the microphone, it is left out of the actions on the page (a product page showed 'Add to cart' as a button and again as the pill under it).
+- A tap on the microphone ('Hold the microphone while you speak') and a microphone that heard nothing are said in the quiet line over the composer, as the web SDK says them, not in the error strip with its red mark; a refused microphone keeps the strip and its Open settings.
+- While a field of a card on the page has the keyboard (a rating's comment, a form), the composer steps aside, so two boxes no longer stand over the keyboard with the card's Send half under the composer; it comes back when the field lets go.
+- While the top bar's menu is open, a tap anywhere on the page beside it only shuts the menu; it pressed what was under it, and a suggestion was sent unasked.
+- After Undo is tapped, 'Undoing…' and then 'Undone' each rise in where the button stood, in both SDKs; a line read back already undone stands still. Off under reduced motion.
+- A table draws no column that no row fills: a plan table's last column, 'You save per seat per year', ran off the plate with nothing under it.
+- A figure in a row of three is set smaller when it does not fit its third, instead of cut: a month's total read 'A$130,...' beside a whole '5' and 'A$26,14'.
+- Answer text drops a bold or highlight mark that has no partner and hugs a word on one side, and the backslash before a quote: a product's description read 'yapılan ==\"satır arası bir çörek gibi** bir'. An equation such as a == b stays as written.
+- A page leaves out a card with nothing in it (a facts card with no rows drew only its title or its fallback words) and a heading with nothing of its own under it: one before another heading, before the suggestions, or last on the page.
+- A hand-over to your team opens the team's page after an answer has opened a screen of your app. The page Rendel was opened from could be gone by then, and the team's page, the handoff and the menu's team row then opened nothing while the question left the thread. The team's page is drawn in the conversation's language, as the thread under it is, not in the phone's.
+- A confirmation card says "Confirmed" only once the server has the tap. While it is on its way the card's buttons rest; a tap that never got there (offline) leaves the card open with "That did not send, so nothing was done", and Confirm is the retry, so no second card asks for the same thing. A handler that reports a failure, or a write the server ran at the tap and that failed, draws "Didn't go through", never "Confirmed". Only a tap that did not get there, or a busy or down server (429, 5xx), is "did not send": a server that refused the card for good (the app suspended, the key revoked, the card unknown here) draws "Didn't go through" with the server's words under it, or the plain failure, and no retry. A new conversation started while the tap was on its way stays new.
+- A cart card whose quantities were changed on the card says the app's cart has not changed yet, and which button changes it, until that button is pressed: the steppers had read as changing the cart itself.
+- A question that never reached the server (offline) stays on screen over "Your message did not send. Check the connection, then try again." and its Try again; it had gone from the screen under "The connection dropped before the answer finished", which no answer had started.
+- Start a new conversation asks once: the first tap turns its row (or the header's start-over button) into "Tap again to clear this conversation", and only a second tap clears it. One tap had cleared a long conversation, a return number with it, for good.
+- A long message, while its answer is written, reads as text at the body's size from the start, its first eight lines, instead of a 26 pt headline over the composer; a short one's words come in within half a second.
+- A rating's Send works with nothing written: the score was already taken at the tap, and the card folds into its thanks. It had been a button that did nothing.
+- A key the server does not know (a 401 on the config) hides the launcher, as `app_not_live` does, and the reason stays in the log: a question had got "Unknown or revoked publishable key." in the sheet.
+
+### Changed
+
+- `RendelMotionScale` has the console's fifth duration, `reveal` (620 ms), and its exit curve, `exitCurve`. The SDK's own bottom sheets (preferences, conversations with the team, the team's page, leaving the app, a picker) open and close at once when the device asks for less motion; they had slid for 250 ms whatever it said.
+
 ## 0.103.0
 
 ### Security

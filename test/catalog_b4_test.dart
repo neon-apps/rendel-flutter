@@ -390,7 +390,8 @@ void main() {
       expect(find.text('Thanks for telling us'), findsNothing);
       final field = find.byWidgetPredicate((w) => w is TextField && w.decoration?.hintText == 'What could be better?');
       expect(field, findsOneWidget);
-      expect(node(tester, 'Send'), isSemantics(isEnabled: false));
+      // Send with nothing written finishes it, the score already in (F1185).
+      expect(node(tester, 'Send'), isSemantics(isEnabled: true, hasTapAction: true));
       await tester.enterText(field, '  The box was crushed.  ');
       await tester.pump();
       expect(node(tester, 'Send'), isSemantics(isEnabled: true, hasTapAction: true));

@@ -328,7 +328,7 @@ void main() {
 
         await pumpShell(tester, c, scale: scale);
         expect(tester.takeException(), isNull);
-        expect(find.bySemanticsLabel('Checking your app…'), findsOneWidget,
+        expect(find.bySemanticsLabel('Working on it…'), findsOneWidget,
             reason: 'the pill has to be on screen to be measured');
 
         held.complete(RendelResult.ok(const {}));

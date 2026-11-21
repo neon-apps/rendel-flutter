@@ -9,9 +9,11 @@ enum RendelLogLevel { debug, warning, error }
 /// reworded. Where the platform supplied its own error code, it is [code].
 /// Where a developer gets the key, said wherever one is refused. An
 /// example's `rd_pk_test_...` used to pass the first check and fail later as
-/// a network error nobody could read. Not exported.
+/// a network error nobody could read. Not which of the two keys: a release
+/// build carries the live key, and "Copy beside Test" sent a developer to the
+/// other one (Mira, F2025). Not exported.
 const String rendelKeyHelp = "Copy your app's key from the Rendel console: "
-    'your app → Settings → Keys & environments → Copy beside Test.';
+    'your app → Settings → Keys & environments.';
 
 class RendelLogRecord {
   const RendelLogRecord({

@@ -36,6 +36,7 @@ Future<bool> askToLeave(BuildContext context, String site, {RendelStrings? strin
   final words = strings ?? RendelStringsScope.of(context);
   final open = await showModalBottomSheet<bool>(
     context: context,
+    sheetAnimationStyle: rendelSheetMotion(context),
     useSafeArea: true,
     backgroundColor: theme.colors.surface,
     shape: RoundedRectangleBorder(

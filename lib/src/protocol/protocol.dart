@@ -200,6 +200,12 @@ class RendelLocalKeys {
   static const String typed = '_typed';
   static const String mismatch = '_mismatch';
 
+  /// `confirm_card`: true while the tap is on its way to the server, and
+  /// `unsent` true once it never got there (nothing ran; Confirm sends it
+  /// again). The card says "Confirmed" only after the server has the tap.
+  static const String sending = '_sending';
+  static const String unsent = '_unsent';
+
   /// `confirm_card` with `full_text`: true once the whole text was opened,
   /// and the text it replaces from `Rendel.setCardSource` (null when that
   /// could not be had, absent when the app gave none).

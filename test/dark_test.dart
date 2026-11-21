@@ -411,5 +411,30 @@ void main() {
         expect(find.text('Ask'), findsOneWidget);
       });
     }
+
+    // A web build on a website the key does not list (Melek F2380, Mira F2220).
+    testWidgets('origin_not_allowed hides the launcher and logs the server\'s sentence', (tester) async {
+      final logs = <RendelLogRecord>[];
+      await tester.runAsync(() => Rendel.init(
+            appKey: 'rd_pk_live_dark_000000000000000000000000',
+            config: RendelConfig(
+              onLog: logs.add,
+              httpClient: MockClient((request) async => request.url.path.endsWith('/v1/apps/config')
+                  ? http.Response(
+                      jsonEncode({
+                        'error': {'code': 'origin_not_allowed', 'message': 'https://shop.example is not allowed to use this key.'}
+                      }),
+                      403)
+                  : http.Response('{}', 200)),
+            ),
+          ));
+      await tester.runAsync(Rendel.refreshConfig);
+      await tester.pumpWidget(const MaterialApp(home: Scaffold(floatingActionButton: RendelLauncher())));
+      expect(Rendel.isEnabled, isFalse);
+      expect(find.text('Ask'), findsNothing);
+      final said = logs.where((r) => r.code == 'origin_not_allowed').toList();
+      expect(said, isNotEmpty);
+      expect(said.first.message, 'https://shop.example is not allowed to use this key. Rendel is hidden on this page.');
+    });
   });
 }

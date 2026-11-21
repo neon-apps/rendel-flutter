@@ -45,11 +45,16 @@ Future<SupportExit?> showRendelSupport(
   RendelStrings? strings,
   bool Function()? supportOn,
   bool sandbox = false,
+  /// The language [strings] are in, when it is not the app's: its times read
+  /// on its clock. A Turkish page on an English phone read "7:13 AM" (Yusuf, F2150).
+  String? language,
 }) {
   final drawn = theme ?? RendelThemeScope.of(context);
   final words = strings ?? RendelStringsScope.of(context);
+  final clock24 = language != null && !const {'en', 'ar'}.contains(language.toLowerCase().split(RegExp('[-_]')).first);
   return showModalBottomSheet<SupportExit>(
     context: context,
+    sheetAnimationStyle: rendelSheetMotion(context),
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: drawn.colors.surfaceRaised,
@@ -60,22 +65,25 @@ Future<SupportExit?> showRendelSupport(
     // The keyboard takes the bottom of the screen: the page sits on it, and the place to write stays in sight.
     builder: (sheet) => Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(sheet).bottom),
-      child: RendelThemeScope(
-        theme: drawn,
-        child: RendelStringsScope(
-          strings: words,
-          child: RendelSupportSheet(
-            support: support,
-            team: team,
-            assistant: assistant,
-            onAction: onAction,
-            canHandle: canHandle,
-            routeTitle: routeTitle,
-            onPick: onPick,
-            onUpload: onUpload,
-            sources: sources,
-            supportOn: supportOn,
-            sandbox: sandbox,
+      child: MediaQuery(
+        data: clock24 ? MediaQuery.of(sheet).copyWith(alwaysUse24HourFormat: true) : MediaQuery.of(sheet),
+        child: RendelThemeScope(
+          theme: drawn,
+          child: RendelStringsScope(
+            strings: words,
+            child: RendelSupportSheet(
+              support: support,
+              team: team,
+              assistant: assistant,
+              onAction: onAction,
+              canHandle: canHandle,
+              routeTitle: routeTitle,
+              onPick: onPick,
+              onUpload: onUpload,
+              sources: sources,
+              supportOn: supportOn,
+              sandbox: sandbox,
+            ),
           ),
         ),
       ),
@@ -703,7 +711,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                     children: [
                       Semantics(
                         header: true,
-                        child: Text(strings.supportTeamOf(widget.team), style: theme.text.body.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.onSurface), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        child: Text(strings.supportTeamOf(widget.team), style: theme.text.body.copyWith(fontSize: 16, fontWeight: FontWeight.w600, color: theme.colors.onSurface), maxLines: 2, overflow: TextOverflow.ellipsis),
                       ),
                       // No thread yet (K3): nothing is known of the team, so nothing is said.
                       if (state != null)
@@ -1209,7 +1217,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     }
     final navigator = Navigator.of(context);
     await widget.support.resolve(byMistake: true);
-    navigator.maybePop();
+    // The way back, as the header's: it opens Rendel's page when the team's page came first (QA 2026-11-20 B2).
+    navigator.maybePop(SupportExit.back);
   }
 
   /// "I'm sorted", or the way back before the team has written: a question, and a small button in the app's colour
@@ -1301,7 +1310,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
         ],
       );
 
-  String _time(BuildContext context, DateTime at) => MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at.toLocal()));
+  String _time(BuildContext context, DateTime at) =>
+      MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(at.toLocal()), alwaysUse24HourFormat: MediaQuery.alwaysUse24HourFormatOf(context));
   TextStyle _meta(RendelTheme theme) => theme.text.caption.copyWith(fontSize: 11.5, color: theme.colors.onSurfaceFaint, fontFeatures: const [FontFeature.tabularFigures()]);
 
   /// A confirm card the team sent that has no confirmation yet: this phone mints it, once, when it is first drawn.

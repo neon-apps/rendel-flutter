@@ -66,8 +66,14 @@ class RendelPresentation extends ChangeNotifier {
   final NavigatorState _navigator;
 
   /// Where the thread was opened from: a page opened over the thread (the
-  /// support page) is shown from here, so it lands above the sheet.
-  BuildContext get origin => _origin;
+  /// support page) is shown from here, so it lands above the sheet. Once an
+  /// answer has opened a screen of the app, the page that opened the thread
+  /// may be gone; its navigator is then the place, as it is for the sheet
+  /// itself ([_present]). An unmounted origin made every way to the team
+  /// return false with nothing shown: a handoff took the question off the
+  /// thread and opened nothing, three times, and the menu's team row did
+  /// nothing (Derya, night 2026-11-20, F1132).
+  BuildContext get origin => _origin.mounted ? _origin : _navigator.context;
 
   /// The root overlay, so a screen the app pushes on a navigator of its own
   /// does not cover the bubble.

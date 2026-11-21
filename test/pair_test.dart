@@ -45,6 +45,25 @@ void main() {
       expect(request.headers['Content-Type'], startsWith('application/json'));
     });
 
+    // Yusuf, 21 November (F2150): a Turkish conversation on an English
+    // phone; the team's page read Turkish around the server's English lines.
+    test('speaks the language the conversation is drawn in, once it has one', () async {
+      final server = _Server(200, {'paired': true, 'ends_at': '2026-10-08T14:00:00.000Z'});
+      final api = RendelApiClient(
+        appKey: 'nc_pk_test_x',
+        deviceId: 'd' * 32,
+        config: const RendelConfig(apiBaseUrl: 'https://api.example', locale: 'en-TR'),
+        httpClient: server,
+      );
+      await api.pair('K7Q2-M9XD');
+      String? drawn;
+      api.drawnLanguage = () => drawn;
+      await api.pair('K7Q2-M9XD');
+      drawn = 'tr';
+      await api.pair('K7Q2-M9XD');
+      expect(server.requests.map((request) => request.headers['Accept-Language']), ['en-TR', 'en-TR', 'tr']);
+    });
+
     test('is paired until the time the server gives', () async {
       final result = await client(
         _Server(200, {'paired': true, 'ends_at': '2026-10-08T14:00:00.000Z'}),

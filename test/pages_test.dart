@@ -201,8 +201,9 @@ void main() {
       expect(tester.widget<Text>(find.text('Which shoe should I buy?')).maxLines, 1);
     });
 
-    // Tuna, 2026-11-14: 12pt in a colour that reads, still one line.
-    testWidgets('reads at 12pt in the soft ink, cut short on one line', (tester) async {
+    // Tuna, 2026-11-14: a colour that reads, still one line. 14pt since the
+    // night review (T02): at 12 it was the smallest, faintest line on screen.
+    testWidgets('reads at 14pt in the soft ink, cut short on one line', (tester) async {
       final api = _LiveApi();
       final c = controller(api);
       addTearDown(c.dispose);
@@ -214,7 +215,7 @@ void main() {
       final line = tester.widget<Text>(
           find.text('Can you compare two to four products side by side: price, rating and allergens?'));
       final paper = RendelTheme.paper();
-      expect(line.style!.fontSize, 12);
+      expect(line.style!.fontSize, 14);
       expect(line.style!.color, paper.colors.onSurfaceSoft);
       expect(line.style!.color, isNot(paper.colors.onSurfaceFaint));
       expect(line.maxLines, 1);
@@ -351,11 +352,11 @@ void main() {
         TurnStart(conversationId: 'c1', messageId: 'm1', model: 'test'),
         TurnStatus(step: 'action', action: 'check_stock'),
       ]);
-      expect(find.bySemanticsLabel('Checking your app…'), findsOneWidget);
+      expect(find.bySemanticsLabel('Working on it…'), findsOneWidget);
       expect(find.bySemanticsLabel('Thinking…'), findsNothing);
 
       await api.push(tester, const [TurnStatus(step: 'daydreaming')]);
-      expect(find.bySemanticsLabel('Checking your app…'), findsOneWidget);
+      expect(find.bySemanticsLabel('Working on it…'), findsOneWidget);
 
       await api.push(tester, const [TurnStatus(step: 'composing')]);
       expect(find.bySemanticsLabel('Putting it together…'), findsOneWidget);
@@ -625,6 +626,26 @@ void main() {
         reason: 'the point with no icon it could draw still lines up',
       );
     });
+
+    // Sevgi and Elif, T02: points none of which drew an icon started 36pt in,
+    // under an empty column.
+    testWidgets('key_points whose icons none could be drawn have no column', (tester) async {
+      final c = seeded([
+        _block('s', 'section', {'title': 'Why this one'}),
+        _block('k', 'key_points', {
+          'items': [
+            {'title': 'Soft landing', 'body': 'Kind to your joints.'},
+            {'icon': 'not_an_icon', 'title': 'Light', 'body': '240 g a shoe.'},
+          ],
+        }),
+      ]);
+      addTearDown(c.dispose);
+      await pump(tester, c);
+      await settle(tester);
+
+      expect(tester.getTopLeft(find.text('Light')).dx, tester.getTopLeft(find.text('Why this one')).dx);
+      expect(tester.getTopLeft(find.text('Soft landing')).dx, tester.getTopLeft(find.text('Why this one')).dx);
+    });
   });
 
   testWidgets("a page's first paragraph is its lede", (tester) async {
@@ -759,13 +780,13 @@ void main() {
       expect(browser.opened, ['https://cilt365.com/routine']);
     });
 
-    testWidgets('a lone asterisk and an unclosed pair stay as written', (tester) async {
+    testWidgets('a lone asterisk stays, and an unclosed pair drops its mark (F0938)', (tester) async {
       final c = seeded([_text('t', 'Take 5 * 3 = 15, and **this stays.')]);
       addTearDown(c.dispose);
       await pump(tester, c);
       await settle(tester);
 
-      expect(find.text('Take 5 * 3 = 15, and **this stays.'), findsOneWidget);
+      expect(find.text('Take 5 * 3 = 15, and this stays.'), findsOneWidget);
     });
 
     testWidgets('a mark can hold bold, and the mark is painted', (tester) async {
@@ -802,13 +823,13 @@ void main() {
       );
     });
 
-    testWidgets('an unclosed == stays literal', (tester) async {
+    testWidgets('an unclosed == drops its mark, an equation stays (F0938)', (tester) async {
       final c = seeded([_text('t', 'If a == b, then ==this stays as it is.')]);
       addTearDown(c.dispose);
       await pump(tester, c);
       await settle(tester);
 
-      expect(find.text('If a == b, then ==this stays as it is.'), findsOneWidget);
+      expect(find.text('If a == b, then this stays as it is.'), findsOneWidget);
       expect(marks, findsNothing);
     });
 
@@ -979,8 +1000,8 @@ void main() {
         }
       }
     }
-    expect(RendelStrings.forLocale('tr').statusAction, 'Uygulamaya bakılıyor…');
-    expect(RendelStrings.forLocale('tr').statusComposing, 'Sayfa hazırlanıyor…');
+    expect(RendelStrings.forLocale('tr').statusAction, 'Hemen hallediyorum…');
+    expect(RendelStrings.forLocale('tr').statusComposing, 'Yanıt hazırlanıyor…');
   });
 
   // The pill in the microphone's place cut 0.92.1's Turkish wait line on a

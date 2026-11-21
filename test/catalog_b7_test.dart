@@ -276,9 +276,13 @@ void main() {
       expect(find.text('Review order · \$186'), findsOneWidget);
       expect(find.text('Delivery is free over \$80.'), findsOneWidget);
 
+      const unsaved = 'Your cart has not changed yet. Press Review order to change it.';
+      expect(find.text(unsaved), findsNothing);
       await tester.tap(find.bySemanticsLabel('More, Crew Socks'));
       await tester.pump();
       expect(find.text('\$204.50'), findsOneWidget);
+      // On the card only, until the button sends it: the app's cart is as it was (F1082).
+      expect(find.text(unsaved), findsOneWidget);
       // Three is the most of it: the fourth tap changes nothing.
       await tester.tap(find.bySemanticsLabel('More, Crew Socks'), warnIfMissed: false);
       await tester.pump();

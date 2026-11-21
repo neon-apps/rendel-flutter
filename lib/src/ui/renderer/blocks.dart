@@ -215,6 +215,9 @@ class _ProseState extends State<_Prose> {
 /// [caret] after the words, in the line.
 InlineSpan _caretSpan(Widget caret) => WidgetSpan(alignment: PlaceholderAlignment.middle, child: caret);
 
+/// A first line too long to be a lede or a summary (the web's `/^[^\n]{201}/`).
+final RegExp _longFirstLine = RegExp(r'^[^\n]{201}');
+
 Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
   final theme = RendelThemeScope.of(context);
   final page = RendelPage.maybeOf(context);
@@ -223,8 +226,11 @@ Widget buildTextBlock(BuildContext context, WireBlock block, RendelDispatcher di
       : block.streamingText;
   // The first paragraph of a page is the lede, set larger, and the rest a
   // step smaller than the prose style (`design/PAGES.md`). On a detail it is
-  // the summary under the head, centred (`design/DETAIL.md`).
-  final lede = page?.lede ?? false;
+  // the summary under the head, centred (`design/DETAIL.md`). A first line
+  // past 200 characters is neither, read at the body's size from the start,
+  // as the web does: 200 words filled a phone at 21pt (Burcu), a summary was
+  // five lines centred (Derya).
+  final lede = (page?.lede ?? false) && !_longFirstLine.hasMatch(text);
   final summary = lede && page!.detail;
   final style = summary
       ? theme.text.prose.copyWith(fontSize: 15.5, height: 1.45)
@@ -329,12 +335,19 @@ double balancedWidth(
 /// them (`markdown.ts`): `**bold**`, `*italic*`, `` `code` ``, `~~struck~~`,
 /// `[words](https://…)`, and `==phrase==`, the phrase an answer marks.
 /// Whitespace just inside a pair does not open or close one, so `a == b`
-/// stays an equation and `5 * 3` a product, and a pair left unclosed stays
-/// literal. The model is told to write none but the mark; what it wrote
+/// stays an equation and `5 * 3` a product; a pair left unclosed loses its
+/// mark ([_unmarked]). The model is told to write none but the mark; what it wrote
 /// anyway arrived as its asterisks (Özlem 2026-10-28, Cilt365).
 final RegExp _inlinePattern = RegExp(
   r'\*\*(.+?)\*\*|\*(?!\s)(.+?)\*|`([^`]+)`|~~(.+?)~~|\[([^\]]+)\]\(([^)\s]+)\)|==(?=\S)(.+?)(?<=\S)==',
 );
+
+/// A mark with no partner, hugging a word on one side only (`yapılan ==\"satır
+/// … gibi** bir`, Derya): the model's typing, never the answer's words, so it
+/// goes, and so does the backslash before a quote. `a == b` and `2**3` stay
+/// as written. The web SDK's `plain` (markdown.ts) is the same.
+final RegExp _strayMark = RegExp(r'(?<=^|\s)(?:\*\*|==)(?=\S)|(?<=\S)(?:\*\*|==)(?=[\s.,;:!?)]|$)');
+String _unmarked(String words) => words.replaceAll(r'\"', '"').replaceAll(_strayMark, '');
 
 /// [_inline]'s reading of a text: flat spans, each in the style its marks
 /// lay over the paragraph's, where the marked phrases fall, and the words
@@ -367,7 +380,7 @@ _Inline _inline(
     TextStyle over(TextStyle more) => style?.merge(more) ?? more;
     var last = 0;
     for (final m in _inlinePattern.allMatches(text)) {
-      out._add(text.substring(last, m.start), style, tap);
+      out._add(_unmarked(text.substring(last, m.start)), style, tap);
       last = m.end;
       if (m[1] != null) {
         walk(m[1]!, over(const TextStyle(fontWeight: FontWeight.w700)), tap);
@@ -401,7 +414,7 @@ _Inline _inline(
         out.marks.add(TextRange(start: start, end: out._length));
       }
     }
-    out._add(text.substring(last), style, tap);
+    out._add(_unmarked(text.substring(last)), style, tap);
   }
 
   walk(text, null, null);
@@ -620,13 +633,22 @@ Widget buildQuickReplies(BuildContext context, WireBlock block, RendelDispatcher
     items: [
       for (final item in items)
         _WayOnCard(
-          label: _str(item['label']) ?? '',
+          label: _withoutMark(_str(item['label']) ?? '', _str(item['icon'])),
           icon: _str(item['icon']),
           onTap: _tap(dispatch, item['action']),
         ),
     ],
   );
 }
+
+/// [label] without the emoji at its end when the card's round draws that
+/// emoji already: "💪" was in the words and again in the round beside them
+/// (Zeynep, Tom, sdkkaza). The web SDK's way on does the same.
+/// Only an emoji: an icon's name ("cart") is a word the label may end on.
+String _withoutMark(String label, String? icon) =>
+    icon != null && icon.isNotEmpty && !_iconWord.hasMatch(icon) && label.endsWith(icon) && label.length > icon.length
+        ? label.substring(0, label.length - icon.length).trimRight()
+        : label;
 
 /// The foot of an answer page (`design/PAGES.md`): a hairline the width of
 /// the screen, the heading centred under it, then the questions as cards.
@@ -897,6 +919,15 @@ class _IconLede extends StatelessWidget {
   }
 }
 
+/// A row's [subtitle] without the [status] it opens on, when the row's pill
+/// says it already: "Yolda · 4 ürün" beside a "Yolda" pill (Derya). The web
+/// SDK's list does the same.
+String? _withoutStatus(String? subtitle, String? status) {
+  if (subtitle == null || status == null || status.isEmpty) return subtitle;
+  if (subtitle == status) return null;
+  return subtitle.startsWith('$status · ') ? subtitle.substring(status.length + 3) : subtitle;
+}
+
 Widget buildItemList(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
   final theme = RendelThemeScope.of(context);
   final items = _maps(block.props['items']);
@@ -917,7 +948,7 @@ Widget buildItemList(BuildContext context, WireBlock block, RendelDispatcher dis
   Widget row(Map item) {
     final image = _str(item['image_url']);
     final file = _str(item['file_type']);
-    final subtitle = _str(item['subtitle']);
+    final subtitle = _withoutStatus(_str(item['subtitle']), _str(_map(item['status'])?['label']));
     final date = _str(item['date_label']);
     final value = valueOf(item);
     final tone = _str(_map(item['amount'])?['tone']);
@@ -2042,6 +2073,11 @@ Widget _confirmCard(
 ) {
   final theme = RendelThemeScope.of(context);
   final resolved = _str(block.props[RendelLocalKeys.resolved]);
+  // The tap on its way to the server: nothing to press twice, nothing called
+  // confirmed yet. One that never got there says so, and Confirm sends it
+  // again (F1441).
+  final sending = block.props[RendelLocalKeys.sending] == true;
+  final unsent = block.props[RendelLocalKeys.unsent] == true && !sending;
   // A destructive action the app says can be taken back (an order that can
   // still be cancelled) is asked like any other: danger means "cannot be
   // taken back" (`design/SYSTEM.md` §6a), and saying so of it was untrue.
@@ -2212,7 +2248,20 @@ Widget _confirmCard(
                   ),
                 )
 
-              : _confirmButtons(
+              : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                if (unsent) ...[
+                  Semantics(
+                    liveRegion: true,
+                    child: Text(
+                      RendelStringsScope.of(context).confirmUnsent.replaceAll('{confirm}', confirmLabel),
+                      style: theme.text.caption.copyWith(color: theme.danger),
+                    ),
+                  ),
+                  SizedBox(height: theme.space.sm),
+                ],
+                _confirmButtons(
                   context,
                   confirm: RendelActionButton(
                     label: confirmLabel,
@@ -2221,8 +2270,9 @@ Widget _confirmCard(
                     // Not while a change is waiting for the server (the card
                     // confirmed is the one it drew last), nor before the
                     // value is typed back and the text read, nor while a
-                    // value it asks for is missing.
-                    onTap: edits?.blocked == true || extras?.armed == false || unfilled
+                    // value it asks for is missing, nor while the tap is
+                    // on its way.
+                    onTap: sending || edits?.blocked == true || extras?.armed == false || unfilled
                         ? null
                         : extras?.typedValue != null
                             ? () => dispatch.onAction(ConfirmAction(
@@ -2239,12 +2289,14 @@ Widget _confirmCard(
                     label: RendelStringsScope.of(context).goBack,
                     quiet: true,
                     expand: true,
-                    onTap: _tap(dispatch, block.props['cancel']),
+                    onTap: sending ? null : _tap(dispatch, block.props['cancel']),
                     part: 'cancel',
                   ),
                   // "Place order · A$8.41" does not fit half a card on a phone.
                   stacked: confirmLabel.length > 14,
                 ),
+                ],
+              ),
         ),
       ],
     ),
@@ -2590,12 +2642,17 @@ Widget buildStatGroup(BuildContext context, WireBlock block, RendelDispatcher di
         // Label, value and delta stack. Set beside the value, the delta
         // competes with it for a third of the plate and the number is the one
         // that loses: "$1,284" ellipsised to "$1,…" is a KPI that no longer
-        // says anything.
-        Text(
-          _str(item['value']) ?? '',
-          style: theme.text.displayTabular,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        // says anything. Nor is a value cut in its third: one that does not
+        // fit is set smaller ("A$130,..." over "A$130,69", Derya), as the web
+        // SDK's wraps.
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: AlignmentDirectional.centerStart,
+          child: Text(
+            _str(item['value']) ?? '',
+            style: theme.text.displayTabular,
+            maxLines: 1,
+          ),
         ),
         if (delta != null) ...[
           SizedBox(height: theme.space.hair),
@@ -4392,7 +4449,7 @@ class _Donut extends StatelessWidget {
     final total = positive.fold<double>(0, (sum, v) => sum + v);
     final percents = _percentages(positive, total);
     final colors = [
-      for (var i = 0; i < positive.length; i++) _sliceColor(theme, i, positive.length),
+      for (var i = 0; i < positive.length; i++) _sliceColor(theme, i),
     ];
     final named = positive.asMap().keys.every(
           (i) => i < labels.length && labels[i].isNotEmpty,
@@ -4503,19 +4560,25 @@ List<int> _percentages(List<double> values, double total) {
   return floors;
 }
 
-/// One ramp from full ink down through it, so a twenty-slice donut never needs
-/// twenty invented colours.
+/// A hue a slice, the web's donut's (`SERIES` in blocks.ts) after its first:
+/// blue, green, amber, the danger rose and the soft ink, each at the web's
+/// value for a light or a dark ground.
 ///
-/// The largest slice used to take the accent. It does not any more: a donut is
-/// something the copilot is telling you, and the accent is reserved for what
-/// you can act on. Full ink already marks the largest slice, and the hairline
-/// gaps between arcs are what separate neighbours.
-Color _sliceColor(RendelTheme theme, int index, int count) {
-  final t = count <= 1 ? 0.0 : index / math.max(1, count - 1);
-
-  // Capped at 0.55, not 0.8: past that the ramp drops under 3:1 against the
-  // plate, and an 8pt swatch is the only thing attaching a name to a slice.
-  return Color.lerp(theme.colors.onSurface, theme.colors.surfaceSunk, t * 0.55)!;
+/// The largest slice is full ink, not the accent: a donut is something the
+/// copilot is telling you, and the accent is reserved for what you can act on.
+/// The rest were a ramp of greys, and Can and Derya could not tell "İçecekler"
+/// from "Fırın & Pastane" by them, nor match a legend dot to its slice (night
+/// review, T02).
+Color _sliceColor(RendelTheme theme, int index) {
+  final dark = theme.colors.onSurface.computeLuminance() > theme.colors.surface.computeLuminance();
+  return switch (index % 6) {
+    0 => theme.colors.onSurface,
+    1 => dark ? const Color(0xFF8DB4FF) : const Color(0xFF2E5BD8),
+    2 => dark ? const Color(0xFF6FD39A) : const Color(0xFF16794A),
+    3 => dark ? const Color(0xFFF5C06B) : const Color(0xFF8A5A00),
+    4 => theme.danger,
+    _ => theme.colors.onSurfaceSoft,
+  };
 }
 
 class _DonutPainter extends CustomPainter {
@@ -4628,10 +4691,20 @@ class _LegendMark extends StatelessWidget {
 
 Widget buildTable(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
   final theme = RendelThemeScope.of(context);
-  final columns = [for (final c in _list(block.props['columns'])) _str(c) ?? ''];
-  final rows = [
+  final named = [for (final c in _list(block.props['columns'])) _str(c) ?? ''];
+  final all = [
     for (final row in _list(block.props['rows']))
       [for (final cell in _list(row)) _str(cell) ?? ''],
+  ];
+  // A column no row fills is not drawn: "You save per seat per year" ran off
+  // the plate with nothing under it (Laura). The web SDK's table does the same.
+  final keep = [
+    for (var c = 0; c < named.length; c++)
+      if (c == 0 || all.any((row) => c < row.length && row[c].trim().isNotEmpty)) c,
+  ];
+  final columns = [for (final c in keep) named[c]];
+  final rows = [
+    for (final row in all) [for (final c in keep) c < row.length ? row[c] : ''],
   ];
   if (columns.isEmpty || rows.isEmpty) {
     return _EmptyPlate(message: block.fallbackText);
@@ -6256,6 +6329,7 @@ Future<String?> _pickOption(
 }) {
   return showModalBottomSheet<String>(
     context: context,
+    sheetAnimationStyle: rendelSheetMotion(context),
     backgroundColor: theme.colors.surface,
     useSafeArea: true,
     builder: (sheetContext) => RendelThemeScope(
@@ -11374,6 +11448,30 @@ VoidCallback? _opens(
 /// enclosure.
 bool readsFlatOnPage(String type) => _enclosureFor(type) == _Enclosure.recorded;
 
+/// The list a block's body is drawn from, for the kinds that draw nothing else.
+const _bodies = {
+  'item_list': 'items', 'stat_group': 'items', 'progress': 'items', 'key_points': 'items', 'order_tracker': 'steps',
+  'datetime_slots': 'slots', 'chart': 'series', 'table': 'rows', 'key_value': 'rows', 'variant_picker': 'options', 'form': 'fields',
+};
+
+/// [blocks] as a page shows them (T02): a block with nothing in it is left
+/// out, and so is a heading with nothing of its own under it, before another
+/// heading, the way on or the page's end ("Beslenme değerleri" alone under
+/// its heading, Derya). The web SDK's `shownOnPage` is the same.
+List<WireBlock> shownOnPage(List<WireBlock> blocks) {
+  final kept = blocks.where((b) {
+    if (!b.ready) return true;
+    if (b.type == 'text') return (_str(b.props['markdown']) ?? '').trim().isNotEmpty;
+    final body = _bodies[b.type];
+    return body == null || _list(b.props[body]).isNotEmpty;
+  }).toList();
+  return [
+    for (var i = 0; i < kept.length; i++)
+      if (kept[i].type != 'section' || (i + 1 < kept.length && !const {'section', 'quick_replies'}.contains(kept[i + 1].type)))
+        kept[i],
+  ];
+}
+
 /// A heading for the blocks after it: the section's title with its subtitle
 /// under it.
 Widget buildSection(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
@@ -11400,8 +11498,9 @@ Widget buildSection(BuildContext context, WireBlock block, RendelDispatcher disp
 
 /// A few points, each a line with an icon: the reasons behind a pick, or a
 /// decision guide. An icon name this build does not know draws nothing and
-/// keeps its column, so the titles still line up; points that name no icon
-/// at all have no column.
+/// keeps its column while another point draws one, so the titles still line
+/// up; where no point draws one there is no column (the points started 36pt
+/// in, under nothing: night review, T02). `.rd-points-list` on the web.
 Widget buildKeyPoints(BuildContext context, WireBlock block, RendelDispatcher dispatch) {
   final theme = RendelThemeScope.of(context);
   final items = _maps(block.props['items']);
@@ -11411,7 +11510,7 @@ Widget buildKeyPoints(BuildContext context, WireBlock block, RendelDispatcher di
     final named = _str(item['tone']);
     return named == 'positive' || named == 'negative' ? named : null;
   }
-  final column = items.any((item) => _str(item['icon']) != null || tone(item) != null);
+  final column = items.any((item) => _iconFor(_str(item['icon'])) != null || tone(item) != null);
 
   return _Plate(
     child: Column(
@@ -11992,7 +12091,13 @@ class _RatingState extends State<_Rating> {
     final rate = widget.dispatch.onRate;
     final score = _score;
     final text = _comment.text.trim();
-    if (rate == null || score == null || text.isEmpty || _busy) return;
+    if (rate == null || score == null || _busy) return;
+    // Send with nothing written finishes it: the score was taken at the tap
+    // (Derya: Send did nothing, F1185).
+    if (text.isEmpty) {
+      setState(() => _props[RendelLocalKeys.answered] = true);
+      return;
+    }
     setState(() {
       _sending = true;
       _failed = false;
@@ -12148,7 +12253,7 @@ class _RatingState extends State<_Rating> {
               RendelActionButton(
                 label: strings.choiceSend,
                 quiet: true,
-                onTap: live && !_busy && _comment.text.trim().isNotEmpty ? _send : null,
+                onTap: live && !_busy ? _send : null,
               ),
             ],
           ),
@@ -14724,6 +14829,9 @@ class _ActionDone extends StatefulWidget {
 class _ActionDoneState extends State<_ActionDone> {
   Timer? _closes;
 
+  /// Undo was tapped here: what it says next rises in where the button was.
+  bool _tapped = false;
+
   DateTime? get _until => DateTime.tryParse(_str(widget.block.props['undo_until']) ?? '');
 
   @override
@@ -14748,7 +14856,7 @@ class _ActionDoneState extends State<_ActionDone> {
     final undo = widget.dispatch.onUndo;
     if (undo == null) return;
     final going = undo(widget.block);
-    setState(() {});
+    setState(() => _tapped = true);
     await going;
     if (mounted) setState(() {});
   }
@@ -14772,12 +14880,25 @@ class _ActionDoneState extends State<_ActionDone> {
     // side: the words were broken a few letters a line (QA R9, SE at AX5).
     // The Undo goes under the words there.
     final stacked = MediaQuery.textScalerOf(context).scale(14) > 14 * 1.35;
+    // "Undoing…", then "Undone", each rising in where the last stood, as
+    // the web SDK's line does: only after a tap here, never on a line read back.
+    final still = !_tapped || MediaQuery.disableAnimationsOf(context);
     final Widget? trailing = undone || phase == 'undoing'
-        ? Padding(
-            padding: EdgeInsets.symmetric(horizontal: stacked ? 0 : 8),
-            child: Text(
-              undone ? strings.actionUndone : strings.actionUndoing,
-              style: theme.text.labelEmphasis.copyWith(fontSize: 13.5, color: soft),
+        ? TweenAnimationBuilder<double>(
+            key: ValueKey(phase),
+            tween: Tween(begin: still ? 1 : 0, end: 1),
+            duration: theme.motion.settle,
+            curve: theme.motion.curve,
+            builder: (context, t, child) => Opacity(
+              opacity: t,
+              child: Transform.translate(offset: Offset(0, 6 * (1 - t)), child: child),
+            ),
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: stacked ? 0 : 8),
+              child: Text(
+                undone ? strings.actionUndone : strings.actionUndoing,
+                style: theme.text.labelEmphasis.copyWith(fontSize: 13.5, color: soft),
+              ),
             ),
           )
         : offered
@@ -14788,9 +14909,9 @@ class _ActionDoneState extends State<_ActionDone> {
                   constraints: const BoxConstraints(minHeight: 36),
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   alignment: Alignment.center,
+                  // A soft fill, no outline (F1687): the web SDK's Undo is drawn the same.
                   decoration: BoxDecoration(
-                    color: theme.colors.surfaceRaised,
-                    border: Border.all(color: theme.hairline),
+                    color: theme.colors.onSurface.withValues(alpha: 0.07),
                     borderRadius: BorderRadius.circular(999),
                   ),
                   child: Text(strings.actionUndo, style: theme.text.labelEmphasis.copyWith(fontSize: 14)),
@@ -14801,9 +14922,10 @@ class _ActionDoneState extends State<_ActionDone> {
       liveRegion: true,
       child: Container(
         padding: const EdgeInsetsDirectional.fromSTEB(12, 10, 8, 10),
+        // One soft white line with a plate's shadow, no outline (F1687), as the web SDK draws it.
         decoration: BoxDecoration(
           color: theme.colors.surfaceRaised,
-          border: Border.all(color: theme.hairline),
+          boxShadow: theme.plateShadow,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -15580,6 +15702,14 @@ class _CartState extends State<_Cart> {
     for (final line in widget.lines) {
       sum += (line['unit_price'] as num) * (quantities[_str(line['id'])] ?? 0);
     }
+    // What the card arrived with is what the app's cart holds: a step away
+    // from it is only on the card until the button sends it, and the card
+    // says so (Can, Derya: the + changed the card, not the cart, F1082).
+    final changed = !locked &&
+        widget.lines.any((line) =>
+            (quantities[_str(line['id'])] ?? 0) !=
+            math.max(0, (line['quantity'] is num ? line['quantity'] as num : 0).toInt()));
+    final status = _error ?? (changed ? strings.cartUnsaved.replaceAll('{submit}', label) : null);
 
     return Container(
       width: double.infinity,
@@ -15641,12 +15771,12 @@ class _CartState extends State<_Cart> {
             onTap: locked ? null : _submit,
             expand: true,
           ),
-          if (_error != null) ...[
+          if (status != null) ...[
             const SizedBox(height: 10),
             Semantics(
               liveRegion: true,
               child: Text(
-                _error!,
+                status,
                 textAlign: TextAlign.center,
                 style: theme.text.body.copyWith(fontSize: 13, height: 1.4),
               ),

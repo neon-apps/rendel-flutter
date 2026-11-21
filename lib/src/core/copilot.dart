@@ -498,6 +498,11 @@ class Rendel {
       config: config,
       httpClient: config.httpClient,
     );
+    // The language the team's page is drawn in (`openSupport`), so the server's lines on it match.
+    _api!.drawnLanguage = () => switch (_controller?.answerLanguage) {
+          final language? when _config.strings == null && RendelStrings.ships(language) => language,
+          _ => null,
+        };
     _handOverClient(_api);
     if (_signOutUnsent) {
       _signOutUnsent = false;
@@ -635,10 +640,11 @@ class Rendel {
     _user = user;
     unawaited(_storeUser(jsonEncode(user)));
     // Somebody else's thread is not this person's to read, on a phone they
-    // share, nor their follow-ups. From anonymous to signed in it stays: it
-    // was theirs.
+    // share, nor one asked signed out: its answers said "sign in to see your
+    // orders" to whoever signs in next (sdkkaza, T38). Nor somebody else's
+    // follow-ups; what this phone was told signed out stays.
+    if (previous != userId) _controller?.reset();
     if (previous != null && previous != userId) {
-      _controller?.reset();
       RendelFollowups.instance.clear();
       _inboxAsked = null;
     }
@@ -976,6 +982,10 @@ class Rendel {
   /// A test key: the thread says so in its header.
   static bool get _sandboxKey => RegExp(r'^(rd|nc)_pk_test_').hasMatch(_appKey ?? '');
 
+  /// Whether the server answered the last config on the draft channel: a test key, or a live key before
+  /// Go live, which the server serves as the test key and never emails from (QA 2026-11-20 B4).
+  static bool _servedDraft = false;
+
   /// How many thread sheets are on screen right now. `reset()` needs to know:
   /// a controller disposed under a mounted [ThreadScreen] leaves the composer
   /// ticking a disposed notifier on the next send.
@@ -1066,9 +1076,17 @@ class Rendel {
               RendelAttachSource.files,
             ],
       theme: themeOf(context),
-      strings: strings,
+      // In the conversation's language, as the thread under it is drawn (`followAnswerLanguage`): over a Turkish
+      // thread on an English phone the team's page was all English (Derya, F1132).
+      strings: _config.strings ??
+          switch (controller.answerLanguage) {
+            final language? when RendelStrings.ships(language) => RendelStrings.forLocale(language),
+            _ => strings,
+          },
+      language: _api?.drawnLanguage?.call(),
       supportOn: _supportOnForPage,
-      sandbox: _sandboxKey,
+      // The team's page as the server sees it: a live key before Go live is the test key there, so no email goes.
+      sandbox: _sandboxKey || _servedDraft,
     );
     // ✕ closes all of Rendel, as on the web.
     if (exit == SupportExit.closed) _presentation?.dismiss();
@@ -1526,6 +1544,7 @@ class Rendel {
     _manifestEdits = 0;
     _manifestSyncing = null;
     _configEtag = null;
+    _servedDraft = false;
     // Support is off until a config says otherwise, and the thread was made with the last client.
     _supportTeam = null;
     _keptTeam = null;
@@ -1701,6 +1720,7 @@ class Rendel {
   /// applied one, and audits the result the same way `init()` audits a
   /// hand-mapped theme.
   static void _apply(RendelRemoteConfig remote) {
+    _servedDraft = remote.channel == 'draft';
     // Before the empty check: an app that published no look can still be
     // switched to one read at a time.
     _parallelReads = remote.parallelReads;
@@ -2063,11 +2083,14 @@ class Rendel {
     }
     if (who != _user?['id']) return;
     List<Map<String, dynamic>> history;
+    controller.restoring = true;
     try {
       history = await api.fetchMessages(id);
     } catch (_) {
       // Not readable now: the thread opens fresh, as it did before.
       return;
+    } finally {
+      controller.restoring = false;
     }
     final moved = !identical(controller, _controller) ||
         who != _user?['id'] ||

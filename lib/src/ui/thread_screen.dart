@@ -28,7 +28,8 @@ import 'renderer/blocks.dart'
         RendelSwap,
         balancedWidth,
         buildNotice,
-        readsFlatOnPage;
+        readsFlatOnPage,
+        shownOnPage;
 import 'renderer/registry.dart';
 import 'memory_chips.dart';
 import 'memory_sheet.dart';
@@ -217,6 +218,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// reason at the other end.
   final _head = ValueNotifier<double>(0);
 
+  /// Whether the top bar's menu is open (`_LabTop`): while it is, the page under it takes no tap.
+  final _menuOpen = ValueNotifier<bool>(false);
+
   /// How tall the follow-up cards under the header are: the page starts below
   /// them, so a card never covers the answer (QA R2-13, an Undo line hidden).
   final _cards = ValueNotifier<double>(0);
@@ -298,6 +302,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   @override
   void initState() {
     super.initState();
+    FocusManager.instance.addListener(_focusMoved);
     // Lab screenshots: a question asked as the thread opens.
     final asked = RendelLab.takeAutoAsk();
     if (asked != null) {
@@ -451,8 +456,23 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   Future<String> _upload(RendelAttachment file) =>
       widget.controller.api.upload(file.bytes, file.mediaType, fileName: file.name);
 
+  /// A field of a card on the page has the keyboard (a rating's comment, a
+  /// form): the composer steps aside while it does, so two boxes do not stand
+  /// over the keyboard, the card's Send half under the composer (Derya).
+  bool _cardTyping = false;
+
+  void _focusMoved() {
+    final at = FocusManager.instance.primaryFocus?.context;
+    final card = at != null &&
+        at.findAncestorWidgetOfExactType<EditableText>() != null &&
+        at.findAncestorWidgetOfExactType<_Composer>() == null &&
+        at.findAncestorStateOfType<_ThreadScreenState>() == this;
+    if (card != _cardTyping && mounted) setState(() => _cardTyping = card);
+  }
+
   @override
   void dispose() {
+    FocusManager.instance.removeListener(_focusMoved);
     _supportBeat?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     widget.controller.removeListener(_turnPages);
@@ -461,6 +481,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     _input.dispose();
     _dock.dispose();
     _head.dispose();
+    _menuOpen.dispose();
     _cards.dispose();
     _voiceSent.dispose();
     _voiceLeaving.dispose();
@@ -677,10 +698,10 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
            reports a clean, immediate end rather than an error. Left alone,
            voice mode opened and shut under the user's finger and said
            nothing. */
-        setState(() {
-          _voice = false;
-          _attachError = _strings.nothingHeard;
-        });
+        setState(() => _voice = false);
+        // A quiet line over the composer, as the web says it: nothing went
+        // wrong that needs a red mark (Can, F0664).
+        _showNote(_strings.nothingHeard);
         return;
       }
       // Already written out live as it was heard, so it is not revealed
@@ -744,7 +765,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // sent, and the strip over the composer says how it is used.
     if (!_listening || _held!.isActive) {
       _cancelVoice();
-      setState(() => _attachError = _strings.holdToSpeak);
+      _showNote(_strings.holdToSpeak);
       return;
     }
     // A host's recogniser that cannot be stopped ends by itself, and voice
@@ -781,6 +802,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       'turn_failed' => s.turnFailed,
       'copilot_stalled' => s.copilotStalled,
       'stream_dropped' => s.streamDropped,
+      'turn_unsent' => s.turnUnsent,
       'no_answer' => s.noAnswer,
       _ => c.errorText,
     };
@@ -799,8 +821,15 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       unawaited(_pair(text.trim()));
       return;
     }
-    // While an answer is written, what was typed stays in the box until it is done.
-    if (text.trim().isEmpty || widget.controller.busy) return;
+    if (text.trim().isEmpty) return;
+    /* While an answer is written, what was typed stays in the box and goes
+       once it is done. Yusuf pressed Send and Enter with the second question
+       in the box, nothing happened, and he sent it again himself once the
+       answer was in (F2143). */
+    if (widget.controller.busy) {
+      if (preset == null) _queued = true;
+      return;
+    }
 
     /* Nothing goes out half-uploaded: an id that does not exist yet is a file
        the turn would silently not carry. The send control is off while one is
@@ -810,7 +839,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // The first picture goes with the question, for the line its answer page
     // opens with.
     final image = _attachments.where((pending) => pending.mediaType.startsWith('image/')).firstOrNull?.bytes;
-    _input.clear();
+    // A suggestion or what was heard goes without what was typed in the box, which stays.
+    if (preset == null) _input.clear();
     _sendHold?.cancel();
     _sendHold = Timer(sendHoldDuration, () {
       if (mounted) setState(() => _justSent = false);
@@ -1055,12 +1085,14 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                           // when the assistant is back, and there is nothing to
                           // press until then.
                           // Lab · look A: the suggestions as cards over the message card.
-                          if (RendelLab.of('look') == 'a' && controller.messages.isEmpty && widget.suggestions.isNotEmpty && !controller.busy && !_noPictures(widget.suggestions))
+                          if (RendelLab.of('look') == 'a' && controller.messages.isEmpty && !controller.restoring && widget.suggestions.isNotEmpty && !controller.busy && !_noPictures(widget.suggestions))
                             _LabCards(suggestions: widget.suggestions, onPick: _send),
                           if (controller.resting)
                             _Resting(hint: controller.notice!.hint)
                           else
-                          _Composer(
+                          Offstage(
+                          offstage: _cardTyping,
+                          child: _Composer(
                             input: _input,
                             busy: controller.busy,
                             status: _status(controller),
@@ -1085,6 +1117,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                             onVoice: widget.onDictate == null ? null : _dictate,
                             onHoldStart: _holdStart,
                             onHoldEnd: _holdEnd,
+                          ),
                           ),
                         ],
                       ),
@@ -1135,6 +1168,10 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// whichever way it was sent: typed, a suggestion, a quick reply, spoken.
   RendelMessage? _question;
   bool _wasBusy = false;
+
+  /// Sent while an answer was still being written: it goes once that answer
+  /// is done (`_syncPages`).
+  bool _queued = false;
 
   /// The assistant's turns that have something to show, oldest first. A
   /// card's detail is not one of them.
@@ -1202,12 +1239,25 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       _asked = null;
       changed = true;
     }
-    if (_wasBusy && !c.busy && _asked != null) {
+    // A turn whose connection failed before any answer keeps its question on
+    // screen over the error and its Try again: going back to the page before
+    // took the message away (Ozan, offline, F1122).
+    final lost = const {'turn_unsent', 'stream_dropped', 'model_busy', 'copilot_stalled'}.contains(c.errorCode);
+    if (_wasBusy && !c.busy && _asked != null && !lost) {
       _asked = null;
       changed = true;
     }
     // A question going out, however it was asked, stops the last answer being read.
     if (c.busy && !_wasBusy) widget.voice?.stop();
+    // What was sent meanwhile goes now, unless the turn failed: then it stays in the box, its Send live again.
+    if (_wasBusy && !c.busy && _queued) {
+      _queued = false;
+      if (c.errorCode == null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && !widget.controller.busy) _send();
+        });
+      }
+    }
     _wasBusy = c.busy;
     // An answer the conversation no longer holds is no page.
     final before = c.pages.length;
@@ -1326,6 +1376,31 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     return null;
   }
 
+  /// On a detail its first action stands lit in the dock ([_primary]), so the
+  /// page does not draw it a second time: Can's product page had "Add to
+  /// cart" as a button on the page and again as the green pill under it.
+  void _undock(List<WireBlock> blocks, ConversationController c) {
+    final at = blocks.indexWhere((b) => b.type == 'actions' && b.ready);
+    if (at < 0) return;
+    final b = blocks[at];
+    final items = b.props['items'];
+    final first = items is List && items.isNotEmpty ? items.first : null;
+    final action = first is Map ? UIAction.tryParse(first['action']) : null;
+    if (first is! Map || first['label'] is! String || action == null || !c.handles(action)) return;
+    if (items.length == 1) {
+      blocks.removeAt(at);
+    } else {
+      blocks[at] = WireBlock(
+        id: b.id,
+        type: b.type,
+        fallbackText: b.fallbackText,
+        props: {...b.props, 'items': items.sublist(1)},
+        surfaceId: b.surfaceId,
+        revision: b.revision,
+      )..ready = true;
+    }
+  }
+
   /// The first item of the first `screens` block on the page on screen.
   ({String label, VoidCallback onTap, bool go})? _firstScreen(ConversationController c) {
     final at = c.page;
@@ -1429,6 +1504,16 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           ),
         ),
       ),
+      // While the top bar's menu is open, a tap anywhere under it only shuts
+      // it: Can's tap beside the menu sent "Return an item" from the page.
+      Positioned.fill(
+        child: ValueListenableBuilder<bool>(
+          valueListenable: _menuOpen,
+          builder: (context, open, _) => open
+              ? GestureDetector(behavior: HitTestBehavior.opaque, onTap: () => _menuOpen.value = false)
+              : const SizedBox.shrink(),
+        ),
+      ),
       Positioned(
         top: 0,
         left: 0,
@@ -1437,6 +1522,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           onHeight: (height) => _head.value = height,
           child: RendelLab.of('look') == 'a'
               ? _LabTop(
+                  menu: _menuOpen,
                   title: widget.title,
                   logoUrl: widget.logoUrl,
                   logoHeaders: widget.logoHeaders,
@@ -1768,7 +1854,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
           // The opening screen keeps what it has always had; only the
           // dissolve is new to it.
           child: shown == null
-              ? RendelLab.of('look') == 'a'
+              ? controller.restoring
+                  ? const SizedBox.shrink()
+                  : RendelLab.of('look') == 'a'
                   ? _LabOpening(
                       headline: widget.headline,
                       subtitle: widget.subtitle,
@@ -1826,7 +1914,8 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
         if (widget.feedback && !detail) controller,
       ]),
       builder: (context, _) {
-        final blocks = [for (final answer in answers) ...answer.blocks];
+        final blocks = shownOnPage([for (final answer in answers) ...answer.blocks]);
+        if (detail) _undock(blocks, controller);
         final dispatch = detail ? _detailDispatch : _dispatch;
         final lede = blocks.indexWhere((block) => block.type == 'text');
         double gap(int i) {
@@ -2100,8 +2189,9 @@ class _Helpful extends StatelessWidget {
 /// The question an answer page answers, over it: one line, cut with an
 /// ellipsis, and the picture sent with it as a small thumbnail. Read as a
 /// caption, not as something said, so it is never a bubble (design/PAGES.md).
-/// 12pt in the soft ink rather than the faint one, so it is read rather than
-/// squinted at (Tuna, 2026-11-14); `.rd-asked` on the web.
+/// In the soft ink rather than the faint one (Tuna, 2026-11-14), at 14pt: at
+/// 12 it was the smallest, faintest line on the screen, and people could not
+/// check what they had written (T02); `.rd-asked` on the web.
 class _AskedLine extends StatelessWidget {
   const _AskedLine({required this.text, this.image});
 
@@ -2126,7 +2216,7 @@ class _AskedLine extends StatelessWidget {
             text.replaceAll(RegExp(r'\s+'), ' '),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: theme.text.captionSoft.copyWith(fontSize: 12),
+            style: theme.text.captionSoft.copyWith(fontSize: 14),
           ),
         ),
       ],
@@ -2259,19 +2349,18 @@ class _Header extends StatelessWidget {
         horizontal: theme.space.sm,
         vertical: theme.space.hair,
       ),
-      // An outline, not a fill. The badge is a notice about the
-      // key, not something the reader can act on, and the accent
-      // means "you can act" everywhere else in the catalog. It
-      // keeps the hue — a developer has to notice it — in the
-      // form the system reserves for accent-as-type.
+      // The theme's soft tone (the mark a phrase is lit with), its
+      // words in ink: a notice about the key, never the accent that
+      // means "you can act", and no outline. The web SDK and the
+      // console's phone draw it the same (night of 20 November, T02).
       decoration: BoxDecoration(
-        border: Border.all(color: theme.accentEdge),
+        color: theme.mark,
         borderRadius: BorderRadius.circular(theme.radius.control),
       ),
       child: Text(
         RendelStringsScope.of(context).testMode,
         style:
-            theme.text.overline.copyWith(color: theme.accentText),
+            theme.text.overline.copyWith(color: theme.colors.onSurface),
         maxLines: 1,
       ),
     );
@@ -2323,17 +2412,7 @@ class _Header extends StatelessWidget {
         _HeaderControls(
           children: [
             if (voice case final voice? when !fresh) _AutoRead(voice: voice),
-            if (onReset != null)
-              RendelPressable(
-                semanticLabel: RendelStringsScope.of(context).newConversation,
-                onTap: onReset!,
-                child: SizedBox(
-                  height: 44,
-                  width: 44,
-                  // Counter-clockwise: start over, which is what it does.
-                  child: _HeaderGlyph.reset(color: theme.colors.onSurface),
-                ),
-              ),
+            if (onReset != null) _ResetButton(onReset: onReset!),
             RendelPressable(
               semanticLabel: RendelStringsScope.of(context).closeCopilot,
               onTap: () => Navigator.of(context).maybePop(),
@@ -2368,6 +2447,74 @@ class _Header extends StatelessWidget {
               children: [row, SizedBox(height: theme.space.xs), badge],
             )
           : row,
+    );
+  }
+}
+
+/// Start over, asked once: the first tap says the conversation will be
+/// cleared, in the glyph's place, and a second tap within a few seconds
+/// clears it (Can, Sevgi, Nuri, Ozan: a 30-message conversation and its return number
+/// went with one tap, F0774, F1381).
+class _ResetButton extends StatefulWidget {
+  const _ResetButton({required this.onReset});
+
+  final VoidCallback onReset;
+
+  @override
+  State<_ResetButton> createState() => _ResetButtonState();
+}
+
+class _ResetButtonState extends State<_ResetButton> {
+  bool _armed = false;
+  Timer? _disarm;
+
+  void _tap() {
+    _disarm?.cancel();
+    if (_armed) {
+      setState(() => _armed = false);
+      widget.onReset();
+      return;
+    }
+    setState(() => _armed = true);
+    _disarm = Timer(const Duration(seconds: 4), () {
+      if (mounted) setState(() => _armed = false);
+    });
+  }
+
+  @override
+  void dispose() {
+    _disarm?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    final strings = RendelStringsScope.of(context);
+    return RendelPressable(
+      semanticLabel: _armed ? strings.newConversationConfirm : strings.newConversation,
+      onTap: _tap,
+      child: _armed
+          ? ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 44, maxWidth: 200),
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: theme.space.sm),
+                child: Center(
+                  child: Text(
+                    strings.newConversationConfirm,
+                    maxLines: 2,
+                    textAlign: TextAlign.center,
+                    style: theme.text.caption.copyWith(color: theme.colors.onSurface),
+                  ),
+                ),
+              ),
+            )
+          : SizedBox(
+              height: 44,
+              width: 44,
+              // Counter-clockwise: start over, which is what it does.
+              child: _HeaderGlyph.reset(color: theme.colors.onSurface),
+            ),
     );
   }
 }
@@ -3341,7 +3488,8 @@ class _ComposerState extends State<_Composer> {
                           )
                         : _AskField(
                             key: const ValueKey('field'),
-                            hint: widget.hint ?? strings.composerHint,
+                            // The words kept in the box, at rest, so they read as kept, not lost (as on the web, F1278).
+                            hint: widget.input.text.trim().isNotEmpty ? widget.input.text.trim() : (widget.hint ?? strings.composerHint),
                             label: strings.typeMessage,
                             onTap: _type,
                           ),
@@ -3688,8 +3836,8 @@ class _ComposerState extends State<_Composer> {
                     builder: (context, value, _) {
                       // Live only when there is something to send, and a
                       // photograph on its own is something to send.
-                      final enabled = !busy &&
-                          !widget.attaching &&
+                      // Live while an answer is written too: what is sent then goes once it is done.
+                      final enabled = !widget.attaching &&
                           (value.text.trim().isNotEmpty ||
                               attachments.isNotEmpty);
                       final still = MediaQuery.disableAnimationsOf(context);
@@ -5091,9 +5239,18 @@ class _AskedState extends State<_Asked> with SingleTickerProviderStateMixin {
   static const _perWord = 150;
   static const _settle = 260;
 
+  /// The last word starts by this, however long the question: 40 words took
+  /// six seconds to come in.
+  static const _lastStart = 450;
+
+  /// Characters past which the question is read as text, at the body's size
+  /// from the start, not set as a headline (1,536 characters were a wall).
+  static const _longAt = 140;
+
   late final List<String> _words =
       widget.text.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).toList();
-  late final int _total = _words.length * _perWord + _settle;
+  late final bool _long = _words.join(' ').length > _longAt;
+  late final int _total = math.min(_words.length * _perWord, _lastStart + _perWord) + _settle;
   late final AnimationController _reveal = AnimationController(
     vsync: this,
     duration: Duration(milliseconds: _total),
@@ -5105,7 +5262,7 @@ class _AskedState extends State<_Asked> with SingleTickerProviderStateMixin {
     super.didChangeDependencies();
     if (_started) return;
     _started = true;
-    if (widget.whole || MediaQuery.disableAnimationsOf(context)) {
+    if (widget.whole || _long || MediaQuery.disableAnimationsOf(context)) {
       _reveal.value = 1;
     } else {
       _reveal.forward();
@@ -5120,13 +5277,26 @@ class _AskedState extends State<_Asked> with SingleTickerProviderStateMixin {
 
   /// How far word [index] has come in, 0 to 1.
   double _shown(int index) =>
-      ((_reveal.value * _total - (index + 1) * _perWord) / _settle).clamp(0.0, 1.0);
+      ((_reveal.value * _total - math.min((index + 1) * _perWord, _lastStart + _perWord)) / _settle).clamp(0.0, 1.0);
 
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final style = _askedStyle(theme);
     final words = _words.join(' ');
+    if (_long) {
+      return Semantics(
+        liveRegion: true,
+        label: widget.text,
+        excludeSemantics: true,
+        child: Text(
+          words,
+          maxLines: 8,
+          overflow: TextOverflow.ellipsis,
+          style: theme.text.body.copyWith(color: theme.colors.onSurface, height: 1.5),
+        ),
+      );
+    }
     return Semantics(
       liveRegion: true,
       label: widget.text,

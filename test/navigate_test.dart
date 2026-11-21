@@ -340,8 +340,9 @@ void main() {
       expect(find.descendant(of: _lit, matching: find.byIcon(Icons.north_east_rounded)), findsOneWidget);
       final mic = tester.getRect(find.bySemanticsLabel('Speak instead of typing'));
       final lit = tester.getRect(_lit);
-      // Voice first, the microphone gives the lit item room: a 46 circle, the item after it.
-      expect(mic.width, 46);
+      // Voice first, the microphone gives the lit item room: a 46 circle in
+      // its 48 target (Android's least), the item after it.
+      expect(mic.width, 48);
       expect(lit.left, greaterThan(mic.right));
       expect(lit.center.dy, closeTo(mic.center.dy, 1));
 
@@ -595,9 +596,28 @@ void main() {
       final reset = find.bySemanticsLabel('Start a new conversation');
       expect(reset, findsOneWidget);
       await tester.tap(reset);
+      await tester.pump();
+      // Asked once: the first tap says it clears the conversation (F0774).
+      expect(reset, findsNothing);
+      await tester.tap(find.bySemanticsLabel('Tap again to clear this conversation'));
       await settle(tester);
       expect(find.text('Where is my order?'), findsOneWidget);
       expect(reset, findsNothing);
+    });
+
+    testWidgets('a tap beside the open menu only shuts it (F0789)', (tester) async {
+      await host(tester);
+      await openMenu(tester);
+      final answer = find.text('It arrives today by 18:00.');
+      final reset = find.bySemanticsLabel('Start a new conversation');
+      expect(reset, findsOneWidget);
+      // The answer's line is under the catch: the tap reaches the catch, not the page.
+      final hit = tester.hitTestOnBinding(tester.getCenter(answer));
+      expect(hit.path.first.target, isNot(tester.renderObject(answer)));
+      await tester.tapAt(tester.getCenter(answer));
+      await settle(tester);
+      expect(reset, findsNothing);
+      expect(answer, findsOneWidget);
     });
 
     testWidgets('closing the panel makes no bubble', (tester) async {

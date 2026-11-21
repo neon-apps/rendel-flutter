@@ -141,8 +141,12 @@ class _RendelLauncherState extends State<RendelLauncher> {
     super.dispose();
   }
 
-  /// After the frame: an overlay is not changed while the tree builds.
-  void _schedule() => WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+  /// After the frame: an overlay is not changed while the tree builds. A frame is asked for too:
+  /// a follow-up landing while the app sits still drew nothing until something else did (QA 2026-11-20 B11).
+  void _schedule() {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _sync());
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
 
   /// The popup or the banner is up while an "In the app" message waits and
   /// the thread is closed; inside the thread it is one of the cards.

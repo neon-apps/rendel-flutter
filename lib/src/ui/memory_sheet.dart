@@ -32,6 +32,7 @@ Future<void> showRendelMemory(
   final words = strings ?? RendelStringsScope.of(context);
   return showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: rendelSheetMotion(context),
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: drawn.colors.surface,

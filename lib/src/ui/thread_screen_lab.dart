@@ -21,6 +21,7 @@ Widget _labOr(RendelTheme theme, {required double radius, required EdgeInsetsGeo
 
 class _LabTop extends StatefulWidget {
   const _LabTop({
+    required this.menu,
     required this.onReset,
     required this.onBack,
     required this.onForward,
@@ -50,6 +51,9 @@ class _LabTop extends StatefulWidget {
   final VoidCallback? onForward;
   final RendelVoice? voice;
 
+  /// Whether the menu is open, held by the screen ([_LabTopState._menu]).
+  final ValueNotifier<bool> menu;
+
   /// The conversation with the team, kept in the menu while a page is open.
   final (String, VoidCallback)? team;
 
@@ -58,11 +62,43 @@ class _LabTop extends StatefulWidget {
 }
 
 class _LabTopState extends State<_LabTop> {
-  bool _menu = false;
+  /// Open or shut, held by the screen, which lays a catch over the page while
+  /// it is open: a tap outside shuts the menu and presses nothing under it.
+  bool get _menu => widget.menu.value;
+  set _menu(bool open) => widget.menu.value = open;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.menu.addListener(_shut);
+  }
+
+  @override
+  void dispose() {
+    widget.menu.removeListener(_shut);
+    super.dispose();
+  }
+
+  void _shut() => setState(() => _resetArmed &= _menu);
+
+  /// Start a new conversation, asked once in its own row: the conversation
+  /// goes for good, a return number with it (Can, Sevgi, Nuri, Ozan: F0640, F0644, F0774, F1381).
+  bool _resetArmed = false;
 
   void _do(VoidCallback? action) {
-    setState(() => _menu = false);
+    setState(() {
+      _menu = false;
+      _resetArmed = false;
+    });
     action?.call();
+  }
+
+  void _reset() {
+    if (!_resetArmed) {
+      setState(() => _resetArmed = true);
+      return;
+    }
+    _do(widget.onReset);
   }
 
   @override
@@ -86,7 +122,7 @@ class _LabTopState extends State<_LabTop> {
     };
     final rows = <(Widget Function(Color), String, VoidCallback?)>[
       if (widget.team case (final title, final open)) ((c) => Icon(Icons.forum_outlined, size: 20, color: c), title, open),
-      ((c) => _HeaderGlyph.reset(color: c), strings.newConversation, widget.onReset),
+      ((c) => _HeaderGlyph.reset(color: c), _resetArmed ? strings.newConversationConfirm : strings.newConversation, widget.onReset),
       if (widget.paged) ...[
         ((c) => _HeaderGlyph.step(rtl ? forward : back, color: c), strings.previousPage, widget.onBack),
         ((c) => _HeaderGlyph.step(rtl ? back : forward, color: c), strings.nextPage, widget.onForward),
@@ -98,7 +134,10 @@ class _LabTopState extends State<_LabTop> {
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 6),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          _labRound(theme, label: strings.menu, onTap: () => setState(() => _menu = !_menu), child: menuMark),
+          _labRound(theme, label: strings.menu, onTap: () => setState(() {
+            _menu = !_menu;
+            _resetArmed = false;
+          }), child: menuMark),
           // The name between the buttons, as on the team's page, with the
           // app's mark before it and the test badge under it.
           Expanded(
@@ -128,10 +167,11 @@ class _LabTopState extends State<_LabTop> {
                 if (!widget.fresh) const SizedBox(height: 3),
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: theme.space.sm, vertical: theme.space.hair),
-                  // An outline, not a fill: a notice about the key, not a control.
-                  decoration: BoxDecoration(border: Border.all(color: theme.accentEdge), borderRadius: BorderRadius.circular(theme.radius.control)),
+                  // The theme's soft tone, its words in ink: a notice about the key, not a
+                  // control, and no outline; as the web SDK and the console's phone draw it.
+                  decoration: BoxDecoration(color: theme.mark, borderRadius: BorderRadius.circular(theme.radius.control)),
                   // Never cut: it is the difference between a test key and a live one.
-                  child: Text(strings.testMode, style: theme.text.overline.copyWith(color: theme.accentText), maxLines: 2, textAlign: TextAlign.center),
+                  child: Text(strings.testMode, style: theme.text.overline.copyWith(color: ink), maxLines: 2, textAlign: TextAlign.center),
                 ),
               ],
             ]),
@@ -183,13 +223,13 @@ class _LabTopState extends State<_LabTop> {
                       for (final (icon, label, action) in rows)
                         RendelPressable(
                           semanticLabel: label,
-                          onTap: action == null ? null : () => _do(action),
+                          onTap: action == null ? null : identical(action, widget.onReset) ? _reset : () => _do(action),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
                             child: Row(children: [
                               SizedBox.square(dimension: 22, child: icon(action == null ? theme.colors.onSurfaceFaint : ink)),
                               const SizedBox(width: 12),
-                              Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.text.label.copyWith(fontSize: 16, color: action == null ? theme.colors.onSurfaceFaint : ink))),
+                              Flexible(child: Text(label, maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.text.label.copyWith(fontSize: 16, color: action == null ? theme.colors.onSurfaceFaint : ink))),
                             ]),
                           ),
                         ),
@@ -224,7 +264,14 @@ class _LabOpening extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
     final words = (headline?.trim().isNotEmpty ?? false) ? headline!.trim() : RendelStringsScope.of(context).emptyTitle;
-    final day = MaterialLocalizations.of(context).formatMediumDate(DateTime.now());
+    // In the words' language, as the web's opening is: with languages: [tr]
+    // on an English phone it read "Fri, Nov 20" over Turkish (Kaan). English
+    // words keep the phone's own date.
+    final strings = RendelStringsScope.of(context);
+    final now = DateTime.now();
+    final day = listEquals(strings.shortDays, const RendelStrings().shortDays)
+        ? MaterialLocalizations.of(context).formatMediumDate(now)
+        : strings.dayHeadingFor(now);
     // Centred while it fits; scrolls on a small phone or at the largest text
     // rather than spilling under the cards.
     return LayoutBuilder(

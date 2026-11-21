@@ -1085,7 +1085,7 @@ class RendelSupport {
     if (status == 'succeeded' || status == 'failed') {
       _answered(invocationId, status == 'succeeded' ? 'confirmed' : 'failed');
       await load();
-      return status!;
+      return status as String;
     }
     if (status != 'confirmed') return 'unanswered';
     final ran = await api.support('POST', _path(threadId, 'continue'), user: user(), body: {'invocation_id': invocationId}, asPerson: true);

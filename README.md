@@ -13,7 +13,7 @@ dependencies:
   rendel:
     git:
       url: https://github.com/neon-apps/rendel-flutter.git
-      ref: v0.103.0
+      ref: v0.104.0
 ```
 
 ## Three lines to a running assistant
@@ -105,7 +105,7 @@ OpenFreeMap's open map data (no key, no account). It asks for no permission
 and no Info.plist or manifest line: Rendel never asks where the user is.
 What it does need from your build:
 
-- **iOS**: a deployment target of 13.0 or later, which the SDK already needs.
+- **iOS**: a deployment target of 15.0 or later, which the SDK already needs.
   CocoaPods or Swift Package Manager fetches MapLibre Native (6.28) on the
   next `pod install` or build.
 - **Android**: `minSdk` 24, which the SDK already needs (MapLibre itself asks

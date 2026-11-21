@@ -43,6 +43,26 @@ final _threadBody = {
   ],
 };
 
+/// Handed to the team, who have not written yet: the message card asks "By mistake?" beside the way back (D4).
+final _justHandedBody = {
+  ..._threadBody,
+  'state': {...(_threadBody['state']! as Map<String, Object>), 'mode': 'waiting', 'team_here': false},
+  'entries': [
+    {
+      'id': '00000000-0000-4000-8000-000000000012',
+      'seq': 1,
+      'kind': 'message',
+      'author': {'kind': 'user'},
+      'text': 'Kargom gelmedi',
+      'blocks': <Object>[],
+      'attachments': <Object>[],
+      'created_at': '2026-11-01T10:00:00Z',
+    },
+  ],
+};
+
+var _teamWrote = true;
+
 final _client = MockClient.streaming((request, body) async {
   final path = request.url.path;
   await body.drain<void>();
@@ -58,7 +78,7 @@ final _client = MockClient.streaming((request, body) async {
     });
   }
   if (path == '/v1/support/unread') return json({'unread': 0});
-  if (path == '/v1/support/current') return json(_threadBody);
+  if (path == '/v1/support/current') return json(_teamWrote ? _threadBody : _justHandedBody);
   if (path == '/v1/support/threads') return json({'threads': <Object>[]});
   // The team's stream, each time the page opens: held open, quiet.
   if (path.endsWith('/stream')) return http.StreamedResponse(StreamController<List<int>>().stream, 200);
@@ -95,7 +115,10 @@ Future<void> _openBoth(WidgetTester tester, {bool rendel = true}) async {
 }
 
 void main() {
-  tearDown(Rendel.resetForTest);
+  tearDown(() {
+    _teamWrote = true;
+    Rendel.resetForTest();
+  });
 
   testWidgets('✕ on the team page closes all of Rendel, as on the web', (tester) async {
     await _openBoth(tester);
@@ -120,6 +143,18 @@ void main() {
   testWidgets("the way back opens Rendel's page when the team's page came first", (tester) async {
     await _openBoth(tester, rendel: false);
     await tester.tap(find.bySemanticsLabel('Back to the assistant'));
+    await _settle(tester);
+    expect(find.byType(RendelSupportSheet), findsNothing);
+    expect(find.byType(ThreadScreen), findsOneWidget);
+    expect(Rendel.isOpen, isTrue);
+  });
+
+  // QA 2026-11-20 B2: before the team had written, the message card's way back closed the team's page
+  // and left the person in the app, with no assistant, when the team's page had come first.
+  testWidgets("By mistake's way back opens Rendel's page when the team's page came first", (tester) async {
+    _teamWrote = false;
+    await _openBoth(tester, rendel: false);
+    await tester.tap(find.text('Back to the assistant'));
     await _settle(tester);
     expect(find.byType(RendelSupportSheet), findsNothing);
     expect(find.byType(ThreadScreen), findsOneWidget);

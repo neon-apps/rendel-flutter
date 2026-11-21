@@ -289,6 +289,7 @@ class RendelMotionScale {
     this.swap = const Duration(milliseconds: 180),
     this.settle = const Duration(milliseconds: 240),
     this.press = const Duration(milliseconds: 120),
+    this.reveal = const Duration(milliseconds: 620),
     this.follow = const Duration(milliseconds: 250),
     this.breath = const Duration(milliseconds: 1100),
     this.caret = const Duration(milliseconds: 600),
@@ -307,6 +308,10 @@ class RendelMotionScale {
 
   /// A finger landing on a target.
   final Duration press;
+
+  /// A large area opening: the page dissolving, the voice veil. The panel's
+  /// fifth duration (MOTION-INVENTORY §2f), the web SDK's `--rd-reveal`.
+  final Duration reveal;
 
   /// The thread following the live edge after a discrete arrival.
   final Duration follow;
@@ -333,6 +338,9 @@ class RendelMotionScale {
   /// A press, which is shorter and shallower than an arrival.
   Curve get pressCurve => const Cubic(0.34, 0.01, 0.2, 1);
 
+  /// Leaving: the panel's exit curve, the web SDK's `--rd-ease-exit`.
+  Curve get exitCurve => const Cubic(0.5, 0, 0.75, 0);
+
   /// The breath is symmetric, so it eases in and out rather than arriving.
   /// Not `Curves.easeInOut`: the most-repeated motion in the product should
   /// not be the framework's default.
@@ -348,6 +356,13 @@ class RendelMotionScale {
   Curve get swapOut => const Interval(0.55, 1, curve: Curves.easeIn);
   Curve get swapIn => const Interval(0.55, 1, curve: Curves.easeOut);
 }
+
+/// A Material bottom sheet's own slide, gone when the device asks for less
+/// motion: it ran its 250 ms whatever the setting said (MOTION-INVENTORY §4).
+/// Null leaves the framework's.
+AnimationStyle? rendelSheetMotion(BuildContext context) => MediaQuery.disableAnimationsOf(context)
+    ? const AnimationStyle(duration: Duration.zero, reverseDuration: Duration.zero)
+    : null;
 
 /// The spacing scale. A 4pt grid, six steps. [plate] is the one padding a
 /// block enclosure uses, so every plated component has the same inset.

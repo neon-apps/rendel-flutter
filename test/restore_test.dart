@@ -7,6 +7,7 @@
 // it was the same person's and within the hour, read back from the server so
 // an answer that finished while the app was dead is there too.
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -24,6 +25,9 @@ class _Server {
   /// How many times the conversation's messages were asked for.
   var read = 0;
 
+  /// Holds the read back until it completes, when set.
+  Completer<void>? hold;
+
   late final client = MockClient((request) async {
     final path = request.url.path;
     if (path.endsWith('/v1/chat')) {
@@ -36,6 +40,7 @@ class _Server {
     }
     if (path.endsWith('/v1/conversations/c-bondi/messages')) {
       read++;
+      await hold?.future;
       // What the server stored once it finished, with nobody listening.
       return http.Response(
         jsonEncode({
@@ -123,6 +128,25 @@ void main() {
     expect(find.textContaining(_answer, findRichText: true), findsWidgets);
   });
 
+  // Kaan, T15: the sheet opened on the empty welcome, then on the last
+  // conversation a moment later.
+  testWidgets('the welcome is not drawn while the last conversation is read back', (tester) async {
+    final server = _Server();
+    await tester.runAsync(() => Rendel.identify(userId: 'olivia'));
+    await _askAndKill(tester, server);
+
+    server.hold = Completer<void>();
+    await _launch(tester, server);
+    await _open(tester);
+    expect(server.read, 1);
+    expect(find.text(const RendelStrings().emptyTitle), findsNothing);
+    expect(find.text(const RendelStrings().emptyBody), findsNothing);
+    server.hold!.complete();
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 50)));
+    await tester.pumpAndSettle();
+    expect(find.textContaining(_answer, findRichText: true), findsWidgets);
+  });
+
   testWidgets('another person signed in on the same phone opens fresh', (tester) async {
     final server = _Server();
     await tester.runAsync(() => Rendel.identify(userId: 'olivia'));
@@ -174,6 +198,8 @@ void main() {
     expect(server.read, 1);
     await openMenu(tester);
     await tester.tap(find.bySemanticsLabel('Start a new conversation'));
+    await tester.pump();
+    await tester.tap(find.bySemanticsLabel('Tap again to clear this conversation'));
     await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
     await tester.pumpAndSettle();
     Rendel.resetForTest(relaunch: true);

@@ -59,6 +59,7 @@ void main() {
     WidgetTester tester, {
     String appKey = 'rd_pk_test_x',
     bool voice = true,
+    List<String> suggestions = const [],
   }) async {
     final server = _Server();
     final c = ConversationController(
@@ -74,6 +75,7 @@ void main() {
         child: Scaffold(
           body: ThreadScreen(
             controller: c,
+            suggestions: suggestions,
             onPickAttachment: (_) async => null,
             onDictate: voice ? (_) async => null : null,
           ),
@@ -122,15 +124,38 @@ void main() {
     expect(server.asked, ['How do I add a refund policy?']);
     expect(find.text('And a shipping policy?'), findsOneWidget);
 
-    server.turns.single.complete();
-    await settle(tester);
-    // Kept through the answer's end: a box with words in it does not fold away.
-    expect(find.text('And a shipping policy?'), findsOneWidget);
+    // Send is live for it: pressed meanwhile, it waits for the answer (Yusuf, F2143: Enter did nothing).
     await tester.tap(find.bySemanticsLabel('Send message'));
     await tester.pump(const Duration(milliseconds: 100));
+    expect(server.asked, ['How do I add a refund policy?']);
+
+    server.turns.single.complete();
+    await settle(tester);
+    // Gone by itself once the answer is done, never typed twice.
     expect(server.asked, ['How do I add a refund policy?', 'And a shipping policy?']);
     server.turns.last.complete();
     await settle(tester);
+  });
+
+  testWidgets('a question typed meanwhile and not sent stays in the box, and reads as kept at rest', (tester) async {
+    final (_, server) = await pump(tester);
+    await send(tester, 'How do I add a refund policy?');
+    await tester.enterText(find.byType(TextField), 'And a shipping policy?');
+    server.turns.single.complete();
+    await settle(tester);
+    expect(server.asked, ['How do I add a refund policy?']);
+    expect(find.text('And a shipping policy?'), findsOneWidget);
+  });
+
+  testWidgets('a suggestion tapped leaves what was typed in the box', (tester) async {
+    final (_, server) = await pump(tester, voice: false, suggestions: const ['Where is my order?']);
+    await tester.enterText(find.byType(TextField), 'half a question');
+    await tester.tap(find.text('Where is my order?'));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(server.asked, ['Where is my order?']);
+    server.turns.single.complete();
+    await settle(tester);
+    expect(find.text('half a question'), findsOneWidget);
   });
 
   testWidgets('without a microphone the box is all there is, through the turn too', (tester) async {

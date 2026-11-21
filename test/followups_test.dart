@@ -122,6 +122,22 @@ void main() {
     ]);
   });
 
+  // QA 2026-11-20 B11: a follow-up that came in while the app sat still was not shown until something
+  // else drew a frame; the person saw it only after opening and closing Rendel.
+  testWidgets('a follow-up that arrives while the app sits still shows without anything else drawing', (tester) async {
+    await _init(tester, next: null);
+    await tester.pumpWidget(_app());
+    await tester.pumpAndSettle();
+    expect(tester.binding.hasScheduledFrame, isFalse);
+    // As the answer to the launch's ask lands.
+    RendelFollowups.instance.current.value = RendelFollowup.tryParse(_followup);
+    // A device draws only the frames something asked for.
+    for (var i = 0; i < 10 && tester.binding.hasScheduledFrame; i++) {
+      await tester.pump();
+    }
+    expect(find.text('Pegasus 41 indirimde').hitTestable(), findsOneWidget);
+  });
+
   testWidgets('a tap opens the conversation the server wrote, as history', (tester) async {
     final server = await _init(tester);
     await tester.pumpWidget(_app());

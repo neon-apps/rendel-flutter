@@ -90,6 +90,7 @@ Future<void> showRendelSupportList(
 }) {
   return showModalBottomSheet<void>(
     context: context,
+    sheetAnimationStyle: rendelSheetMotion(context),
     isScrollControlled: true,
     useSafeArea: true,
     backgroundColor: theme.colors.surfaceRaised,
@@ -229,7 +230,9 @@ class _SupportListState extends State<_SupportList> {
                           fontWeight: FontWeight.w600,
                           color: theme.colors.onSurface,
                         ),
-                        maxLines: 1,
+                        // Two lines, as the web's: "Lunar Kozmetik (web)
+                        // ekibiyle tüm sohbetler" was cut on a phone (T02).
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),

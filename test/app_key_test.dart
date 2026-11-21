@@ -41,6 +41,8 @@ void main() {
     final refused = logs.where((record) => record.code == 'invalid_key').toList();
     expect(refused, isNotEmpty);
     expect(refused.first.message, contains('Settings → Keys & environments'));
+    // Hidden, never a box for the person (Kaan, F1386).
+    expect(Rendel.isEnabled, isFalse);
   });
 
   // Keys made since the rename start rd_pk_; the ones made before, nc_pk_.

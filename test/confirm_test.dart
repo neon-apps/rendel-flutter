@@ -390,6 +390,93 @@ void main() {
       c.dispose();
     });
 
+    test('a tap that never reaches the server leaves the card open, not confirmed (F1441)', () async {
+      final server = _Server()..decisionFails = true;
+      final c = controller(server);
+
+      expect(await c.confirmInvocation('inv_7'), isFalse);
+
+      final card = c.messages.first.blocks.single.props;
+      expect(card[RendelLocalKeys.resolved], isNull);
+      expect(card[RendelLocalKeys.unsent], isTrue);
+      expect(card[RendelLocalKeys.sending], isFalse);
+      expect(server.chats, isEmpty, reason: 'nothing ran, and no turn retried a second card');
+      expect(c.busy, isFalse);
+      expect(c.phase, RendelPhase.awaitingConfirmation);
+
+      // Confirm again is the retry.
+      server.decisionFails = false;
+      expect(await c.confirmInvocation('inv_7'), isTrue);
+      expect(card[RendelLocalKeys.resolved], 'confirmed');
+      expect(card[RendelLocalKeys.unsent], isFalse);
+      expect(server.chats, hasLength(1));
+      c.dispose();
+    });
+
+    test('a card the server refused for good says so, with its words, and no retry (night review 5)', () async {
+      final server = _Server()
+        ..decisionRefusal = (403, {
+          'error': {'code': 'quota_exceeded', 'message': 'This app is suspended.'}
+        });
+      final c = controller(server);
+
+      expect(await c.confirmInvocation('inv_7'), isTrue);
+
+      final card = c.messages.first.blocks.single.props;
+      expect(card[RendelLocalKeys.resolved], 'failed');
+      expect(card[RendelLocalKeys.unsent], isNot(isTrue));
+      expect(server.chats, isEmpty);
+      expect(c.errorCode, 'quota_exceeded');
+      expect(c.errorText, 'This app is suspended.');
+      expect(c.canRetry, isFalse);
+      expect(c.busy, isFalse);
+      expect(c.phase, RendelPhase.idle);
+      c.dispose();
+    });
+
+    test('a refusal with no words of its own reads as the plain failure (night review 5)', () async {
+      final server = _Server()..decisionRefusal = (404, <String, dynamic>{});
+      final c = controller(server);
+
+      expect(await c.confirmInvocation('inv_7'), isTrue);
+
+      expect(c.messages.first.blocks.single.props[RendelLocalKeys.resolved], 'failed');
+      expect(c.errorCode, 'turn_failed');
+      expect(c.canRetry, isFalse);
+      c.dispose();
+    });
+
+    test('a busy or down server leaves the card open to press again (night review 5)', () async {
+      final server = _Server()..decisionRefusal = (503, <String, dynamic>{});
+      final c = controller(server);
+
+      expect(await c.confirmInvocation('inv_7'), isFalse);
+
+      final card = c.messages.first.blocks.single.props;
+      expect(card[RendelLocalKeys.resolved], isNull);
+      expect(card[RendelLocalKeys.unsent], isTrue);
+      expect(c.phase, RendelPhase.awaitingConfirmation);
+      c.dispose();
+    });
+
+    test('a new conversation while the tap is on its way stays new (night review 5)', () async {
+      final server = _Server()
+        ..holdDecision = Completer<void>()
+        ..decisionFails = true;
+      final c = controller(server);
+
+      final confirming = c.confirmInvocation('inv_7');
+      await Future<void>.delayed(Duration.zero);
+      c.reset();
+      server.holdDecision!.complete();
+      await confirming;
+
+      expect(c.messages, isEmpty);
+      expect(c.phase, RendelPhase.idle);
+      expect(c.busy, isFalse);
+      c.dispose();
+    });
+
     test('declining a server-run card is an ordinary decline', () async {
       final server = _Server();
       final c = controller(server);
@@ -430,6 +517,10 @@ void main() {
 class _Server extends http.BaseClient {
   bool cardRunsOnServer = true;
   String decisionStatus = 'confirmed';
+  /// The confirm endpoint unreachable, as offline.
+  bool decisionFails = false;
+  /// The confirm endpoint's answer when it is not a 200: its status and body.
+  (int, Map<String, dynamic>)? decisionRefusal;
   Completer<void>? holdDecision;
 
   final List<String> paths = [];
@@ -445,6 +536,10 @@ class _Server extends http.BaseClient {
     if (path.endsWith('/confirm')) {
       decisions.add(body['decision'] as String);
       await holdDecision?.future;
+      if (decisionFails) throw http.ClientException('offline');
+      if (decisionRefusal case (final status, final answer)) {
+        return http.StreamedResponse(Stream.value(utf8.encode(jsonEncode(answer))), status);
+      }
       return http.StreamedResponse(
         Stream.value(utf8.encode(jsonEncode({'status': decisionStatus}))),
         200,

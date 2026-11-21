@@ -462,6 +462,9 @@ void main() {
 
       expect(_lit, findsOneWidget);
       expect(find.descendant(of: _lit, matching: find.text('Add to cart')), findsOneWidget);
+      // Lit there, it is not drawn on the page a second time; the next one is (F0689).
+      expect(find.text('Add to cart'), findsOneWidget);
+      expect(_inSheet('Open the site'), findsOneWidget);
       final mic = tester.getRect(find.bySemanticsLabel('Speak instead of typing'));
       final lit = tester.getRect(_lit);
       expect(lit.left, greaterThan(mic.right));

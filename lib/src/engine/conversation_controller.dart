@@ -368,6 +368,18 @@ class ConversationController extends ChangeNotifier {
   bool busy = false;
   RendelPhase phase = RendelPhase.idle;
 
+  /// While the last conversation is read back from the server after a
+  /// relaunch: the thread draws neither the opening nor a page meanwhile.
+  /// Kaan's sheet opened on the empty welcome and, a moment later, on "Your
+  /// name is Ayşe." (T15).
+  bool get restoring => _restoring;
+  bool _restoring = false;
+  set restoring(bool value) {
+    if (value == _restoring) return;
+    _restoring = value;
+    _notify();
+  }
+
   /// The step the server last said this turn is on (`turn.status`): null
   /// until it says one, then `action` or `composing`. A step this build does
   /// not know is ignored and the one before it kept. Cleared when the turn
@@ -965,7 +977,9 @@ class ConversationController extends ChangeNotifier {
       // card is now resolved either way.
       return true;
     }
-    _markConfirmCard(invocationId, confirmed: true);
+    // Sending, not yet confirmed: the card says "Confirmed" only once the
+    // server has the tap (Ozan, F1441).
+    _markCardLocal(invocationId, sending: true, unsent: false);
     // The handler for a write or destructive action runs before the
     // continuation request, so without this the page sits silent between
     // "Confirm" and the result: the pill says the app is being checked.
@@ -979,15 +993,36 @@ class ConversationController extends ChangeNotifier {
     // about itself. The record is written from the user's press, not from the
     // handler's report, so a client that never taps cannot manufacture one.
     //
-    // Awaited but not gated on: an app whose customer has not turned
-    // server-mediated confirmation on is served exactly as before, and a
-    // network blip on this call must not cost the user the action they just
-    // authorised. The server is the one that decides whether the record was
-    // required.
+    // Gated on: a tap that never reached the server ran nothing, and the card
+    // stays open with Confirm as the retry. Going on offline drew "Confirmed"
+    // over a return that was never opened, and a turn retried instead drew a
+    // second card for the same thing (Ozan, F1441).
     // With the person and their token: a write the server makes as them
     // then runs at the tap, so it is made even if the app is put away
     // before the continuation below goes out.
     final recorded = await api.recordDecision(invocationId, confirm: true, typed: typed, user: user());
+    // A new conversation meanwhile: nothing of this card is left to answer on.
+    if (generation != _generation) return true;
+    _markCardLocal(invocationId, sending: false);
+    if (recorded is RendelError) {
+      // The server refused it for good (the app suspended, the key revoked):
+      // the card did not go through, the line under it says why, and Confirm
+      // is not offered again for an answer that will not change.
+      busy = false;
+      phase = RendelPhase.idle;
+      errorText = recorded.message;
+      errorCode = recorded.code;
+      _lastErrorRetryable = false;
+      _markConfirmCard(invocationId, confirmed: true, failed: true);
+      return true;
+    }
+    if (recorded == null) {
+      _markCardLocal(invocationId, unsent: true);
+      busy = false;
+      phase = RendelPhase.awaitingConfirmation;
+      _notify();
+      return false;
+    }
     if (recorded == 'typed_mismatch') {
       // Not what the card asked for: open again, with the reason under the field.
       for (final message in messages) {
@@ -1017,7 +1052,8 @@ class ConversationController extends ChangeNotifier {
       _notify();
       return true;
     }
-    if (generation != _generation) return true;
+    // A write the server ran at the tap and that failed says so, never "Confirmed".
+    _markConfirmCard(invocationId, confirmed: true, failed: recorded == 'failed');
     if (action == null) {
       // The server runs the action on this very request, after checking the
       // tap recorded above, and it needs the user's token to do it — which
@@ -1032,6 +1068,8 @@ class ConversationController extends ChangeNotifier {
     }
     final result = await _execute(action.$1, action.$2, invocationId: invocationId);
     if (generation != _generation) return true;
+    // The app's handler said no: the card says it did not go through.
+    if (!result.ok) _markConfirmCard(invocationId, confirmed: true, failed: true);
     await _run({
       'tool_results': [
         {
@@ -1362,6 +1400,11 @@ class ConversationController extends ChangeNotifier {
   Future<void> _run(Map<String, dynamic> payload, [int? inherited]) async {
     final generation = inherited ?? _generation;
     if (generation != _generation) return;
+    // The device's side of this request (optimisation 6.1), each moment
+    // counted from here.
+    final clock = Stopwatch()..start();
+    final timing = <String, int>{};
+    String? timedRequest;
     // A question of the person's, not the continuation of one: its answer is
     // read anew.
     if (inherited == null) {
@@ -1513,6 +1556,7 @@ class ConversationController extends ChangeNotifier {
     var completed = false;
     String? answerLang;
     String? answerSpeech;
+    timing['prep_ms'] = clock.elapsedMilliseconds;
 
     try {
       // A stalled stream is indistinguishable from a slow one until it is
@@ -1522,6 +1566,7 @@ class ConversationController extends ChangeNotifier {
         // A logout landed while this turn was open. Everything it was writing
         // into is gone, and the next line would dereference it.
         if (generation != _generation) return;
+        timing.putIfAbsent('first_event_ms', () => clock.elapsedMilliseconds);
         // Not every event changes what is on screen, and the only listener is
         // the thread, which rebuilds every visible block when it hears one.
         var visible = true;
@@ -1531,6 +1576,7 @@ class ConversationController extends ChangeNotifier {
             this.conversationId = conversationId;
             onConversation?.call(conversationId);
             lastRequestId = requestId;
+            timedRequest = requestId;
             _openAssistant?.serverId = messageId;
             // Heard only when the language moved, for the thread's words.
             visible = lang != null && lang != answerLanguage;
@@ -1559,6 +1605,7 @@ class ConversationController extends ChangeNotifier {
               visible = false;
             }
           case BlockStart(:final index, :final id, :final blockType):
+            timing.putIfAbsent('first_block_ms', () => clock.elapsedMilliseconds);
             // Only the first block of a turn changes the thread's shape, by
             // ending the wait for one; the rest just extend a message.
             structural = phase != RendelPhase.streaming;
@@ -1568,12 +1615,14 @@ class ConversationController extends ChangeNotifier {
             _openAssistant!.blocks.add(block);
             _openAssistant!.touch();
           case BlockDelta(:final index, :final textDelta):
+            if (textDelta.isNotEmpty) timing.putIfAbsent('first_ready_ms', () => clock.elapsedMilliseconds);
             _turnBlocks[index]?.streamingText += textDelta;
             _openAssistant?.touch();
             // A token changes one paragraph in one turn. Nothing about the
             // thread's shape moved, so nothing else needs to hear it.
             structural = false;
           case BlockReady(:final index, :final block):
+            timing.putIfAbsent('first_ready_ms', () => clock.elapsedMilliseconds);
             // A retry or a resumed stream can deliver an old drawing of a
             // surface after a newer one. Dropped before anything else, so it
             // cannot take a form's place or a surface's either.
@@ -1661,8 +1710,12 @@ class ConversationController extends ChangeNotifier {
             _rest(told);
           case RendelError(:final code, :final message, :final retryable):
             settled = true;
-            errorText = message;
-            errorCode = code;
+            // A key the server does not know, or a website the key does not list: the developer's to fix, and their
+            // sentence goes to the log below. The person reads the thread's own words under their question, with
+            // nothing to try again (Melek F2380, Mira F2024, F2220).
+            final theirs = code == 'invalid_key' || code == 'origin_not_allowed';
+            errorText = theirs ? 'The assistant stopped responding.' : message;
+            errorCode = theirs ? 'copilot_stalled' : code;
             _lastErrorRetryable = retryable;
             // The wire code and the request id, for whoever is debugging.
             // The bar above shows the message; this is the developer's copy.
@@ -1691,8 +1744,11 @@ class ConversationController extends ChangeNotifier {
       errorCode = 'copilot_stalled';
       _lastErrorRetryable = true;
     } catch (err) {
-      errorText = 'The connection dropped before the answer finished.';
-      errorCode = 'stream_dropped';
+      // Nothing came back at all: the question never got there (offline),
+      // and no answer had started to drop (Ozan, F1122).
+      final unsent = !timing.containsKey('first_event_ms');
+      errorText = unsent ? 'The message did not send.' : 'The connection dropped before the answer finished.';
+      errorCode = unsent ? 'turn_unsent' : 'stream_dropped';
       _lastErrorRetryable = true;
       RendelLog.error(
         'transport_failed',
@@ -1702,6 +1758,7 @@ class ConversationController extends ChangeNotifier {
         error: err,
       );
     }
+    timing['end_ms'] = clock.elapsedMilliseconds;
 
     // The stream can also end between the last event and here.
     if (generation != _generation) return;
@@ -1767,9 +1824,11 @@ class ConversationController extends ChangeNotifier {
     _pruneEmptyAssistant();
 
     if (awaitingReads) {
-      await _runPendingReads(generation);
+      await _runPendingReads(generation, timing);
+      _timed(timedRequest, timing);
       return; // _runPendingReads issues the continuation, which re-enters _run.
     }
+    _timed(timedRequest, timing);
 
     // A busy model, before anything was drawn: try the same turn again once,
     // by itself, after a short wait. It carries the same turn id, so the
@@ -1930,9 +1989,10 @@ class ConversationController extends ChangeNotifier {
     return false;
   }
 
-  Future<void> _runPendingReads(int generation) async {
+  Future<void> _runPendingReads(int generation, Map<String, int> timing) async {
     phase = RendelPhase.runningAction;
     _notify();
+    final clock = Stopwatch()..start();
     // A snapshot: `reset()` clears `_pendingReads`, and clearing a map being
     // iterated across an await throws a ConcurrentModificationError out of
     // `_runPendingReads` — which is called outside `_run`'s try, so it escaped
@@ -1961,9 +2021,18 @@ class ConversationController extends ChangeNotifier {
         if (!result.ok) 'error': result.error,
       };
     });
+    timing['reads_ms'] = clock.elapsedMilliseconds;
     if (generation != _generation) return;
     _pendingReads.clear();
     await _run({'tool_results': results}, generation);
+  }
+
+  /// One request as this device lived it, for the server to keep beside its
+  /// own numbers (optimisation 6.1). Never awaited; a count that did not
+  /// land is only a count.
+  void _timed(String? requestId, Map<String, int> timing) {
+    if (requestId == null) return;
+    unawaited(api.sendEvent({'type': 'turn_timing', 'request_id': requestId, ...timing}));
   }
 
   /// `run(0)` to `run(count - 1)`, up to four at a time, or one at a time
@@ -2090,17 +2159,31 @@ class ConversationController extends ChangeNotifier {
     return null;
   }
 
-  void _markConfirmCard(String invocationId, {required bool confirmed}) {
+  void _markConfirmCard(String invocationId, {required bool confirmed, bool failed = false}) {
     for (final message in messages) {
       for (final block in message.blocks) {
         if (block.type == 'confirm_card' &&
             block.props['invocation_id'] == invocationId) {
-          block.props[RendelLocalKeys.resolved] = confirmed ? 'confirmed' : 'declined';
+          block.props[RendelLocalKeys.resolved] = failed ? 'failed' : confirmed ? 'confirmed' : 'declined';
           message.touch();
         }
       }
     }
     _notify();
+  }
+
+  /// What an open card is doing with its tap: sending it, or told it did not get there.
+  void _markCardLocal(String invocationId, {bool? sending, bool? unsent}) {
+    for (final message in messages) {
+      for (final block in message.blocks) {
+        if (block.type == 'confirm_card' &&
+            block.props['invocation_id'] == invocationId) {
+          if (sending != null) block.props[RendelLocalKeys.sending] = sending;
+          if (unsent != null) block.props[RendelLocalKeys.unsent] = unsent;
+          message.touch();
+        }
+      }
+    }
   }
 
   // ———————————————————— forms that update in place ————————————————————

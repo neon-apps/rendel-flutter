@@ -94,7 +94,7 @@ void main() {
     tester.view.devicePixelRatio = 3;
     addTearDown(tester.view.reset);
     await openList(tester, [_thread('t1', 'Kargo nerede', resolved: true)]);
-    final title = find.text('Halden ekibiyle yazışmalar');
+    final title = find.text('Halden ekibiyle tüm sohbetler');
     expect(title, findsOneWidget);
     expect(tester.getSize(title).width, greaterThan(180));
     expect(find.bySemanticsLabel(RendelStrings.forLocale('tr').supportBack), findsOneWidget);

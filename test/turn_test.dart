@@ -241,6 +241,21 @@ void main() {
     c.dispose();
   });
 
+  // The key or the website is the developer's to fix: their sentence is logged, never shown (F2024, F2220, F2380).
+  test('a refusal of the key or the website reads as the thread\'s own words, with no retry', () async {
+    for (final code in ['invalid_key', 'origin_not_allowed']) {
+      final c = build([
+        RendelError(code: code, message: 'Developer words.', retryable: false),
+      ]);
+      await c.send('iade kaç gün içinde yapılır').timeout(const Duration(seconds: 5));
+      expect(c.errorCode, 'copilot_stalled');
+      expect(c.errorText, isNot(contains('Developer words.')));
+      expect(c.canRetry, isFalse);
+      expect(c.messages.map((m) => m.role), ['user']);
+      c.dispose();
+    }
+  });
+
   test('a retry carries the same turn_id, so the server can dedupe it',
       () async {
     // `model_busy` and a dropped stream are both raised after the server has

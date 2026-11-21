@@ -40,7 +40,7 @@ void main() {
     }
   }
 
-  Future<ConversationController> pump(WidgetTester tester) async {
+  Future<ConversationController> pump(WidgetTester tester, {String? body}) async {
     gate = Completer<void>();
     final c = ConversationController(
       api: RendelApiClient(
@@ -50,7 +50,7 @@ void main() {
         httpClient: MockClient((request) async {
           if (!request.url.path.endsWith('/v1/chat')) return http.Response('{}', 200);
           await gate.future;
-          return http.Response(turn, 200, headers: {'content-type': 'text/event-stream'});
+          return http.Response(body ?? turn, 200, headers: {'content-type': 'text/event-stream'});
         }),
       ),
       actions: const {},
@@ -95,5 +95,57 @@ void main() {
     await answer(tester);
     expect(find.byType(TextField), findsNothing);
     expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
+  });
+
+  testWidgets("a card's field with the keyboard puts the composer aside, and back after (F1190)", (tester) async {
+    // Derya's rating: the card's comment box and the composer both stood over the keyboard.
+    final withForm = sse([
+      ('turn.start', {'conversation_id': 'c1', 'message_id': 'm1', 'request_id': 'r1'}),
+      ('block.start', {'index': 0, 'id': 'b0', 'block_type': 'form'}),
+      ('block.ready', {
+        'index': 0,
+        'block': {
+          'id': 'b0',
+          'type': 'form',
+          'fallback_text': 'A note.',
+          'props': {
+            'form_id': 'note',
+            'title': 'Anything to add?',
+            'fields': [
+              {'kind': 'text', 'name': 'note', 'label': 'Note'}
+            ],
+            'submit_label': 'Send',
+          },
+        },
+      }),
+      ('turn.end', {'status': 'completed', 'pending': <String>[]}),
+    ]);
+    await pump(tester, body: withForm);
+    await tester.tap(find.bySemanticsLabel('Type a message'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'merhaba');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await answer(tester);
+    expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
+    await tester.tap(find.byType(TextField).first);
+    await tester.pump();
+    expect(find.bySemanticsLabel('Type a message'), findsNothing);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+    expect(find.bySemanticsLabel('Type a message'), findsOneWidget);
+  });
+
+  testWidgets('a tap on the microphone is told how it is used in a quiet line, not as an error (F0664)', (tester) async {
+    await pump(tester);
+    final gesture = await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
+    await tester.pump(const Duration(milliseconds: 50));
+    await gesture.up();
+    await tester.pump();
+    await tester.pump();
+    final said = find.textContaining(RegExp('Hold the microphone|Nothing was heard'));
+    expect(said, findsOneWidget);
+    // The web says it with its quiet note; the error strip, with its mark, is for what failed.
+    expect(find.ancestor(of: said, matching: find.byWidgetPredicate((w) => '${w.runtimeType}' == '_ErrorSlot')), findsNothing);
+    await tester.pump(const Duration(seconds: 6));
   });
 }

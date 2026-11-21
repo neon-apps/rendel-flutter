@@ -48,10 +48,12 @@ class RendelStrings {
     this.cardEditFailed = 'That change didn’t go through. Try again.',
     this.cardLess = 'Fewer',
     this.cardMore = 'More',
+    this.cartUnsaved = 'Your cart has not changed yet. Press {submit} to change it.',
     this.composerHint = 'Ask anything',
     this.launcher = 'Ask',
     this.sendMessage = 'Send message',
     this.newConversation = 'Start a new conversation',
+    this.newConversationConfirm = 'Tap again to clear this conversation',
     this.readAloud = 'Answers play by themselves',
     this.autoRead = 'Voice replies',
     this.menu = 'Menu',
@@ -60,6 +62,7 @@ class RendelStrings {
     this.stopReading = 'Stop reading',
     this.retry = 'Try again',
     this.streamDropped = 'The connection dropped before the answer finished.',
+    this.turnUnsent = 'Your message did not send. Check the connection, then try again.',
     this.noAnswer = 'No answer came back. Try again.',
     this.confirmationExpired = 'That confirmation expired. Ask again and I will redo it.',
     this.turnFailed = 'Something failed while finishing that. Try again.',
@@ -92,6 +95,7 @@ class RendelStrings {
     this.confirmed = 'Confirmed',
     this.notAnswered = 'Not answered',
     this.cardFailed = 'Didn\'t go through',
+    this.confirmUnsent = 'That did not send, so nothing was done. Press {confirm} to try again.',
     this.notConfirmed = 'Not confirmed',
     this.subtotal = 'Subtotal',
     this.tax = 'Tax',
@@ -125,7 +129,7 @@ class RendelStrings {
     this.readoutNowPeak = '{label}, the highest',
     this.soldOut = 'Sold out: {labels}',
     this.statusThinking = 'Thinking…',
-    this.statusAction = 'Checking your app…',
+    this.statusAction = 'Working on it…',
     this.statusComposing = 'Putting it together…',
     this.previousPage = 'Previous page',
     this.nextPage = 'Next page',
@@ -359,6 +363,10 @@ class RendelStrings {
   final String cardLess;
   final String cardMore;
 
+  /// A cart card whose quantities were changed on the card and not yet sent:
+  /// the app's cart is as it was. `{submit}` is the card's button label.
+  final String cartUnsaved;
+
   final String composerHint;
 
   /// The launcher's word when neither the code nor the console wrote one:
@@ -369,6 +377,9 @@ class RendelStrings {
   /// Screen-reader labels for the two controls with no visible text.
   final String sendMessage;
   final String newConversation;
+
+  /// Start over once tapped: what a second tap does.
+  final String newConversationConfirm;
 
   /// What the header's Auto-read switch does, as its screen-reader hint:
   /// answers are read by themselves.
@@ -394,6 +405,10 @@ class RendelStrings {
 
   final String retry;
   final String streamDropped;
+
+  /// A question that never reached the server (offline): it stays on screen,
+  /// and Try again sends it.
+  final String turnUnsent;
   final String noAnswer;
   final String confirmationExpired;
 
@@ -466,6 +481,10 @@ class RendelStrings {
   final String confirmed;
   final String notAnswered;
   final String cardFailed;
+
+  /// A confirmation card whose tap never reached the server: nothing ran,
+  /// and `{confirm}` (the card's confirm label) sends it again.
+  final String confirmUnsent;
   final String notConfirmed;
 
   /// The summing rows of a receipt.
@@ -981,10 +1000,12 @@ class RendelStrings {
     String? cardEditFailed,
     String? cardLess,
     String? cardMore,
+    String? cartUnsaved,
     String? composerHint,
     String? launcher,
     String? sendMessage,
     String? newConversation,
+    String? newConversationConfirm,
     String? readAloud,
     String? autoRead,
     String? menu,
@@ -993,6 +1014,7 @@ class RendelStrings {
     String? stopReading,
     String? retry,
     String? streamDropped,
+    String? turnUnsent,
     String? noAnswer,
     String? confirmationExpired,
     String? turnFailed,
@@ -1024,6 +1046,7 @@ class RendelStrings {
     String? confirmed,
     String? notAnswered,
     String? cardFailed,
+    String? confirmUnsent,
     String? notConfirmed,
     String? subtotal,
     String? tax,
@@ -1245,10 +1268,12 @@ class RendelStrings {
       cardEditFailed: cardEditFailed ?? this.cardEditFailed,
       cardLess: cardLess ?? this.cardLess,
       cardMore: cardMore ?? this.cardMore,
+      cartUnsaved: cartUnsaved ?? this.cartUnsaved,
       composerHint: composerHint ?? this.composerHint,
       launcher: launcher ?? this.launcher,
       sendMessage: sendMessage ?? this.sendMessage,
       newConversation: newConversation ?? this.newConversation,
+      newConversationConfirm: newConversationConfirm ?? this.newConversationConfirm,
       readAloud: readAloud ?? this.readAloud,
       autoRead: autoRead ?? this.autoRead,
       menu: menu ?? this.menu,
@@ -1257,6 +1282,7 @@ class RendelStrings {
       stopReading: stopReading ?? this.stopReading,
       retry: retry ?? this.retry,
       streamDropped: streamDropped ?? this.streamDropped,
+      turnUnsent: turnUnsent ?? this.turnUnsent,
       noAnswer: noAnswer ?? this.noAnswer,
       confirmationExpired: confirmationExpired ?? this.confirmationExpired,
       turnFailed: turnFailed ?? this.turnFailed,
@@ -1288,6 +1314,7 @@ class RendelStrings {
       confirmed: confirmed ?? this.confirmed,
       notAnswered: notAnswered ?? this.notAnswered,
       cardFailed: cardFailed ?? this.cardFailed,
+      confirmUnsent: confirmUnsent ?? this.confirmUnsent,
       notConfirmed: notConfirmed ?? this.notConfirmed,
       subtotal: subtotal ?? this.subtotal,
       tax: tax ?? this.tax,
@@ -1516,6 +1543,7 @@ const Map<String, RendelStrings> _byLocale = {
     cardEditFailed: 'Bu değişiklik iletilemedi. Tekrar deneyin.',
     cardLess: 'Azalt',
     cardMore: 'Artır',
+    cartUnsaved: 'Sepetiniz henüz güncellenmedi. Kaydetmek için {submit} düğmesine dokunun.',
     working: 'Çalışıyor…',
     emptyTitle: 'Bu uygulamayla ilgili ne isterseniz sorun.',
     emptyBody: 'Kendi cümlelerinizle sorun. Bir cümle yeterli.',
@@ -1526,6 +1554,7 @@ const Map<String, RendelStrings> _byLocale = {
     launcher: 'Sor',
     sendMessage: 'Mesajı gönder',
     newConversation: 'Yeni bir sohbet başlat',
+    newConversationConfirm: 'Sohbeti temizlemek için tekrar dokunun.',
     readAloud: 'Yanıtlar kendiliğinden okunur',
     autoRead: 'Sesli yanıt',
     menu: 'Menü',
@@ -1534,6 +1563,7 @@ const Map<String, RendelStrings> _byLocale = {
     stopReading: 'Okumayı durdur',
     retry: 'Tekrar dene',
     streamDropped: 'Bağlantı, yanıt tamamlanmadan koptu.',
+    turnUnsent: 'Mesajınız gitmedi. Bağlantınızı kontrol edip tekrar deneyin.',
     noAnswer: 'Yanıt gelmedi. Tekrar deneyin.',
     confirmationExpired: 'Bu onayın süresi doldu. Tekrar sorun, yeniden yapayım.',
     turnFailed: 'Bu yanıt tamamlanırken bir şey ters gitti. Tekrar deneyin.',
@@ -1572,6 +1602,7 @@ const Map<String, RendelStrings> _byLocale = {
     confirmed: 'Onaylandı',
     notAnswered: 'Yanıtlanmadı',
     cardFailed: 'Gerçekleşmedi',
+    confirmUnsent: 'İsteğiniz iletilemedi, işlem yapılmadı. Tekrar {confirm} düğmesine dokunun.',
     notConfirmed: 'Onaylanmadı',
     subtotal: 'Ara toplam',
     tax: 'Vergi',
@@ -1599,8 +1630,8 @@ const Map<String, RendelStrings> _byLocale = {
     files: 'Dosyalar',
     listening: 'Dinliyorum',
     statusThinking: 'Düşünüyor…',
-    statusAction: 'Uygulamaya bakılıyor…',
-    statusComposing: 'Sayfa hazırlanıyor…',
+    statusAction: 'Hemen hallediyorum…',
+    statusComposing: 'Yanıt hazırlanıyor…',
     previousPage: 'Önceki sayfa',
     nextPage: 'Sonraki sayfa',
     statusDetail: 'Ayrıntılar getiriliyor…',
@@ -1696,8 +1727,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportWhenTomorrow: 'yarın saat {time}',
     supportWhenDay: '{day} günü saat {time}',
     supportBack: 'Asistana dön',
-    supportMistake: 'Yanlışlıkla mı oldu? Asistana dön',
-    supportMistakeAsk: 'Yanlışlıkla mı oldu?',
+    supportMistake: 'Yanlışlıkla mı geçtiniz? Asistana dön',
+    supportMistakeAsk: 'Yanlışlıkla mı geçtiniz?',
     supportSorted: 'Sorunum çözüldü',
     supportSortedAsk: 'Yardımcı olabildik mi?',
     supportYou: 'Siz',
@@ -1727,21 +1758,21 @@ const Map<String, RendelStrings> _byLocale = {
     supportContactTooMany: 'Bu sohbette e-posta adresi tekrar değiştirilemez.',
     supportContactTest: 'E-posta adresi kaydedildi. Bu bir test anahtarı olduğu için e-posta gönderilmez ve girilecek bir kod yoktur.',
     supportNewLine: 'Yeni mesaj',
-    supportOfferTeam: 'Ekibimizle görüşün',
+    supportOfferTeam: 'Ekibe yazın',
     supportClosed: 'Bu sohbet kapatıldı. İstediğiniz zaman yazın, ekip ilgilenecektir.',
     supportUnread: 'Ekipten yeni mesajlar: {count}',
-    supportOpen: 'Ekiple konuşun',
-    supportRowTitle: '{team} ekibiyle görüşmeniz',
+    supportOpen: 'Ekibe yazın',
+    supportRowTitle: '{team} ekibiyle sohbetiniz',
     supportSending: 'Gönderiliyor…',
     supportRead: 'Okundu',
     supportSortedTitle: 'Çözüldü olarak işaretlediniz',
     supportSortedBody: 'Dilediğiniz an yazabilirsiniz; {team} ekibi hemen devralır.',
     supportPreparedBy: '{name} sizin için hazırladı',
-    supportRecent: 'Son yazışmalar',
+    supportRecent: 'Son sohbetler',
     supportSeeAll: 'Tümünü gör',
-    supportAll: '{team} ekibiyle yazışmalar',
-    supportSearch: 'Yazışmalarınızda arayın…',
-    supportSearchNone: 'Aramanızla eşleşen yazışma yok.',
+    supportAll: '{team} ekibiyle tüm sohbetler',
+    supportSearch: 'Sohbetlerinizde arayın',
+    supportSearchNone: 'Eşleşen bir sohbet bulunamadı.',
     supportThisWeek: 'Bu hafta',
     supportEarlier: 'Daha önce',
     supportSortedWith: '{name} ile çözüldü',
@@ -1753,8 +1784,8 @@ const Map<String, RendelStrings> _byLocale = {
     supportReplied: '{name} yanıtladı',
     supportShow: 'Aç',
     supportReopenHint: 'Yeniden açmak için yazın…',
-    supportOtherOpen: 'Ekiple açık bir yazışmanız zaten var.',
-    supportGoTo: 'Yazışmaya git',
+    supportOtherOpen: 'Ekiple açık başka bir sohbetiniz var.',
+    supportGoTo: 'Sohbete git',
     supportReachTeam: '{team} ekibine ulaşın',
     supportAllow: 'İzin ver',
     supportDeny: 'Şimdi değil',
@@ -1784,6 +1815,7 @@ const Map<String, RendelStrings> _byLocale = {
     cardEditFailed: 'Die Änderung kam nicht an. Versuchen Sie es erneut.',
     cardLess: 'Weniger',
     cardMore: 'Mehr',
+    cartUnsaved: 'Ihr Warenkorb ist noch unverändert. Drücken Sie {submit}, um ihn zu ändern.',
     working: 'Arbeitet…',
     emptyTitle: 'Fragen Sie alles über diese App.',
     emptyBody: 'Fragen Sie in Ihren eigenen Worten. Ein Satz genügt.',
@@ -1794,6 +1826,7 @@ const Map<String, RendelStrings> _byLocale = {
     launcher: 'Fragen',
     sendMessage: 'Nachricht senden',
     newConversation: 'Neue Unterhaltung beginnen',
+    newConversationConfirm: 'Noch einmal tippen, um diese Unterhaltung zu löschen',
     readAloud: 'Antworten werden von selbst vorgelesen',
     autoRead: 'Sprachantworten',
     menu: 'Menü',
@@ -1802,6 +1835,7 @@ const Map<String, RendelStrings> _byLocale = {
     stopReading: 'Vorlesen beenden',
     retry: 'Erneut versuchen',
     streamDropped: 'Die Verbindung wurde vor dem Ende der Antwort unterbrochen.',
+    turnUnsent: 'Ihre Nachricht wurde nicht gesendet. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
     noAnswer: 'Es kam keine Antwort. Versuchen Sie es erneut.',
     confirmationExpired:
         'Diese Bestätigung ist abgelaufen. Fragen Sie erneut, dann mache ich es noch einmal.',
@@ -1842,6 +1876,7 @@ const Map<String, RendelStrings> _byLocale = {
     confirmed: 'Bestätigt',
     notAnswered: 'Nicht beantwortet',
     cardFailed: 'Fehlgeschlagen',
+    confirmUnsent: 'Das wurde nicht gesendet, es ist also nichts passiert. Drücken Sie {confirm}, um es erneut zu versuchen.',
     notConfirmed: 'Nicht bestätigt',
     subtotal: 'Zwischensumme',
     tax: 'Steuern',
@@ -1869,7 +1904,7 @@ const Map<String, RendelStrings> _byLocale = {
     files: 'Dateien',
     listening: 'Hört zu',
     statusThinking: 'Denkt nach…',
-    statusAction: 'App wird geprüft…',
+    statusAction: 'Wird erledigt…',
     statusComposing: 'Seite wird erstellt…',
     previousPage: 'Vorherige Seite',
     nextPage: 'Nächste Seite',
@@ -2054,6 +2089,7 @@ const Map<String, RendelStrings> _byLocale = {
     cardEditFailed: 'La modification n’est pas passée. Réessayez.',
     cardLess: 'Moins',
     cardMore: 'Plus',
+    cartUnsaved: 'Votre panier n’a pas encore changé. Appuyez sur {submit} pour le modifier.',
     working: 'En cours…',
     emptyTitle: 'Posez toutes vos questions sur cette application.',
     emptyBody: 'Posez votre question avec vos mots. Une phrase suffit.',
@@ -2064,6 +2100,7 @@ const Map<String, RendelStrings> _byLocale = {
     launcher: 'Demander',
     sendMessage: 'Envoyer le message',
     newConversation: 'Démarrer une nouvelle conversation',
+    newConversationConfirm: 'Touchez à nouveau pour effacer cette conversation',
     readAloud: 'Les réponses se lisent d’elles-mêmes',
     autoRead: 'Réponses vocales',
     menu: 'Menu',
@@ -2072,6 +2109,7 @@ const Map<String, RendelStrings> _byLocale = {
     stopReading: 'Arrêter la lecture',
     retry: 'Réessayer',
     streamDropped: 'La connexion a été perdue avant la fin de la réponse.',
+    turnUnsent: 'Votre message n’a pas été envoyé. Vérifiez la connexion, puis réessayez.',
     noAnswer: 'Aucune réponse n’est arrivée. Réessayez.',
     confirmationExpired:
         'Cette confirmation a expiré. Redemandez et je recommence.',
@@ -2111,6 +2149,7 @@ const Map<String, RendelStrings> _byLocale = {
     confirmed: 'Confirmé',
     notAnswered: 'Sans réponse',
     cardFailed: 'Non abouti',
+    confirmUnsent: 'L’envoi a échoué, rien n’a donc été fait. Appuyez sur {confirm} pour réessayer.',
     notConfirmed: 'Non confirmé',
     subtotal: 'Sous-total',
     tax: 'Taxes',
@@ -2138,7 +2177,7 @@ const Map<String, RendelStrings> _byLocale = {
     files: 'Fichiers',
     listening: 'À l’écoute',
     statusThinking: 'Réflexion…',
-    statusAction: 'Vérification de l\'app…',
+    statusAction: 'En cours…',
     statusComposing: 'Création de la page…',
     previousPage: 'Page précédente',
     nextPage: 'Page suivante',
@@ -2323,6 +2362,7 @@ const Map<String, RendelStrings> _byLocale = {
     cardEditFailed: 'El cambio no se aplicó. Inténtalo de nuevo.',
     cardLess: 'Menos',
     cardMore: 'Más',
+    cartUnsaved: 'Tu carrito aún no ha cambiado. Pulsa {submit} para cambiarlo.',
     working: 'Trabajando…',
     emptyTitle: 'Pregunta lo que quieras sobre esta aplicación.',
     emptyBody: 'Pregunta con tus propias palabras. Basta una frase.',
@@ -2333,6 +2373,7 @@ const Map<String, RendelStrings> _byLocale = {
     launcher: 'Preguntar',
     sendMessage: 'Enviar mensaje',
     newConversation: 'Iniciar una conversación nueva',
+    newConversationConfirm: 'Toca otra vez para borrar esta conversación',
     readAloud: 'Las respuestas se leen solas',
     autoRead: 'Respuestas por voz',
     menu: 'Menú',
@@ -2341,6 +2382,7 @@ const Map<String, RendelStrings> _byLocale = {
     stopReading: 'Dejar de leer',
     retry: 'Inténtalo de nuevo',
     streamDropped: 'La conexión se cortó antes de terminar la respuesta.',
+    turnUnsent: 'Tu mensaje no se envió. Revisa la conexión y vuelve a intentarlo.',
     noAnswer: 'No llegó ninguna respuesta. Inténtalo de nuevo.',
     confirmationExpired: 'Esa confirmación caducó. Vuelve a pedirlo y lo repito.',
     turnFailed: 'Algo falló al terminar esa respuesta. Inténtalo de nuevo.',
@@ -2379,6 +2421,7 @@ const Map<String, RendelStrings> _byLocale = {
     confirmed: 'Confirmado',
     notAnswered: 'Sin respuesta',
     cardFailed: 'No se completó',
+    confirmUnsent: 'No se envió, así que no se hizo nada. Pulsa {confirm} para intentarlo de nuevo.',
     notConfirmed: 'No confirmado',
     subtotal: 'Subtotal',
     tax: 'Impuestos',
@@ -2406,7 +2449,7 @@ const Map<String, RendelStrings> _byLocale = {
     files: 'Archivos',
     listening: 'Escuchando',
     statusThinking: 'Pensando…',
-    statusAction: 'Revisando la app…',
+    statusAction: 'En ello…',
     statusComposing: 'Preparando la página…',
     previousPage: 'Página anterior',
     nextPage: 'Página siguiente',
@@ -2591,6 +2634,7 @@ const Map<String, RendelStrings> _byLocale = {
     cardEditFailed: 'لم يصل هذا التغيير. حاول مرة أخرى.',
     cardLess: 'أقل',
     cardMore: 'أكثر',
+    cartUnsaved: 'لم تتغير سلتك بعد. اضغط {submit} لتغييرها.',
     working: 'جارٍ العمل…',
     emptyTitle: 'اسأل أي شيء عن هذا التطبيق.',
     emptyBody: 'اسأل بكلماتك الخاصة. جملة واحدة تكفي.',
@@ -2601,6 +2645,7 @@ const Map<String, RendelStrings> _byLocale = {
     launcher: 'اسأل',
     sendMessage: 'إرسال الرسالة',
     newConversation: 'بدء محادثة جديدة',
+    newConversationConfirm: 'اضغط مرة أخرى لمسح هذه المحادثة',
     readAloud: 'تُقرأ الإجابات تلقائيًا',
     autoRead: 'ردود صوتية',
     menu: 'القائمة',
@@ -2609,6 +2654,7 @@ const Map<String, RendelStrings> _byLocale = {
     stopReading: 'أوقف القراءة',
     retry: 'حاول مرة أخرى',
     streamDropped: 'انقطع الاتصال قبل أن تكتمل الإجابة.',
+    turnUnsent: 'لم تُرسَل رسالتك. تحقّق من الاتصال ثم حاول مرة أخرى.',
     noAnswer: 'لم تصل أي إجابة. حاول مرة أخرى.',
     confirmationExpired: 'انتهت صلاحية هذا التأكيد. اسأل مرة أخرى وسأعيد تنفيذه.',
     turnFailed: 'حدث خطأ أثناء إكمال ذلك. حاول مرة أخرى.',
@@ -2646,6 +2692,7 @@ const Map<String, RendelStrings> _byLocale = {
     confirmed: 'تم التأكيد',
     notAnswered: 'بلا إجابة',
     cardFailed: 'لم تكتمل',
+    confirmUnsent: 'لم يتم الإرسال، لذا لم يُنفَّذ شيء. اضغط {confirm} للمحاولة مرة أخرى.',
     notConfirmed: 'لم يتم التأكيد',
     subtotal: 'المجموع الفرعي',
     tax: 'الضريبة',
@@ -2673,7 +2720,7 @@ const Map<String, RendelStrings> _byLocale = {
     files: 'الملفات',
     listening: 'جارٍ الاستماع',
     statusThinking: 'جارٍ التفكير…',
-    statusAction: 'جارٍ التحقق من تطبيقك…',
+    statusAction: 'جارٍ التنفيذ…',
     statusComposing: 'جارٍ تجهيز الصفحة…',
     previousPage: 'الصفحة السابقة',
     nextPage: 'الصفحة التالية',

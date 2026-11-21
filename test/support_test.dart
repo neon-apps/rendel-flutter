@@ -288,6 +288,10 @@ Future<void> _close(WidgetTester tester) async {
 }
 
 void main() {
+  // RendelSupport reads what was skipped from SharedPreferences as it is made;
+  // a test that never mocked it failed after it had passed, when the read
+  // came back with MissingPluginException (CI, 20 November).
+  setUp(() => SharedPreferences.setMockInitialValues({}));
   group('the support page', () {
     testWidgets("groups a speaker's lines, names who answered for which team, and says what happened with its time (design A)", (tester) async {
       final server = _Server(
@@ -664,6 +668,29 @@ void main() {
         if (keyboard == 0) expect(find.textContaining('Yeni · '), findsOneWidget);
       });
     }
+
+    // Yusuf, 21 November (F2150): "Your message is with the Grove team. · 7:13 AM" on a Turkish page.
+    testWidgets('reads its times on the clock of the language it is drawn in', (tester) async {
+      final server = _Server(entries: [_entry(1, text: 'bir insanla konusmak istiyorum')], state: _state());
+      await tester.pumpWidget(MaterialApp(
+        home: RendelThemeScope(
+          theme: RendelTheme.paper(),
+          child: Scaffold(
+            body: Builder(
+              builder: (context) => TextButton(
+                onPressed: () => showRendelSupport(context, support: server.support(), team: 'Grove', onAction: (_) async => true, canHandle: (_) => true, strings: RendelStrings.forLocale('tr'), language: 'tr'),
+                child: const Text('open'),
+              ),
+            ),
+          ),
+        ),
+      ));
+      await tester.tap(find.text('open'));
+      await _settle(tester);
+      expect(find.textContaining(RegExp(r'\d:\d\d')), findsWidgets);
+      expect(find.textContaining(RegExp(r'\b(AM|PM)\b')), findsNothing);
+      await _close(tester);
+    });
 
     testWidgets('reads right to left in Arabic, with its words and nothing cut', (tester) async {
       final server = _Server(
