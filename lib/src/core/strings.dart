@@ -107,6 +107,16 @@ class RendelStrings {
     this.nothingToShow = 'Nothing to show.',
     this.dayHeading = '{day} {date} {month}',
     this.shortDays = const ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    this.months = const ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
+    this.menuCut = 'Cut',
+    this.menuCopy = 'Copy',
+    this.menuPaste = 'Paste',
+    this.menuSelectAll = 'Select all',
+    this.menuDelete = 'Delete',
+    this.menuLookUp = 'Look up',
+    this.menuSearchWeb = 'Search web',
+    this.menuShare = 'Share',
+    this.menuScanText = 'Scan text',
     this.shortMonths = const [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -520,6 +530,21 @@ class RendelStrings {
   /// three.
   final String dayHeading;
   final List<String> shortDays;
+  /// The months in full, January first: a calendar's heading, "Aralık 2026".
+  final List<String> months;
+
+  /// The text selection menu's buttons, for a host whose Material words are
+  /// in another language than the conversation: "Kopyala", not "Copy".
+  final String menuCut;
+  final String menuCopy;
+  final String menuPaste;
+  final String menuSelectAll;
+  final String menuDelete;
+  final String menuLookUp;
+  final String menuSearchWeb;
+  final String menuShare;
+  final String menuScanText;
+
   final List<String> shortMonths;
 
   /// What a screen reader calls the controls that have no visible text.
@@ -1074,6 +1099,16 @@ class RendelStrings {
     String? nothingToShow,
     String? dayHeading,
     List<String>? shortDays,
+    List<String>? months,
+    String? menuCut,
+    String? menuCopy,
+    String? menuPaste,
+    String? menuSelectAll,
+    String? menuDelete,
+    String? menuLookUp,
+    String? menuSearchWeb,
+    String? menuShare,
+    String? menuScanText,
     List<String>? shortMonths,
     String? openCopilot,
     String? closeCopilot,
@@ -1345,6 +1380,16 @@ class RendelStrings {
       nothingToShow: nothingToShow ?? this.nothingToShow,
       dayHeading: dayHeading ?? this.dayHeading,
       shortDays: shortDays ?? this.shortDays,
+      months: months ?? this.months,
+      menuCut: menuCut ?? this.menuCut,
+      menuCopy: menuCopy ?? this.menuCopy,
+      menuPaste: menuPaste ?? this.menuPaste,
+      menuSelectAll: menuSelectAll ?? this.menuSelectAll,
+      menuDelete: menuDelete ?? this.menuDelete,
+      menuLookUp: menuLookUp ?? this.menuLookUp,
+      menuSearchWeb: menuSearchWeb ?? this.menuSearchWeb,
+      menuShare: menuShare ?? this.menuShare,
+      menuScanText: menuScanText ?? this.menuScanText,
       shortMonths: shortMonths ?? this.shortMonths,
       openCopilot: openCopilot ?? this.openCopilot,
       closeCopilot: closeCopilot ?? this.closeCopilot,
@@ -1636,6 +1681,16 @@ const Map<String, RendelStrings> _byLocale = {
     nothingToShow: 'Gösterilecek bir şey yok.',
     dayHeading: '{date} {month} {day}',
     shortDays: ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'],
+    months: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'],
+    menuCut: 'Kes',
+    menuCopy: 'Kopyala',
+    menuPaste: 'Yapıştır',
+    menuSelectAll: 'Tümünü seç',
+    menuDelete: 'Sil',
+    menuLookUp: 'Araştır',
+    menuSearchWeb: 'Web\'de ara',
+    menuShare: 'Paylaş',
+    menuScanText: 'Metin tara',
     shortMonths: [
       'Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz',
       'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara',
@@ -1913,6 +1968,16 @@ const Map<String, RendelStrings> _byLocale = {
     nothingToShow: 'Nichts anzuzeigen.',
     dayHeading: '{day} {date}. {month}',
     shortDays: ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So'],
+    months: ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'],
+    menuCut: 'Ausschneiden',
+    menuCopy: 'Kopieren',
+    menuPaste: 'Einsetzen',
+    menuSelectAll: 'Alles auswählen',
+    menuDelete: 'Löschen',
+    menuLookUp: 'Nachschlagen',
+    menuSearchWeb: 'Im Web suchen',
+    menuShare: 'Teilen',
+    menuScanText: 'Text scannen',
     shortMonths: [
       'Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun',
       'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez',
@@ -2189,6 +2254,16 @@ const Map<String, RendelStrings> _byLocale = {
     nothingToShow: 'Rien à afficher.',
     dayHeading: '{day} {date} {month}',
     shortDays: ['lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.', 'dim.'],
+    months: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
+    menuCut: 'Couper',
+    menuCopy: 'Copier',
+    menuPaste: 'Coller',
+    menuSelectAll: 'Tout sélectionner',
+    menuDelete: 'Supprimer',
+    menuLookUp: 'Rechercher',
+    menuSearchWeb: 'Rechercher sur le Web',
+    menuShare: 'Partager',
+    menuScanText: 'Scanner le texte',
     shortMonths: [
       'janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin',
       'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.',
@@ -2464,6 +2539,16 @@ const Map<String, RendelStrings> _byLocale = {
     nothingToShow: 'Nada que mostrar.',
     dayHeading: '{day} {date} {month}',
     shortDays: ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'],
+    months: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+    menuCut: 'Cortar',
+    menuCopy: 'Copiar',
+    menuPaste: 'Pegar',
+    menuSelectAll: 'Seleccionar todo',
+    menuDelete: 'Eliminar',
+    menuLookUp: 'Consultar',
+    menuSearchWeb: 'Buscar en la Web',
+    menuShare: 'Compartir',
+    menuScanText: 'Escanear texto',
     shortMonths: [
       'ene', 'feb', 'mar', 'abr', 'may', 'jun',
       'jul', 'ago', 'sept', 'oct', 'nov', 'dic',
@@ -2738,6 +2823,16 @@ const Map<String, RendelStrings> _byLocale = {
     nothingToShow: 'لا شيء لعرضه.',
     dayHeading: '{day} {date} {month}',
     shortDays: ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'],
+    months: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'],
+    menuCut: 'قص',
+    menuCopy: 'نسخ',
+    menuPaste: 'لصق',
+    menuSelectAll: 'تحديد الكل',
+    menuDelete: 'حذف',
+    menuLookUp: 'بحث',
+    menuSearchWeb: 'البحث في الويب',
+    menuShare: 'مشاركة',
+    menuScanText: 'مسح النص',
     shortMonths: [
       'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
       'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',

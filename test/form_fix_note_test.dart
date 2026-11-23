@@ -98,10 +98,45 @@ void main() {
     expect(find.text('Dec 15'), findsNothing);
   });
 
+  testWidgets('its calendar names the month and the days in Turkish, Monday first', (tester) async {
+    await pump(tester, RendelStrings.forLocale('tr'));
+
+    await tester.tap(find.text('15 Ara'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 600));
+
+    expect(find.text('Aralık $year'), findsOneWidget);
+    expect(find.textContaining('December'), findsNothing);
+    final pzt = tester.getTopLeft(find.text('Pzt')).dx;
+    final paz = tester.getTopLeft(find.text('Paz')).dx;
+    expect(pzt, lessThan(paz));
+  });
+
+  testWidgets('its copy and paste menu is in Turkish', (tester) async {
+    await pump(tester, RendelStrings.forLocale('tr'));
+    await tester.enterText(find.byType(EditableText).first, 'Madrid');
+    await tester.pump();
+
+    final field = tester.state<EditableTextState>(find.byType(EditableText).first);
+    field.showToolbar();
+    await tester.pump();
+
+    expect(find.text('Tümünü seç'), findsOneWidget);
+    expect(find.text('Select all'), findsNothing);
+  });
+
   testWidgets('an English form in an English app keeps the host\'s Material words', (tester) async {
     await pump(tester, const RendelStrings());
 
     expect(find.text('Dec 15'), findsOneWidget);
+    await tester.enterText(find.byType(EditableText).first, 'Madrid');
+    await tester.pump();
+    tester.state<EditableTextState>(find.byType(EditableText).first).showToolbar();
+    await tester.pump();
+    expect(find.text('Select all'), findsOneWidget);
+    tester.state<EditableTextState>(find.byType(EditableText).first).hideToolbar();
+    await tester.enterText(find.byType(EditableText).first, '');
+    await tester.pump();
     await send(tester, 'Otelleri ara');
     expect(find.text('1 field above needs fixing.'), findsOneWidget);
   });

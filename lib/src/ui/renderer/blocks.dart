@@ -21,6 +21,7 @@ import '../../core/templates.dart';
 import '../../transport/api_client.dart' show RendelUploadFailure;
 import '../theme.dart';
 import '../lab/lab.dart';
+import '../material_words.dart';
 import 'map_engine.dart';
 import 'registry.dart';
 
@@ -1650,6 +1651,7 @@ class _ConfirmExtrasState extends State<_ConfirmExtras> {
         Text(strings.typeToConfirmFor(expected), style: theme.text.caption),
         SizedBox(height: theme.space.xs),
         TextField(
+          contextMenuBuilder: rendelContextMenu,
           controller: _typed,
           autocorrect: false,
           enableSuggestions: false,
@@ -1950,6 +1952,7 @@ class _EditRowState extends State<_EditRow> {
         );
       default:
         control = TextField(
+          contextMenuBuilder: rendelContextMenu,
           controller: _text,
           keyboardType: _kind == 'number' ? const TextInputType.numberWithOptions(decimal: true) : TextInputType.text,
           maxLength: _dbl(widget.control['max_length'])?.toInt(),
@@ -6214,6 +6217,7 @@ class _Field extends StatelessWidget {
                 Semantics(
                   isRequired: required ? true : null,
                   child: TextField(
+                    contextMenuBuilder: rendelContextMenu,
                     controller: controller,
                     focusNode: focusNode,
                     enabled: enabled,
@@ -6621,6 +6625,7 @@ class _OptionListState extends State<_OptionList> {
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: TextField(
+                contextMenuBuilder: rendelContextMenu,
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 onChanged: (text) {
@@ -6868,7 +6873,7 @@ class _MonthSheetState extends State<_MonthSheet> {
                 child: Semantics(
                   liveRegion: true,
                   child: Text(
-                    material?.formatMonthYear(_month) ?? '${strings.shortMonths[month - 1]} $year',
+                    material?.formatMonthYear(_month) ?? '${strings.months[month - 1]} $year',
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -6931,19 +6936,9 @@ class _MonthSheetState extends State<_MonthSheet> {
   }
 }
 
-/// The host's Material words, when it has any: the SDK carries no date
-/// library, so a month's name and a day said in full come from them.
-///
-/// Only when they are in the language the copilot is speaking. An app that
-/// never loaded Turkish Material words still has English ones, and a Turkish
-/// form then showed "Dec 15"; the SDK's own month names say "15 Ara".
-MaterialLocalizations? _material(BuildContext context) {
-  final host = Localizations.maybeLocaleOf(context);
-  if (host == null) return null;
-  final speaking = RendelStringsScope.of(context).shortMonths;
-  if (!listEquals(RendelStrings.forLocale(host.toLanguageTag()).shortMonths, speaking)) return null;
-  return Localizations.of<MaterialLocalizations>(context, MaterialLocalizations);
-}
+/// The host's Material words, only when they are in the conversation's
+/// language (`material_words.dart`).
+MaterialLocalizations? _material(BuildContext context) => rendelMaterialWords(context);
 
 /// A day as a date field shows it, in the host's language: "Nov 14, 2026".
 String _dayWords(BuildContext context, DateTime day) =>
@@ -10199,7 +10194,7 @@ bool _sameDay(DateTime a, DateTime b) => a.year == b.year && a.month == b.month 
 /// Material localizations when there are any.
 String _time(BuildContext context, DateTime at) {
   final local = at.toLocal();
-  final material = Localizations.of<MaterialLocalizations>(context, MaterialLocalizations);
+  final material = _material(context);
   if (material == null) return '${_two(local.hour)}:${_two(local.minute)}';
   return material.formatTimeOfDay(
     TimeOfDay.fromDateTime(local),
@@ -10219,7 +10214,7 @@ String _clock(BuildContext context, DateTime at) {
 /// [at] with its date, always: the start a calendar button adds.
 String _when(BuildContext context, DateTime at) {
   final local = at.toLocal();
-  final material = Localizations.of<MaterialLocalizations>(context, MaterialLocalizations);
+  final material = _material(context);
   final day = material?.formatMediumDate(local) ??
       RendelStringsScope.of(context).dayHeadingFor(local);
   return '$day, ${_time(context, local)}';
@@ -11123,6 +11118,7 @@ class _ChoiceWrite extends StatelessWidget {
               child: Semantics(
                 label: label,
                 child: TextField(
+                  contextMenuBuilder: rendelContextMenu,
                   controller: controller,
                   // Opened by a tap that asked to write, so the keyboard
                   // comes with it.
@@ -12239,6 +12235,7 @@ class _RatingState extends State<_Rating> {
                   alignment: AlignmentDirectional.centerStart,
                   decoration: BoxDecoration(color: theme.tint, borderRadius: BorderRadius.circular(12)),
                   child: TextField(
+                    contextMenuBuilder: rendelContextMenu,
                     controller: _comment,
                     enabled: !_sending,
                     // What `comment` takes on the wire.

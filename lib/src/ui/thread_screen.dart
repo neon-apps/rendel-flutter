@@ -32,6 +32,7 @@ import 'renderer/blocks.dart'
         shownOnPage;
 import 'renderer/registry.dart';
 import 'memory_chips.dart';
+import 'material_words.dart';
 import 'memory_sheet.dart';
 import 'leave_sheet.dart';
 import '../core/log.dart';
@@ -3882,6 +3883,7 @@ class _ComposerState extends State<_Composer> {
                 child: Semantics(
                   label: strings.messageField,
                   child: TextField(
+                    contextMenuBuilder: rendelContextMenu,
                     controller: widget.input,
                     focusNode: _focus,
                     // Open while an answer is written: the next question

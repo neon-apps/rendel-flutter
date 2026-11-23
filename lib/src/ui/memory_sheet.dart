@@ -4,6 +4,7 @@ import '../core/memory.dart';
 import '../core/strings.dart';
 import '../protocol/protocol.dart' show MemoryKind;
 import 'renderer/blocks.dart' show RendelActionButton;
+import 'material_words.dart';
 import 'theme.dart';
 
 /// A note's last day, short, in the reader's language: "Nov 1".
@@ -14,8 +15,7 @@ import 'theme.dart';
 /// after.
 String memoryLastDay(BuildContext context, DateTime expiresAt) {
   final day = expiresAt.toUtc().subtract(const Duration(milliseconds: 1));
-  return Localizations.of<MaterialLocalizations>(context, MaterialLocalizations)
-          ?.formatShortMonthDay(day) ??
+  return rendelMaterialWords(context)?.formatShortMonthDay(day) ??
       '${day.day} ${RendelStringsScope.of(context).shortMonths[day.month - 1]}';
 }
 

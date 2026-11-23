@@ -7,6 +7,17 @@ asks of you.
 
 ## Unreleased
 
+## 0.112.0
+
+### Changed
+
+- Everything the copilot draws follows the conversation's language when the host's Material words are in another one: a calendar's heading names the month in full ("Aralık 2026"), and the times and dates on cards and in "What I remember for you" use the SDK's own words.
+- Its text fields' copy and paste menu is in the conversation's language in that case ("Kopyala", "Yapıştır"); with matching Material words the platform's menu is unchanged.
+
+### Added
+
+- `RendelStrings.months`, and `menuCut`, `menuCopy`, `menuPaste`, `menuSelectAll`, `menuDelete`, `menuLookUp`, `menuSearchWeb`, `menuShare` and `menuScanText`, in every language the SDK ships.
+
 ## 0.111.0
 
 ### Changed
