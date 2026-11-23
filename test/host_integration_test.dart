@@ -204,7 +204,8 @@ void main() {
         await Future<void>.delayed(const Duration(milliseconds: 100));
       });
       await tester.pump(const Duration(milliseconds: 400));
-      Navigator.of(tester.element(find.byType(TextField))).pop();
+      // The box folds away once a question is sent; the thread is still there.
+      Navigator.of(tester.element(find.byWidgetPredicate((w) => w.runtimeType.toString() == 'ThreadScreen'))).pop();
       await tester.pump(const Duration(milliseconds: 600));
       return turns.last['user'];
     }

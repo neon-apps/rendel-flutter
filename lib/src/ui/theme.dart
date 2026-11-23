@@ -589,6 +589,17 @@ class RendelGroundLight {
   final RendelGroundStrength strength;
 }
 
+/// Whose colours the voice ring turns in (Tuna, 2026-11-23): `theme.voiceRing`
+/// on the wire. [colors], two to four, win; else [preset], one of
+/// `VOICE_RING_PRESETS`'s names or "app". Both null is the app's own colours:
+/// the ground light's two, else the accent's hue either side of itself.
+class RendelVoiceRing {
+  const RendelVoiceRing({this.preset, this.colors});
+
+  final String? preset;
+  final List<Color>? colors;
+}
+
 /// One kind of card set apart from the rest: `theme.cards` in the console.
 ///
 /// Every field is optional and a null one is the theme's own, so an empty
@@ -839,6 +850,7 @@ class RendelTheme {
     this.displayFontFamily,
     this.backdrop,
     this.groundLight,
+    this.voiceRing,
     Color? accentText,
     Color? accentEdge,
     Color? danger,
@@ -869,6 +881,10 @@ class RendelTheme {
   /// The light behind the panel, from the console. Null draws it as every
   /// build did: [RendelLook.groundLight] or the accent, at full strength.
   final RendelGroundLight? groundLight;
+  
+  /// The voice ring's colours, from the console (`theme.voiceRing`). Null
+  /// is the app's own: see [RingPalette].
+  final RendelVoiceRing? voiceRing;
 
   /// Kinds of card set apart from the rest, by catalog type
   /// (`product_cards`, `info_card`, …). See [forCard].
@@ -925,6 +941,7 @@ class RendelTheme {
       displayFontFamily: displayFontFamily,
       backdrop: backdrop,
       groundLight: groundLight,
+      voiceRing: voiceRing,
       // A literal accent pair stays; a derived one is derived again against
       // this card's plate, so an outlined button's word still reads on it.
       parts: look.parts,
@@ -1374,6 +1391,7 @@ class RendelTheme {
               displayFontFamily: display ?? displayFontFamily,
               backdrop: backdrop,
               groundLight: groundLight,
+              voiceRing: voiceRing,
               accentText: _accentText,
               accentEdge: _accentEdge,
               danger: _danger,
@@ -1409,6 +1427,7 @@ class RendelTheme {
     String? displayFontFamily,
     RendelBackdrop? backdrop,
     RendelGroundLight? groundLight,
+    RendelVoiceRing? voiceRing,
   }) {
     Color blend(Color a, Color b, double t) => Color.lerp(a, b, t)!;
     const white = Color(0xFFFFFFFF);
@@ -1553,6 +1572,7 @@ class RendelTheme {
       displayFontFamily: displayFontFamily,
       backdrop: backdrop,
       groundLight: groundLight,
+      voiceRing: voiceRing,
     );
   }
 
@@ -1604,6 +1624,8 @@ class RendelTheme {
       displayFontFamily: light.displayFontFamily,
       // Its colours only give the hue; the dark pastel is made from them.
       groundLight: light.groundLight,
+      // The ring's colours, too, only give the hue.
+      voiceRing: light.voiceRing,
     );
   }
 }

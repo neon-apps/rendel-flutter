@@ -484,6 +484,7 @@ class RendelRemoteConfig {
     final displayFontFamily =
         _font(theme['displayFontFamily']) ?? base.displayFontFamily;
     final groundLight = _groundLight(theme['groundLight']) ?? base.groundLight;
+    final voiceRing = _voiceRing(theme['voiceRing']) ?? base.voiceRing;
     RendelTheme build(RendelBackdrop? backdrop) => _built(
           base,
           surface: surface,
@@ -499,6 +500,7 @@ class RendelRemoteConfig {
           displayFontFamily: displayFontFamily,
           backdrop: backdrop,
           groundLight: groundLight,
+          voiceRing: voiceRing,
         );
     if (!theme.containsKey('backdrop')) return build(base.backdrop);
     final backdrop = _backdrop(theme['backdrop']);
@@ -534,6 +536,7 @@ class RendelRemoteConfig {
     required String? displayFontFamily,
     required RendelBackdrop? backdrop,
     required RendelGroundLight? groundLight,
+    required RendelVoiceRing? voiceRing,
   }) {
     if (!touchesColour) {
       // The accent roles come across too.
@@ -564,6 +567,7 @@ class RendelRemoteConfig {
         displayFontFamily: displayFontFamily,
         backdrop: backdrop,
         groundLight: groundLight,
+        voiceRing: voiceRing,
         accentText: base.accentText,
         accentEdge: base.accentEdge,
       );
@@ -594,6 +598,7 @@ class RendelRemoteConfig {
       displayFontFamily: displayFontFamily,
       backdrop: backdrop,
       groundLight: groundLight,
+      voiceRing: voiceRing,
     );
   }
 
@@ -634,6 +639,28 @@ class RendelRemoteConfig {
     };
     if (colors == null && strength == null) return null;
     return RendelGroundLight(colors: colors, strength: strength ?? RendelGroundStrength.normal);
+  }
+
+  /// The presets this build draws (`VOICE_RING_PRESETS` and "app").
+  static const _ringPresets = {'app', 'spectrum', 'ocean', 'sunset', 'forest', 'ember', 'mono'};
+
+  /// `theme.voiceRing`: a preset this build knows, or two to four opaque
+  /// colours. Null when it says nothing this build can read, so the theme
+  /// keeps the one it had; an unknown preset is the app's own colours.
+  static RendelVoiceRing? _voiceRing(Object? value) {
+    final map = _submap(value);
+    if (map.isEmpty) return null;
+    List<Color>? colors;
+    final raw = map['colors'];
+    if (raw is List && raw.length >= 2 && raw.length <= 4) {
+      final parsed = [for (final c in raw) _color(c)];
+      if (parsed.every((c) => c != null && c.a == 1)) colors = parsed.cast<Color>();
+    }
+    final preset = map['preset'];
+    return RendelVoiceRing(
+      preset: preset is String && _ringPresets.contains(preset) ? preset : null,
+      colors: colors,
+    );
   }
 
   /// `theme.backdrop`: two to four opaque colours, a direction from the

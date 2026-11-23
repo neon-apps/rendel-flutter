@@ -525,6 +525,28 @@ void main() {
     });
   });
 
+  group('the voice ring', () {
+    test('takes a preset, or two to four colours', () {
+      final ocean = _parse('{"config":{"theme":{"voiceRing":{"preset":"ocean"}}}}')!.applyTo(_base());
+      expect(ocean.voiceRing?.preset, 'ocean');
+      final own = _parse('{"config":{"theme":{"voiceRing":{"colors":["#4F5CFF","#8B5CF6","#10B981"]}}}}')!.applyTo(_base());
+      expect(own.voiceRing?.colors, const [Color(0xFF4F5CFF), Color(0xFF8B5CF6), Color(0xFF10B981)]);
+    });
+
+    test('drops what it cannot read: one colour, five, a translucent one, an unknown preset', () {
+      for (final raw in [
+        '{"colors":["#4F5CFF"]}',
+        '{"colors":["#4F5CFF","#8B5CF6","#10B981","#F43F5E","#FFFFFF"]}',
+        '{"colors":["#4F5CFF","#804F5CFF"]}',
+        '{"preset":"rainbow"}',
+      ]) {
+        final ring = _parse('{"config":{"theme":{"voiceRing":$raw}}}')!.applyTo(_base()).voiceRing;
+        expect(ring?.colors, isNull, reason: raw);
+        expect(ring?.preset, isNull, reason: raw);
+      }
+    });
+  });
+
   group('the ground light', () {
     test('takes two colours and a strength, each on its own', () {
       final theme = _parse(

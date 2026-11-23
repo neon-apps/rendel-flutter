@@ -41,6 +41,7 @@ import '../core/strings.dart';
 import 'followup_card.dart';
 import 'support_list.dart';
 import 'theme.dart';
+import 'ring_voice_mode.dart';
 import 'lab/lab.dart';
 
 part 'thread_screen_lab.dart';
@@ -491,6 +492,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     _voiceSent.dispose();
     _voiceLeaving.dispose();
     _voiceFalls.dispose();
+    _holdHint.dispose();
     _held?.cancel();
     _sendHold?.cancel();
     _noteTimer?.cancel();
@@ -648,6 +650,17 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
   /// fading out (the one the switcher kept) hears it.
   final _voiceSent = ValueNotifier<bool>(false);
 
+  /// Which press the voice mode is for. A press let go at once frees the
+  /// microphone there and then; the recogniser it started may report its end
+  /// seconds later (iOS does), and that late end belongs to an old press, not
+  /// to whichever one is listening by then (Tuna 2026-11-23: after a quick
+  /// tap the microphone would not take a second press).
+  int _voiceRun = 0;
+
+  /// Counts quick taps on the microphone, each of which the
+  /// microphone answers by showing how it is held ([RingMicHalo.hint]).
+  final _holdHint = ValueNotifier<int>(0);
+
   /// For the frame a spoken question is sent in: the composer, hidden under
   /// voice mode, comes back with its pill already in the microphone's place
   /// rather than fading in over a fading microphone.
@@ -666,9 +679,16 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // A keyboard left up from typing goes: the question is spoken now.
     FocusManager.instance.primaryFocus?.unfocus();
 
+    final run = ++_voiceRun;
     final started = widget.dictationStarted;
     void opened() {
       if (!started!.value || !mounted) return;
+      // An old press, let go and freed, whose microphone opened late: shut it
+      // again, unless a new press is listening on it by now.
+      if (run != _voiceRun) {
+        if (!_dictating) widget.onStopDictating?.call();
+        return;
+      }
       // Let go before the microphone opened: it closes again, unheard.
       if (_voiceCancelled) return widget.onStopDictating?.call();
       setState(() => _listening = true);
@@ -688,12 +708,12 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     started?.addListener(opened);
     try {
       final text = await dictate((partial) {
-        if (!mounted || _voiceCancelled) return;
+        if (!mounted || _voiceCancelled || run != _voiceRun) return;
         // Live, as they are heard. The point of dictation is watching it
         // happen; words that appear only once you stop are a transcript.
         setState(() => _heard = partial);
       });
-      if (!mounted || _voiceCancelled) return;
+      if (!mounted || _voiceCancelled || run != _voiceRun) return;
       final words = text?.trim() ?? '';
       if (words.isEmpty) {
         /* Nothing at all was captured.
@@ -721,14 +741,14 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       });
       WidgetsBinding.instance.addPostFrameCallback((_) => _dockAtOnce = false);
     } on RendelDictationDenied {
-      if (!mounted) return;
+      if (!mounted || run != _voiceRun) return;
       // Refused, not broken: say where the switch is (Grove report P1-9).
       setState(() {
         _voice = false;
         _attachError = _strings.dictationDenied;
       });
     } catch (err) {
-      if (!mounted) return;
+      if (!mounted || run != _voiceRun) return;
       /* The recogniser failed, which is not silence.
 
          This read 'That could not be heard. Try again.' — in English under a
@@ -742,12 +762,15 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       });
     } finally {
       started?.removeListener(opened);
-      if (!_voiceSent.value) _voiceFalls.value = true;
-      if (mounted) {
-        setState(() {
-          _dictating = false;
-          _listening = false;
-        });
+      // A press already let go and freed: its late end leaves the next one be.
+      if (run == _voiceRun) {
+        if (!_voiceSent.value) _voiceFalls.value = true;
+        if (mounted) {
+          setState(() {
+            _dictating = false;
+            _listening = false;
+          });
+        }
       }
     }
   }
@@ -770,7 +793,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     // sent, and the strip over the composer says how it is used.
     if (!_listening || _held!.isActive) {
       _cancelVoice();
-      _showNote(_strings.holdToSpeak);
+      // The microphone shows how it is held, rather than a
+      // quiet line over the composer.
+      _holdHint.value++;
       return;
     }
     // A host's recogniser that cannot be stopped ends by itself, and voice
@@ -786,12 +811,26 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
       identical(_attachError, _strings.dictationDenied) &&
       defaultTargetPlatform == TargetPlatform.iOS;
 
+  /// The ring's stop, in the microphone's place: what was heard is sent. A
+  /// screen reader's way, which opens voice mode with a tap and cannot hold.
+  void _stopVoice() {
+    if (_heard.trim().isNotEmpty) _voiceLeaving.value = true;
+    widget.onStopDictating?.call();
+  }
+
   /// A tap away from voice mode while it listens: nothing is sent.
   void _cancelVoice() {
     _voiceCancelled = true;
     _voiceFalls.value = true;
     widget.onStopDictating?.call();
-    setState(() => _voice = false);
+    // The microphone is free at once, without waiting for the recogniser to
+    // say it has ended; that end, when it comes, is the old press's.
+    _voiceRun++;
+    setState(() {
+      _voice = false;
+      _dictating = false;
+      _listening = false;
+    });
   }
 
   /// The failed turn's sentence, in the host's language.
@@ -965,34 +1004,54 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                       // fade, and the veil and the sphere bring themselves in.
                       duration: Duration.zero,
                       // Long enough for the sphere to be seen falling away.
+                      // Long enough for the ring to land in the
+                      // turn's pill, and it fades itself.
                       reverseDuration: MediaQuery.disableAnimationsOf(context)
                           ? Duration.zero
-                          : _VoiceModeState.fall,
-                      // There from its first frame for a screen reader,
-                      // whatever it looks like while it fades in.
-                      transitionBuilder: (child, animation) => FadeTransition(
-                        opacity: animation,
-                        alwaysIncludeSemantics: true,
-                        child: child,
-                      ),
+                          : RingVoiceMode.leave,
+                      transitionBuilder: (child, animation) => child,
                       child: !_voice
                           ? const SizedBox.shrink()
-                          : _VoiceMode(
-                              key: const ValueKey('voice'),
+                          // The ring that listens (Tuna 2026-11-23, the lab at
+                          // /lab/voice-ring), in the sphere's place.
+                          : RingVoiceMode(
+                              // Each press its own: one still fading out never comes back.
+                              key: ValueKey(('voice', _voiceRun)),
                               heard: _heard,
-                              dock: _dock,
                               sent: _voiceSent,
                               leaving: _voiceLeaving,
                               falls: _voiceFalls,
                               listening: _listening,
                               level: widget.dictationLevel,
-                              voiceIcon: widget.voiceIcon,
-                              wide: widget.voiceFirst,
-                              onStop: widget.onStopDictating,
                               onCancel: _cancelVoice,
+                              onStop: widget.onStopDictating == null ? null : _stopVoice,
+                              wide: widget.voiceFirst,
                             ),
                     ),
                   ),
+                  // While an answer is read aloud, the small
+                  // ring moves with the voice over the composer, with a stop.
+                  if (widget.voice case final voice?)
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: ValueListenableBuilder<double>(
+                        valueListenable: _dock,
+                        builder: (context, dock, _) => Padding(
+                          padding: EdgeInsets.only(bottom: dock + 10),
+                          child: Center(
+                            child: ValueListenableBuilder<bool>(
+                              valueListenable: voice.sounding,
+                              builder: (context, sounding, _) => RingReading(
+                                on: sounding && !_voice,
+                                onStop: voice.stop,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
                   /* The composer floats over the page rather than under it.
 
                      The page runs to the bottom edge and scrolls behind the
@@ -1014,8 +1073,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                       // swells over its own, in the same place; back with a
                       // fade. Its glass skips the blur while it fades: a blur
                       // redrawn every frame of a fade is what stuttered.
+                      // It stays under the ring, as the lab's bar does.
                       child: LabFade(
-                        visible: !_voice,
+                        visible: true,
                         duration: _dockAtOnce ? const Duration(milliseconds: 1) : theme.motion.swap,
                         child: _SizeReporter(
                       onHeight: (height) => _dock.value = height,
@@ -1101,6 +1161,9 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                           child: _Composer(
                             input: _input,
                             busy: controller.busy,
+                            held: _voice,
+                            level: widget.dictationLevel,
+                            holdHint: _holdHint,
                             status: _status(controller),
                             atOnce: _dockAtOnce,
                             primary: _primary(controller),
@@ -3244,6 +3307,9 @@ class _Composer extends StatefulWidget {
   const _Composer({
     required this.input,
     required this.busy,
+    this.held = false,
+    this.level,
+    this.holdHint,
     this.status,
     this.atOnce = false,
     this.primary,
@@ -3265,6 +3331,12 @@ class _Composer extends StatefulWidget {
 
   final TextEditingController input;
   final bool busy;
+
+  /// The microphone is held and the ring listens; the rest
+  /// of the row dims, and the microphone wears the ring's colours.
+  final bool held;
+  final ValueListenable<double>? level;
+  final ValueListenable<int>? holdHint;
 
   /// What an answer page's turn is doing, said by the pill drawn in the
   /// microphone's place. Null leaves the composer as it always was.
@@ -3366,7 +3438,16 @@ class _ComposerState extends State<_Composer> {
   /// Sent from the box: it is the box the question was typed in, and it
   /// stays while the answer is written, with or without a microphone.
   void _sendTyped() {
-    _mode = _Mode.text;
+    // Tuna 2026-11-23: a typed question shows the same
+    // loading as a spoken one, the turn's pill with its ring, so the box
+    // folds away once it is sent. A file still being added keeps it open.
+    // With no microphone the box is all there is, through the turn too.
+    if (_voice) {
+      _mode = _Mode.rest;
+      _focus.unfocus();
+    } else {
+      _mode = _Mode.text;
+    }
     widget.onSend();
   }
 
@@ -3442,6 +3523,13 @@ class _ComposerState extends State<_Composer> {
         _ => Icons.add_rounded,
       };
 
+  /// Held, everything but the microphone dims, as the lab's bar does.
+  Widget _dim(Widget child) => AnimatedOpacity(
+        opacity: widget.held ? 0.35 : 1,
+        duration: Duration(milliseconds: MediaQuery.disableAnimationsOf(context) ? 0 : 300),
+        child: child,
+      );
+
   Widget _rest(RendelTheme theme) {
     if (widget.voiceFirst && _voice) return _restVoice(theme);
     final strings = RendelStringsScope.of(context);
@@ -3461,18 +3549,18 @@ class _ComposerState extends State<_Composer> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             if (_attach)
-              _Round(
+              _dim(_Round(
                 icon: _attachGlyph,
                 label: strings.attachFile,
                 onTap: widget.busy ? null : _plus,
-              )
+              ))
             else
               const SizedBox(width: _Round.side + 2),
             const SizedBox(width: 8),
             // While an answer page is on its way, a pill in the field's place
             // says what the turn is doing.
             Expanded(
-              child: AnimatedSwitcher(
+              child: _dim(AnimatedSwitcher(
                 duration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
                 reverseDuration: still || widget.atOnce ? Duration.zero : theme.motion.settle,
                 // Said from its first frame, however faint it still is.
@@ -3482,7 +3570,14 @@ class _ComposerState extends State<_Composer> {
                   child: child,
                 ),
                 child: status != null
-                    ? _StatusPill(key: const ValueKey('status'), label: status)
+                    // A tap on it opens the box again, to type the next
+                    // question meanwhile; it goes once the answer is done.
+                    ? GestureDetector(
+                        key: const ValueKey('status'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _type,
+                        child: _StatusPill(label: status),
+                      )
                     : primary != null
                         ? _Arrive(
                             key: ValueKey(primary.label),
@@ -3499,28 +3594,33 @@ class _ComposerState extends State<_Composer> {
                             label: strings.typeMessage,
                             onTap: _type,
                           ),
-              ),
+              )),
             ),
             const SizedBox(width: 8),
             // Beside a lit action there is no room for the field: a round
             // keyboard stands in for it.
             if (primary != null && status == null) ...[
-              _Round(
+              _dim(_Round(
                 icon: Icons.keyboard_outlined,
                 label: strings.typeMessage,
                 onTap: _type,
-              ),
+              )),
               const SizedBox(width: 8),
             ],
-            _MicPill(
-              icon: switch (widget.voiceIcon) {
-                RendelVoiceIcon.waveform => Icons.graphic_eq_rounded,
-                _ => Icons.mic_rounded,
-              },
-              label: strings.speak,
-              onTap: widget.busy ? null : _listen,
-              onDown: widget.busy ? null : widget.onHoldStart,
-              onUp: widget.onHoldEnd,
+            RingMicHalo(
+              on: widget.held,
+              level: widget.level,
+              hint: widget.holdHint,
+              child: _MicPill(
+                icon: switch (widget.voiceIcon) {
+                  RendelVoiceIcon.waveform => Icons.graphic_eq_rounded,
+                  _ => Icons.mic_rounded,
+                },
+                label: strings.speak,
+                onTap: widget.busy ? null : _listen,
+                onDown: widget.busy ? null : widget.onHoldStart,
+                onUp: widget.onHoldEnd,
+              ),
             ),
           ],
           ),
@@ -3548,11 +3648,11 @@ class _ComposerState extends State<_Composer> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               if (_attach)
-                _Round(
+                _dim(_Round(
                   icon: _attachGlyph,
                   label: strings.attachFile,
                   onTap: widget.busy ? null : _plus,
-                )
+                ))
               else
                 const SizedBox(width: _Round.side + 2),
               const SizedBox(width: 8),
@@ -3566,22 +3666,35 @@ class _ComposerState extends State<_Composer> {
                     child: child,
                   ),
                   child: status != null
-                      ? _StatusPill(key: const ValueKey('status'), label: status)
+                      // A tap on it opens the box again, to type the next
+                    // question meanwhile; it goes once the answer is done.
+                    ? GestureDetector(
+                        key: const ValueKey('status'),
+                        behavior: HitTestBehavior.opaque,
+                        onTap: _type,
+                        child: _StatusPill(label: status),
+                      )
                       : Row(
                           key: const ValueKey('mic'),
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _MicPill(
-                              icon: switch (widget.voiceIcon) {
-                                RendelVoiceIcon.waveform => Icons.graphic_eq_rounded,
-                                _ => Icons.mic_rounded,
-                              },
-                              label: strings.speak,
-                              onTap: widget.busy ? null : _listen,
-                              onDown: widget.busy ? null : widget.onHoldStart,
-                              onUp: widget.onHoldEnd,
-                              // A circle beside a lit action, so its label reads whole.
-                              width: primary == null ? 128 : _MicPill.side,
+                            RingMicHalo(
+                              on: widget.held,
+                              level: widget.level,
+                              hint: widget.holdHint,
+                              wide: primary == null,
+                              child: _MicPill(
+                                icon: switch (widget.voiceIcon) {
+                                  RendelVoiceIcon.waveform => Icons.graphic_eq_rounded,
+                                  _ => Icons.mic_rounded,
+                                },
+                                label: strings.speak,
+                                onTap: widget.busy ? null : _listen,
+                                onDown: widget.busy ? null : widget.onHoldStart,
+                                onUp: widget.onHoldEnd,
+                                // A circle beside a lit action, so its label reads whole.
+                                width: primary == null ? 128 : _MicPill.side,
+                              ),
                             ),
                             if (primary != null) ...[
                               const SizedBox(width: 8),
@@ -3597,11 +3710,11 @@ class _ComposerState extends State<_Composer> {
                 ),
               ),
               const SizedBox(width: 8),
-              _Round(
+              _dim(_Round(
                 icon: Icons.keyboard_outlined,
                 label: strings.typeMessage,
                 onTap: status != null ? null : _type,
-              ),
+              )),
             ],
           ),
         ),
@@ -4149,13 +4262,11 @@ class _HeaderGlyphPainter extends CustomPainter {
 /// 260ms the pill swells an eighth, easing out, in its own colour.
 class _MicPill extends StatelessWidget {
   const _MicPill({
-    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
     this.onDown,
     this.onUp,
-    this.held = false,
     this.width = side,
   });
 
@@ -4169,7 +4280,6 @@ class _MicPill extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onDown;
   final VoidCallback? onUp;
-  final bool held;
 
   // The panel's look: a filled ink circle, as its send is.
   static BoxDecoration _decoration(RendelTheme theme) => RendelLab.of('look') == 'a'
@@ -4184,30 +4294,6 @@ class _MicPill extends StatelessWidget {
     final theme = RendelThemeScope.of(context);
     final still = MediaQuery.disableAnimationsOf(context);
     final glyph = Icon(icon, size: 24, color: RendelLab.of('look') == 'a' ? theme.colors.surfaceRaised : theme.colors.onAccent);
-    if (held) {
-      return TweenAnimationBuilder<double>(
-        tween: Tween(begin: still ? 1 : 0, end: 1),
-        duration: const Duration(milliseconds: 260),
-        builder: (context, t, child) => Padding(
-          padding: const EdgeInsets.all(1),
-          child: Transform.scale(
-            scale: 1 + 0.12 * Curves.easeOutCubic.transform(t),
-            child: Container(
-              width: width,
-              height: side,
-              decoration: _decoration(theme),
-              child: child,
-            ),
-          ),
-        ),
-        child: RendelPressable(
-          semanticLabel: label,
-          onTap: onTap,
-          pressedScale: 1,
-          child: Center(child: glyph),
-        ),
-      );
-    }
     // Drawn 46 tall, touched 48: the 1 round it is inside its target, held or not.
     final pill = Padding(
       padding: const EdgeInsets.all(1),
@@ -4312,459 +4398,6 @@ class _ArriveState extends State<_Arrive> with SingleTickerProviderStateMixin {
       ),
     );
   }
-}
-
-/// Voice mode, over everything under the header, as Monogram draws it
-/// (Tuna 2026-10-26, measured from her recording frame by frame).
-///
-/// The page greys under a veil, and a frosted sphere twice the screen's
-/// width rises from under the microphone — fast for a third of a second,
-/// then creeping on while it is held — its edge soft, what it covers blurred
-/// past reading. It swells with the speaker's voice, and the words are
-/// written over it as they arrive. Let go with words, it swells once and the
-/// pill thinks; let go with none, or let go of, it falls the way it came.
-/// The web SDK draws the same.
-class _VoiceMode extends StatefulWidget {
-  const _VoiceMode({
-    super.key,
-    required this.heard,
-    required this.dock,
-    required this.sent,
-    required this.leaving,
-    required this.falls,
-    required this.listening,
-    required this.level,
-    required this.voiceIcon,
-    this.wide = false,
-    required this.onStop,
-    required this.onCancel,
-  });
-
-  final String heard;
-
-  /// The composer's height, which the question's place is measured from.
-  final ValueListenable<double> dock;
-
-  /// True once the question is sent: the words and the pill are gone, and
-  /// only the veil and the sphere are left to fade.
-  final ValueListenable<bool> sent;
-
-  /// True once the microphone is let go with words: the sphere swells once,
-  /// and the pill thinks while the last words are made out.
-  final ValueListenable<bool> leaving;
-
-  /// True once nothing will be sent: the sphere falls away.
-  final ValueListenable<bool> falls;
-
-  /// The recogniser is listening; until it is, nothing is said.
-  final bool listening;
-  final ValueListenable<double>? level;
-  final RendelVoiceIcon voiceIcon;
-
-  /// The microphone is the wide pill it was in the composer (voice first).
-  final bool wide;
-
-  /// Stops listening and sends. Null when the recogniser cannot be stopped.
-  final VoidCallback? onStop;
-  final VoidCallback onCancel;
-
-  @override
-  State<_VoiceMode> createState() => _VoiceModeState();
-}
-
-class _VoiceModeState extends State<_VoiceMode> with TickerProviderStateMixin {
-  /// How long the sphere takes to fall away.
-  static const fall = Duration(milliseconds: 540);
-
-  // The sphere's rise, run backwards to fall.
-  late final AnimationController _rise = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 650),
-    reverseDuration: fall,
-  );
-  late final CurvedAnimation _risen = CurvedAnimation(
-    parent: _rise,
-    curve: Curves.easeOutQuart,
-    reverseCurve: Curves.easeInOutCubic,
-  );
-  // The veil is there before the sphere is up, and goes after it has fallen.
-  // Typing first, the heard words show once the circle from the corner is
-  // under them, never floating on the page before it.
-  late final CurvedAnimation _wordsIn = CurvedAnimation(
-    parent: _rise,
-    curve: const Interval(0.55, 1, curve: Curves.easeOut),
-  );
-  late final CurvedAnimation _veiled = CurvedAnimation(
-    parent: _rise,
-    curve: const Interval(0, 0.6, curve: Curves.easeOut),
-    reverseCurve: const Interval(0, 0.7, curve: Curves.easeInOut),
-  );
-
-  // The slow climb after the rise, for as long as it is held.
-  late final AnimationController _creep = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 900),
-  );
-  // It starts as the rise ends.
-  late final CurvedAnimation _crept = CurvedAnimation(
-    parent: _creep,
-    curve: const Interval(0.33, 1, curve: Curves.easeOut),
-  );
-
-  // One swell when it is let go with words.
-  late final AnimationController _pulse = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 460),
-  );
-
-  // The sphere's slow drift, so it is alive between words.
-  late final AnimationController _drift = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 4200),
-  );
-  bool _started = false;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.leaving.addListener(_let);
-    widget.falls.addListener(_fall);
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_started) return;
-    _started = true;
-    if (MediaQuery.disableAnimationsOf(context)) {
-      _rise.value = 1;
-      _creep.value = 1;
-    } else {
-      _rise.forward();
-      _creep.forward();
-      _drift.repeat(reverse: true);
-    }
-    _let();
-    _fall();
-  }
-
-  void _let() {
-    if (!widget.leaving.value || _pulse.isAnimating || _pulse.value > 0) return;
-    if (MediaQuery.disableAnimationsOf(context)) return;
-    _pulse.forward();
-  }
-
-  /// Once it falls it only falls: a new press opens a voice mode of its own.
-  void _fall() {
-    if (!widget.falls.value || _rise.status == AnimationStatus.reverse) return;
-    if (MediaQuery.disableAnimationsOf(context)) return;
-    _creep.stop();
-    _rise.reverse();
-  }
-
-  @override
-  void dispose() {
-    widget.leaving.removeListener(_let);
-    widget.falls.removeListener(_fall);
-    _risen.dispose();
-    _veiled.dispose();
-    _wordsIn.dispose();
-    _crept.dispose();
-    _rise.dispose();
-    _creep.dispose();
-    _pulse.dispose();
-    _drift.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = RendelThemeScope.of(context);
-    final strings = RendelStringsScope.of(context);
-    final colors = theme.colors;
-    final glow = voiceGlow(colors.surface, colors.onSurface);
-    final dark = colors.surface.computeLuminance() < colors.onSurface.computeLuminance();
-
-    // Once sent, nothing here takes a tap: the page under it is back.
-    return ValueListenableBuilder<bool>(
-      valueListenable: widget.sent,
-      builder: (context, sent, _) => IgnorePointer(
-        ignoring: sent,
-        child: LayoutBuilder(
-        builder: (context, box) {
-          final width = box.maxWidth;
-          final height = box.maxHeight;
-          // 1.7 times a phone's width, so only its crown shows; on a wide
-          // screen, held to the height.
-          final sphere = math.min(width * 1.7, height * 1.1);
-          return Stack(
-            clipBehavior: Clip.hardEdge,
-            children: [
-              // The veil: the page greys under it, a fifth darker, as it does
-              // under a held microphone on the phone this was asked to look
-              // like. A colour and a gradient in one decoration paint only the
-              // gradient, which is why 0.60.1 drew no veil at all.
-              Positioned.fill(
-                child: FadeTransition(
-                  opacity: _veiled,
-                  child: ColoredBox(
-                    color: Colors.black.withValues(alpha: dark ? 0.32 : 0.20),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: const Alignment(1, -0.4),
-                          radius: 1.1,
-                          colors: [
-                            colors.accent.withValues(alpha: 0.10),
-                            colors.accent.withValues(alpha: 0),
-                          ],
-                        ),
-                      ),
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-                ),
-              ),
-              // The sphere: its crown at 55% of the screen a third of a
-              // second after the press, and 47% by the end of the first
-              // second, where it stays while it is held.
-              // Typing first, the microphone is in the row's corner: the
-              // sphere grows from it, a circle centred on it (Tuna
-              // 2026-11-16), and falls back into it.
-              AnimatedBuilder(
-                animation: Listenable.merge([_risen, _crept]),
-                builder: (context, child) {
-                  if (!widget.wide) {
-                    final rtl = Directionality.of(context) == TextDirection.rtl;
-                    final cx = rtl ? 14 + _MicPill.side / 2 : width - 14 - _MicPill.side / 2;
-                    final cy = height - math.max(MediaQuery.paddingOf(context).bottom, 18) - 30;
-                    // From inside the microphone, easing in, then on over the
-                    // next second while it is held: small first, then large.
-                    final r = 18 + height * 0.52 * Curves.easeInOutCubic.transform(_rise.value) + height * 0.10 * _crept.value;
-                    return Positioned(left: cx - r, top: cy - r, width: r * 2, height: r * 2, child: child!);
-                  }
-                  return Positioned(
-                    left: (width - sphere) / 2,
-                    width: sphere,
-                    height: sphere,
-                    top: height * (1.02 - 0.50 * _risen.value - 0.10 * _crept.value),
-                    child: child!,
-                  );
-                },
-                child: AnimatedBuilder(
-                  animation: _pulse,
-                  builder: (context, child) {
-                    // Up fast, back slowly.
-                    final t = _pulse.value;
-                    final swell = t < 0.3
-                        ? Curves.easeOut.transform(t / 0.3)
-                        : 1 - Curves.easeInOut.transform((t - 0.3) / 0.7);
-                    return Transform.scale(
-                      scale: 1 + 0.08 * swell,
-                      alignment: widget.wide ? Alignment.bottomCenter : Alignment.center,
-                      child: child,
-                    );
-                  },
-                  child: ValueListenableBuilder<double>(
-                    valueListenable: widget.level ?? const _Silent(),
-                    builder: (context, level, child) => TweenAnimationBuilder<double>(
-                      tween: Tween(end: 1 + 0.03 * level),
-                      duration: const Duration(milliseconds: 160),
-                      builder: (context, swell, child) => Transform.scale(
-                        scale: swell,
-                        alignment: widget.wide ? Alignment.bottomCenter : Alignment.center,
-                        child: child,
-                      ),
-                      child: child,
-                    ),
-                    child: AnimatedBuilder(
-                      animation: _drift,
-                      builder: (context, child) {
-                        final t = Curves.easeInOut.transform(_drift.value);
-                        return Transform.translate(
-                          offset: Offset(width * (-0.02 + 0.04 * t), height * (0.006 - 0.012 * t)),
-                          child: child,
-                        );
-                      },
-                      child: Stack(
-                        children: [
-                          // What it covers, blurred, inside its soft edge so
-                          // the blur's own edge is under the fade.
-                          Positioned.fill(
-                            child: Padding(
-                              padding: EdgeInsets.all(sphere * 0.012),
-                              child: ClipOval(
-                                child: BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                                  child: const SizedBox.expand(),
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Milky and translucent, a little brighter toward
-                          // its edge, as glass is, and soft over its last
-                          // twenty points.
-                          Positioned.fill(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: RadialGradient(
-                                  stops: const [0, 0.84, 0.95, 0.978, 1],
-                                  colors: [
-                                    glow.withValues(alpha: 0.66),
-                                    glow.withValues(alpha: 0.68),
-                                    glow.withValues(alpha: 0.82),
-                                    glow.withValues(alpha: 0.5),
-                                    glow.withValues(alpha: 0),
-                                  ],
-                                ),
-                              ),
-                              child: const SizedBox.expand(),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              // A tap anywhere but the microphone lets the question go. Its
-              // own layer, under the words and the pill, so it takes no
-              // label of theirs; the pill is the way to it for a reader.
-              Positioned.fill(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  excludeFromSemantics: true,
-                  onTap: widget.onCancel,
-                ),
-              ),
-              // The words, in the box the question is written in (`_Asked`'s),
-              // so it takes their place without a move. Gone the moment it is.
-              if (!sent && (widget.listening || widget.heard.isNotEmpty))
-                Positioned.fill(
-                  child: FadeTransition(
-                  opacity: widget.wide ? kAlwaysCompleteAnimation : _wordsIn,
-                  child: ValueListenableBuilder<double>(
-                    valueListenable: widget.dock,
-                    builder: (context, dock, _) => Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Padding(
-                        padding: _askedPadding(dock),
-                        child: Semantics(
-                          container: true,
-                          liveRegion: true,
-                          child: LayoutBuilder(
-                            builder: (context, box) {
-                              final words = widget.heard.isEmpty
-                                  ? '${strings.listening}…'
-                                  : widget.heard;
-                              final style = widget.heard.isEmpty
-                                  ? _askedStyle(theme).copyWith(
-                                      fontWeight: FontWeight.w500,
-                                      color: colors.onSurface.withValues(alpha: 0.45),
-                                    )
-                                  : _askedStyle(theme).copyWith(color: colors.onSurface);
-                              return SizedBox(
-                                width: balancedWidth(
-                                  words,
-                                  style,
-                                  box.maxWidth,
-                                  MediaQuery.textScalerOf(context),
-                                  Directionality.of(context),
-                                ),
-                                child: Text(words, textAlign: TextAlign.center, style: style),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                ),
-              if (!sent)
-              Positioned.fill(
-                // Keyed: the words above arrive when listening starts, and
-                // unkeyed this was rebuilt and the pill swelled a second time.
-                key: const ValueKey('voice-pill'),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.only(
-                        bottom: math.max(MediaQuery.paddingOf(context).bottom, 18),
-                      ),
-                      child: SizedBox(
-                        height: 60,
-                        // Where the composer's microphone was: in the middle
-                        // voice first, else at the row's end (12 + 2 in), so it
-                        // swells in place rather than jumping to the middle.
-                        child: Container(
-                          alignment: widget.wide ? Alignment.center : AlignmentDirectional.centerEnd,
-                          // 13 and the pill's own 1 (its target's margin).
-                          padding: EdgeInsetsDirectional.only(end: widget.wide ? 0 : 13),
-                          // Let go with words heard, it thinks, as the pill
-                          // in the composer will once they are sent.
-                          child: ValueListenableBuilder<bool>(
-                            valueListenable: widget.leaving,
-                            builder: (context, leaving, _) => AnimatedSwitcher(
-                              duration: MediaQuery.disableAnimationsOf(context)
-                                  ? Duration.zero
-                                  : theme.motion.swap,
-                              transitionBuilder: (child, animation) => FadeTransition(
-                                opacity: animation,
-                                alwaysIncludeSemantics: true,
-                                child: ScaleTransition(
-                                  scale: Tween(begin: 0.9, end: 1.0).animate(animation),
-                                  child: child,
-                                ),
-                              ),
-                              child: leaving && widget.heard.trim().isNotEmpty
-                                  ? _StatusPill(
-                                      key: const ValueKey('thinking'),
-                                      label: strings.statusThinking,
-                                    )
-                                  : _MicPill(
-                                      key: const ValueKey('mic'),
-                                      icon: switch (widget.voiceIcon) {
-                                        RendelVoiceIcon.waveform =>
-                                          Icons.graphic_eq_rounded,
-                                        _ => Icons.mic_rounded,
-                                      },
-                                      label: strings.stopListening,
-                                      onTap: widget.onStop,
-                                      held: true,
-                                      width: widget.wide ? 128 : _MicPill.side,
-                                    ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
-      ),
-      ),
-    );
-  }
-}
-
-/// A level that never moves, for a host's recogniser that reports none.
-class _Silent extends ValueListenable<double> {
-  const _Silent();
-
-  @override
-  double get value => 0;
-
-  @override
-  void addListener(VoidCallback listener) {}
-
-  @override
-  void removeListener(VoidCallback listener) {}
 }
 
 /// A file the user picked and the server accepted, waiting for its turn.
@@ -5029,7 +4662,7 @@ class _Glass extends StatelessWidget {
 /// the primary action wears, a small turning ring, and what the turn is
 /// doing, the words crossfading as they change.
 class _StatusPill extends StatelessWidget {
-  const _StatusPill({super.key, required this.label});
+  const _StatusPill({required this.label});
 
   final String label;
 
@@ -5074,8 +4707,10 @@ class _StatusPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          _Ring(color: ink),
-          const SizedBox(width: 10),
+          // The ring that listened lands here, turned to the
+          // pill's ink, and works on.
+          RingSpot(solid: ink, landing: true),
+          const SizedBox(width: 8),
           Flexible(child: words),
         ],
       ),

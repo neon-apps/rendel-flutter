@@ -8,11 +8,14 @@ import 'package:rendel/rendel.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/transport/api_client.dart';
 import 'package:rendel/src/ui/theme.dart' show voiceGlow;
+import 'package:rendel/src/ui/ring_voice_mode.dart' show RingVoiceMode;
 import 'package:rendel/src/ui/thread_screen.dart';
 
 /// Voice mode, Tuna 2026-10-21: on a dark theme its words were white on a
 /// near-white glow (Corvo), and a sent question showed twice for a moment,
-/// the words heard fading out under the question written over them.
+/// the words heard fading out under the question written over them. The ring
+/// that listens (2026-11-23) keeps both: its own ground, and words that go
+/// the moment the question is written.
 void main() {
   final corvo = RendelTheme.fromTokens(
     surface: const Color(0xFF0B0C0E),
@@ -90,24 +93,25 @@ void main() {
     return (done, say);
   }
 
-  testWidgets('glows in the theme, so its words read on a dark one', (tester) async {
+  testWidgets('listens on the app\'s own ground, so its words read on a dark one', (tester) async {
     final c = held();
     addTearDown(c.dispose);
     final (_, say) = await speak(tester, c, corvo);
     say('Why is my balance lower');
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-    final dome = tester
-        .widgetList<DecoratedBox>(find.byType(DecoratedBox))
-        .map((box) => (box.decoration as BoxDecoration?)?.gradient)
-        .whereType<RadialGradient>()
-        // The sphere's own, not the veil's light.
-        .singleWhere((gradient) => gradient.stops?.length == 5);
-    final ink = corvo.colors.onSurface;
-    // Translucent since 0.60.1, as Monogram's is: the glow, in part.
-    final glow = dome.colors.first.withValues(alpha: 1);
-    expect(glow, voiceGlow(corvo.colors.surface, ink));
-    expect(contrastRatio(ink, glow), greaterThanOrEqualTo(4.5));
+    // The ring's ground is the theme's own surface, nearly opaque over the page.
+    final ground = tester
+        .widgetList<ColoredBox>(find.descendant(of: find.byType(RingVoiceMode), matching: find.byType(ColoredBox)))
+        .map((box) => box.color)
+        .firstWhere((colour) => colour.withValues(alpha: 1) == corvo.colors.surface);
+    expect(ground.a, greaterThan(0.95));
+    // The newest word in the page's ink, which reads on it.
+    final word = tester.widget<DefaultTextStyle>(
+      find.ancestor(of: find.text('lower'), matching: find.byType(DefaultTextStyle)).first,
+    );
+    expect(word.style.color, corvo.colors.onSurface);
+    expect(contrastRatio(corvo.colors.onSurface, corvo.colors.surface), greaterThanOrEqualTo(4.5));
   });
 
   testWidgets('a spoken question is written once, in the place it was heard in',
@@ -118,16 +122,18 @@ void main() {
     const words = 'Find white sneakers under 130 in size 42';
     say(words);
     await tester.pump();
-    final heardAt = tester.getRect(find.text(words));
+    // The ring writes it word by word as it is heard.
+    expect(find.text('sneakers'), findsOneWidget);
 
     done.complete(words);
     await tester.pump();
-    // Voice mode is still fading, and only the question shows the words.
+    // The ring is still landing, and only the question shows the words: the
+    // heard ones go in the frame it is written.
     for (final ms in [0, 60, 120]) {
       await tester.pump(Duration(milliseconds: ms));
       expect(find.text(words), findsOneWidget);
+      expect(find.text('sneakers'), findsNothing);
     }
-    expect(tester.getRect(find.text(words)), heardAt);
     // Past the copilot's own time limit, which ends the turn it is holding.
     await tester.pump(const Duration(minutes: 2));
     await tester.pump(const Duration(seconds: 1));

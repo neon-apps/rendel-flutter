@@ -295,6 +295,11 @@ class RendelVoice {
   /// When the answer being read was first heard; null until a sound is made.
   DateTime? _heardAt;
 
+  /// True while a voice is actually heard: from the first sound of an answer
+  /// to its end or a stop, not while its voice is still on its way. The
+  /// "Reading aloud" pill over the composer shows for as long as it is.
+  final sounding = ValueNotifier<bool>(false);
+
   /// How long the answer being read has been heard: zero while its voice is
   /// still on its way, and when nothing is read. The Listen pill shows it.
   Duration get elapsed {
@@ -436,6 +441,7 @@ class RendelVoice {
           deadline?.cancel();
           await _hold(rate);
           _heardAt = DateTime.now();
+          sounding.value = true;
         }
         pieces.add(bytes);
         await _out.feed(bytes);
@@ -480,6 +486,7 @@ class RendelVoice {
   Future<void> _play(int rate, List<Uint8List> pieces, int turn) async {
     await _hold(rate);
     _heardAt = DateTime.now();
+    sounding.value = true;
     for (final piece in pieces) {
       if (turn != _turn) return;
       await _out.feed(piece);
@@ -530,6 +537,7 @@ class RendelVoice {
         return;
       }
       _heardAt = DateTime.now();
+      sounding.value = true;
       await done.timeout(const Duration(seconds: 60));
     } catch (err) {
       RendelLog.warn('read_aloud_failed', 'the natural voice did not play: $err');
@@ -565,6 +573,7 @@ class RendelVoice {
       if (voice != null) await tts.setVoice(voice);
       if (turn != _turn) return;
       _heardAt = DateTime.now();
+      sounding.value = true;
       // Returns once it has been said (`awaitSpeakCompletion`), or stopped.
       await tts.speak(text);
     } catch (err) {
@@ -577,12 +586,14 @@ class RendelVoice {
     if (turn != _turn) return;
     playing.value = null;
     _heardAt = null;
+    sounding.value = false;
   }
 
   Future<void> stop() async {
     _turn++;
     playing.value = null;
     _heardAt = null;
+    sounding.value = false;
     _fetching?.close();
     _fetching = null;
     for (final file in _spoken) {

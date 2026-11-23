@@ -60,6 +60,7 @@ class RendelStrings {
     this.listen = 'Listen',
     this.readAloudThis = 'Listen to this answer',
     this.stopReading = 'Stop reading',
+    this.readingAloud = 'Reading aloud',
     this.retry = 'Try again',
     this.streamDropped = 'The connection dropped before the answer finished.',
     this.turnUnsent = 'Your message did not send. Check the connection, then try again.',
@@ -402,6 +403,10 @@ class RendelStrings {
 
   /// Unused since 0.59.9, as [listen] is.
   final String stopReading;
+
+  /// Over the composer while an answer is read aloud, beside the small ring
+  /// that moves with the voice and the stop.
+  final String readingAloud;
 
   final String retry;
   final String streamDropped;
@@ -1012,6 +1017,7 @@ class RendelStrings {
     String? listen,
     String? readAloudThis,
     String? stopReading,
+    String? readingAloud,
     String? retry,
     String? streamDropped,
     String? turnUnsent,
@@ -1280,6 +1286,7 @@ class RendelStrings {
       listen: listen ?? this.listen,
       readAloudThis: readAloudThis ?? this.readAloudThis,
       stopReading: stopReading ?? this.stopReading,
+      readingAloud: readingAloud ?? this.readingAloud,
       retry: retry ?? this.retry,
       streamDropped: streamDropped ?? this.streamDropped,
       turnUnsent: turnUnsent ?? this.turnUnsent,
@@ -1561,6 +1568,7 @@ const Map<String, RendelStrings> _byLocale = {
     listen: 'Dinle',
     readAloudThis: 'Bu yanıtı dinle',
     stopReading: 'Okumayı durdur',
+    readingAloud: 'Sesli okunuyor',
     retry: 'Tekrar dene',
     streamDropped: 'Bağlantı, yanıt tamamlanmadan koptu.',
     turnUnsent: 'Mesajınız gitmedi. Bağlantınızı kontrol edip tekrar deneyin.',
@@ -1833,6 +1841,7 @@ const Map<String, RendelStrings> _byLocale = {
     listen: 'Anhören',
     readAloudThis: 'Diese Antwort anhören',
     stopReading: 'Vorlesen beenden',
+    readingAloud: 'Wird vorgelesen',
     retry: 'Erneut versuchen',
     streamDropped: 'Die Verbindung wurde vor dem Ende der Antwort unterbrochen.',
     turnUnsent: 'Ihre Nachricht wurde nicht gesendet. Prüfen Sie die Verbindung und versuchen Sie es erneut.',
@@ -2107,6 +2116,7 @@ const Map<String, RendelStrings> _byLocale = {
     listen: 'Écouter',
     readAloudThis: 'Écouter cette réponse',
     stopReading: 'Arrêter la lecture',
+    readingAloud: 'Lecture à voix haute',
     retry: 'Réessayer',
     streamDropped: 'La connexion a été perdue avant la fin de la réponse.',
     turnUnsent: 'Votre message n’a pas été envoyé. Vérifiez la connexion, puis réessayez.',
@@ -2380,6 +2390,7 @@ const Map<String, RendelStrings> _byLocale = {
     listen: 'Escuchar',
     readAloudThis: 'Escuchar esta respuesta',
     stopReading: 'Dejar de leer',
+    readingAloud: 'Leyendo en voz alta',
     retry: 'Inténtalo de nuevo',
     streamDropped: 'La conexión se cortó antes de terminar la respuesta.',
     turnUnsent: 'Tu mensaje no se envió. Revisa la conexión y vuelve a intentarlo.',
@@ -2652,6 +2663,7 @@ const Map<String, RendelStrings> _byLocale = {
     listen: 'استمع',
     readAloudThis: 'استمع إلى هذه الإجابة',
     stopReading: 'أوقف القراءة',
+    readingAloud: 'قراءة بصوت عالٍ',
     retry: 'حاول مرة أخرى',
     streamDropped: 'انقطع الاتصال قبل أن تكتمل الإجابة.',
     turnUnsent: 'لم تُرسَل رسالتك. تحقّق من الاتصال ثم حاول مرة أخرى.',

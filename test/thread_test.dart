@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:rendel/rendel.dart';
 import 'package:rendel/src/engine/conversation_controller.dart';
 import 'package:rendel/src/transport/api_client.dart';
+import 'package:rendel/src/ui/ring_voice_mode.dart' show RingVoiceMode;
 import 'package:rendel/src/ui/thread_screen.dart';
 
 /// The copilot's shell, which the catalog's own gallery never exercises.
@@ -497,16 +498,17 @@ void main() {
       // Held, as a finger holds it while it speaks.
       await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump();
-      expect(find.text('Listening…'), findsOneWidget);
+      expect(find.text('Listening'), findsOneWidget);
 
+      // The ring writes each word as it is heard, the newest in full ink.
       say('merhaba');
       await tester.pump();
       expect(find.text('merhaba'), findsOneWidget);
 
       say('merhaba nasılsın');
       await tester.pump();
-      expect(find.text('merhaba nasılsın'), findsOneWidget);
-      expect(find.text('merhaba'), findsNothing);
+      expect(find.text('merhaba'), findsOneWidget);
+      expect(find.text('nasılsın'), findsOneWidget);
     });
 
     Future<Completer<String?>> speak(
@@ -784,7 +786,11 @@ void main() {
       await tester.tap(find.bySemanticsLabel('Yazmak yerine konuşun'));
       await tester.pump();
       expect(stops, ['stopped']);
+      // The microphone shows how it is held, the line over it saying so.
+      await tester.pump(const Duration(milliseconds: 300));
       expect(find.text('Konuşurken mikrofona basılı tutun'), findsOneWidget);
+      await tester.pump(const Duration(seconds: 4));
+      expect(find.text('Konuşurken mikrofona basılı tutun'), findsNothing);
 
       // What the recogniser made of it afterwards is not sent.
       done.complete('merh');
@@ -832,6 +838,46 @@ void main() {
       expect(c.messages, isEmpty);
     });
 
+    // Tuna 2026-11-23: after a quick tap the microphone would not take a
+    // second press while the recogniser was still reporting its end.
+    testWidgets('a quick tap frees the microphone at once, for the next press', (tester) async {
+      final c = controller();
+      addTearDown(c.dispose);
+      var calls = 0;
+      final never = Completer<String?>();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: RendelThemeScope(
+            theme: RendelTheme.paper(),
+            child: Scaffold(
+              body: ThreadScreen(
+                controller: c,
+                onDictate: (_) {
+                  calls++;
+                  return never.future;
+                },
+                onStopDictating: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      final mic = find.bySemanticsLabel('Speak instead of typing');
+      var finger = await tester.startGesture(tester.getCenter(mic));
+      await tester.pump(const Duration(milliseconds: 100));
+      await finger.up();
+      await tester.pump();
+      expect(calls, 1);
+
+      // The recogniser has not said it ended; the next press listens anyway.
+      finger = await tester.startGesture(tester.getCenter(mic));
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(calls, 2);
+      await finger.up();
+      await tester.pump(const Duration(seconds: 4));
+    });
+
     testWidgets('waits for the recogniser before it says it is listening',
         (tester) async {
       final c = controller();
@@ -871,7 +917,8 @@ void main() {
 
     // "Listening…" arriving over the pill rebuilt it, and its swell played a
     // second time under the finger: the ring flashed twice (Özlem 2026-10-26).
-    testWidgets('the held pill swells once, not again when listening starts',
+    // The ring that listens now: it is the same one, not built again.
+    testWidgets('the ring comes in once, not again when listening starts',
         (tester) async {
       final c = controller();
       addTearDown(c.dispose);
@@ -895,12 +942,7 @@ void main() {
       await tester.pump();
       await tester.startGesture(tester.getCenter(find.bySemanticsLabel('Speak instead of typing')));
       await tester.pump(const Duration(milliseconds: 300));
-      State swell() => tester.state(find
-          .ancestor(
-            of: find.bySemanticsLabel('Stop listening'),
-            matching: find.byType(TweenAnimationBuilder<double>),
-          )
-          .first);
+      State swell() => tester.state(find.byType(RingVoiceMode));
       final before = swell();
 
       started.value = true;

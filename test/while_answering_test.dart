@@ -104,13 +104,24 @@ void main() {
     }
   }
 
+  /// A tap on the turn's pill opens the box again, once taps are taken
+  /// again after a send (`sendHoldDuration`).
+  Future<void> reopen(WidgetTester tester) async {
+    await tester.pump(sendHoldDuration);
+    await tester.tap(find.bySemanticsLabel('Thinking…'));
+    await tester.pump(const Duration(milliseconds: 400));
+  }
+
   String hint(WidgetTester tester) => tester.widget<TextField>(find.byType(TextField)).decoration!.hintText!;
 
-  testWidgets('the box a question was typed in stays, and says what the turn is doing', (tester) async {
+  // Tuna 2026-11-23: a typed question loads as a spoken one does.
+  testWidgets('the box a question was typed in folds into the turn\'s pill, and opens again with a tap', (tester) async {
     final (_, server) = await pump(tester);
     await send(tester, 'How do I add a refund policy?');
     expect(server.asked, ['How do I add a refund policy?']);
-    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byType(TextField), findsNothing);
+    expect(find.bySemanticsLabel('Thinking…'), findsOneWidget);
+    await reopen(tester);
     expect(hint(tester), 'Thinking…');
     server.turns.single.complete();
     await settle(tester);
@@ -119,7 +130,10 @@ void main() {
   testWidgets('a second question typed meanwhile is kept, and goes once the answer is done', (tester) async {
     final (_, server) = await pump(tester);
     await send(tester, 'How do I add a refund policy?');
-    await send(tester, 'And a shipping policy?');
+    await reopen(tester);
+    await tester.enterText(find.byType(TextField), 'And a shipping policy?');
+    await tester.testTextInput.receiveAction(TextInputAction.send);
+    await tester.pump(const Duration(milliseconds: 100));
     // Not sent, and not lost.
     expect(server.asked, ['How do I add a refund policy?']);
     expect(find.text('And a shipping policy?'), findsOneWidget);
@@ -140,6 +154,7 @@ void main() {
   testWidgets('a question typed meanwhile and not sent stays in the box, and reads as kept at rest', (tester) async {
     final (_, server) = await pump(tester);
     await send(tester, 'How do I add a refund policy?');
+    await reopen(tester);
     await tester.enterText(find.byType(TextField), 'And a shipping policy?');
     server.turns.single.complete();
     await settle(tester);

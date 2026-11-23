@@ -40,6 +40,7 @@ final Map<String, Object Function(RendelStrings)> _fields = {
   'listen': (s) => s.listen,
   'readAloudThis': (s) => s.readAloudThis,
   'stopReading': (s) => s.stopReading,
+  'readingAloud': (s) => s.readingAloud,
   'retry': (s) => s.retry,
   'streamDropped': (s) => s.streamDropped,
   'turnUnsent': (s) => s.turnUnsent,

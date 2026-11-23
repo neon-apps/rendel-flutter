@@ -7,6 +7,20 @@ asks of you.
 
 ## Unreleased
 
+## 0.110.0
+
+### Changed
+
+- Voice mode is a ring that listens, in place of the sphere: 96 ticks that move with the voice over the app's ground, "Listening" once the microphone is open, and the words as they are heard. The message box stays under it, dimmed, its microphone wearing the ring's colours. Let go, the ring flies into the turn's pill, whose small ring replaces the spinner.
+- A typed question shows the same pill: the box folds away once it is sent. A tap on the pill opens it again to type the next question meanwhile; with no microphone the box stays.
+- A quick tap on the microphone shows how it is held, and frees it at once for the next press.
+- While an answer is heard, a pill over the message box says **Reading aloud**, with a stop.
+
+### Added
+
+- `theme.voiceRing` from the console's Appearance › Voice ring: a preset or two to four of your colours. Without it the ring turns in your ground light's two colours, else your accent's family.
+- `RendelStrings.readingAloud`, in every language the SDK ships; `RendelVoice.sounding`, true while a voice is heard.
+
 ## 0.109.0
 
 ### Changed
