@@ -1151,9 +1151,6 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                           // Under a notice the composer rests: its place says
                           // when the assistant is back, and there is nothing to
                           // press until then.
-                          // Lab · look A: the suggestions as cards over the message card.
-                          if (RendelLab.of('look') == 'a' && controller.messages.isEmpty && !controller.restoring && widget.suggestions.isNotEmpty && !controller.busy && !_noPictures(widget.suggestions))
-                            _LabCards(suggestions: widget.suggestions, onPick: _send),
                           if (controller.resting)
                             _Resting(hint: controller.notice!.hint)
                           else
@@ -1933,7 +1930,7 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
                       onOpen: (url) => controller.tapAction(OpenUrlAction(url)),
                       recent: _recent(),
                       // With no picture, the suggestions are a list under the greeting.
-                      suggestions: !controller.busy && _noPictures(widget.suggestions) ? widget.suggestions : const [],
+                      suggestions: !controller.busy ? widget.suggestions : const [],
                       onPick: _send,
                     )
                   : _EmptyState(

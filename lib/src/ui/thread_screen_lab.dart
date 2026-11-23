@@ -2,7 +2,7 @@ part of 'thread_screen.dart';
 
 /// The panel's look (`design/plans/sdk-look-a.md`, Tuna 2026-11-15): round
 /// glass buttons floating at the top, the opening centred, the suggestions
-/// as cards with a picture, and a message card at the foot: what you will
+/// as a list under it, and a message card at the foot: what you will
 /// ask on top, attach, the microphone and send under it. The SDK's own controls do the work: the same
 /// steps, read aloud, start over, close, field, attach menu and held mic.
 
@@ -247,7 +247,7 @@ class _LabOpening extends StatelessWidget {
   const _LabOpening({required this.headline, required this.subtitle, required this.onOpen, this.recent, this.suggestions = const [], this.onPick});
   final String? headline;
 
-  /// Suggestions with no picture, drawn as a list under the words (`_LabList`); empty draws none.
+  /// The suggestions, drawn as a list under the words (`_LabList`); empty draws none.
   final List<String> suggestions;
   final void Function(String)? onPick;
 
@@ -316,14 +316,11 @@ class _LabOpening extends StatelessWidget {
   }
 }
 
-/// True when no suggestion has a picture from the app: then they are a list
-/// under the greeting (`_LabList`), not the row over the message card.
-bool _noPictures(List<String> suggestions) => suggestions.every((s) => RendelLook.cardFor(s)?.image == null);
-
-/// Suggestions with no picture (Tuna, 2026-11-17, B5 of the suggestions lab):
-/// one glass card under the greeting, 22 round, a row 70 tall for each, the
-/// title (17) over its line, a hairline between rows and a 32 round arrow at
-/// the end. The web panel draws the same (`.rd-cards[data-list]`).
+/// The suggestions (Tuna, 2026-11-17, B5 of the suggestions lab; every
+/// suggestion from 0.114.0, 2026-11-23, when the row of picture cards over
+/// the message card went): one glass card under the greeting, 22 round, a row
+/// 70 tall for each, the title (17) over its line, a hairline between rows
+/// and a 32 round arrow at the end. The web panel draws the same (`.rd-cards`).
 class _LabList extends StatelessWidget {
   const _LabList({required this.suggestions, required this.onPick});
   final List<String> suggestions;
@@ -377,74 +374,6 @@ class _LabList extends StatelessWidget {
             ),
           ]),
         ),
-      ),
-    );
-  }
-}
-
-/// The suggestions as a row of cards over the message card, each with a picture.
-class _LabCards extends StatelessWidget {
-  const _LabCards({required this.suggestions, required this.onPick});
-  final List<String> suggestions;
-  final void Function(String) onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = RendelThemeScope.of(context);
-    // 55 points tall, 15 from the screen's edge, 9 apart and 11 above the
-    // message card, as in the reference. Faded, in place, while + is open.
-    return ValueListenableBuilder<bool>(
-      valueListenable: LabPopover.anyOpen,
-      builder: (context, menu, cards) => IgnorePointer(
-        ignoring: menu,
-        child: LabFade(visible: !menu, child: cards!),
-      ),
-      child: Transform.translate(
-      offset: const Offset(0, 5.5),
-      child: SizedBox(
-      height: 55,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        // Out to the screen's edges, so the row runs off it.
-        padding: const EdgeInsets.symmetric(horizontal: 15),
-        clipBehavior: Clip.none,
-        itemCount: suggestions.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 9),
-        itemBuilder: (context, i) {
-          final s = suggestions[i];
-          final card = RendelLook.cardFor(s);
-          return RendelPressable(
-            semanticLabel: s,
-            onTap: () => onPick(s),
-            // As wide as its words, so the line under the title is read whole.
-            child: LabGlass(
-              radius: 18,
-              constraints: const BoxConstraints(minWidth: 190, maxWidth: 300),
-              padding: const EdgeInsets.fromLTRB(14, 7, 16, 7),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                // No picture from the app, no place for one: the words alone.
-                if (card?.image case final image?) ...[
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: image.startsWith('https://')
-                        ? Image.network(image, width: 32, height: 32, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const SizedBox(width: 32, height: 32))
-                        : Image.asset(image, width: 32, height: 32, fit: BoxFit.cover),
-                  ),
-                  const SizedBox(width: 14),
-                ],
-                Flexible(
-                  child: Column(mainAxisSize: MainAxisSize.min, mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(card?.title ?? s, maxLines: card == null ? 2 : 1, overflow: TextOverflow.ellipsis, style: theme.text.label.copyWith(fontSize: 16, fontWeight: FontWeight.w600, height: 1.2)),
-                    if (card?.line case final line?)
-                      Text(line, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.text.body.copyWith(fontSize: 15, color: theme.colors.onSurfaceSoft, height: 1.2)),
-                  ]),
-                ),
-              ]),
-            ),
-          );
-        },
-      ),
-      ),
       ),
     );
   }

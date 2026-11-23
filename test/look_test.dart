@@ -94,8 +94,13 @@ void main() {
     expect(find.text('Return an item'), findsOneWidget);
   });
 
-  testWidgets('suggestions with no picture are a list under the greeting, an arrow on each row (Tuna, 2026-11-17, B5)', (tester) async {
+  testWidgets('suggestions are a list under the greeting, an arrow on each row, with or without a picture from the app (Tuna, 2026-11-17, B5; 2026-11-23)', (tester) async {
+    // A picture from the app is no longer drawn, and no longer moves them over the message card.
+    RendelLook.suggestionCards = const {
+      'Where is my order?': RendelSuggestionCard(title: 'Where is my order?', image: 'https://example.com/order.webp'),
+    };
     await pump(tester, RendelTheme.paper());
+    expect(find.byType(Image), findsNothing);
     final words = find.text('Return an item');
     expect(words, findsOneWidget);
     expect(find.byIcon(Icons.auto_awesome_rounded), findsNothing);

@@ -7,6 +7,12 @@ asks of you.
 
 ## Unreleased
 
+## 0.114.0
+
+### Changed
+
+- Every opening suggestion is a row of the list under the greeting: its title over its line and a round arrow at the end, so people read all of them at once. The row of picture cards over the message box is gone, and `RendelSuggestionCard.image` is accepted and no longer drawn.
+
 ## 0.113.0
 
 ### Changed

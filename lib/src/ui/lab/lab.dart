@@ -278,7 +278,8 @@ class RendelSuggestionCard {
   /// The line under the title, at most 60.
   final String? line;
 
-  /// An asset path, or an https URL.
+  /// An asset path, or an https URL. Not drawn from 0.114.0: every
+  /// suggestion is a row of the list under the greeting, its words alone.
   final String? image;
 }
 
@@ -398,10 +399,6 @@ class LabPopover extends StatefulWidget {
   final Object groupId;
   final Widget child;
 
-  /// Whether a menu is open: what sits under it (the suggestion cards) steps
-  /// back meanwhile, keeping its place.
-  static final ValueNotifier<bool> anyOpen = ValueNotifier(false);
-
   @override
   State<LabPopover> createState() => _LabPopoverState();
 }
@@ -417,17 +414,6 @@ class _LabPopoverState extends State<LabPopover> {
   void didUpdateWidget(LabPopover oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.open) _drawn = true;
-    // After the frame: a notifier set while building would rebuild its listeners mid-build.
-    if (oldWidget.open != widget.open) {
-      final open = widget.open;
-      WidgetsBinding.instance.addPostFrameCallback((_) => LabPopover.anyOpen.value = open);
-    }
-  }
-
-  @override
-  void dispose() {
-    if (widget.open) WidgetsBinding.instance.addPostFrameCallback((_) => LabPopover.anyOpen.value = false);
-    super.dispose();
   }
 
   @override
