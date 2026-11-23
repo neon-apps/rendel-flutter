@@ -7,11 +7,17 @@ asks of you.
 
 ## Unreleased
 
+## 0.113.0
+
+### Changed
+
+- A confirmation card's details read like a `key_value` block's on a page: each label and value on one line, a hairline between rows, no white panel around them. Controls for values the person may change sit in the same rows.
+
 ## 0.112.0
 
 ### Changed
 
-- Everything the copilot draws follows the conversation's language when the host's Material words are in another one: a calendar's heading names the month in full ("Aralık 2026"), and the times and dates on cards and in "What I remember for you" use the SDK's own words.
+- Everything the assistant draws follows the conversation's language when the host's Material words are in another one: a calendar's heading names the month in full ("Aralık 2026"), and the times and dates on cards and in "What I remember for you" use the SDK's own words.
 - Its text fields' copy and paste menu is in the conversation's language in that case ("Kopyala", "Yapıştır"); with matching Material words the platform's menu is unchanged.
 
 ### Added

@@ -2170,7 +2170,9 @@ Widget _confirmCard(
           ),
         if (display.isNotEmpty || controls.isNotEmpty) ...[
           SizedBox(height: theme.space.md),
-          _KvPanel(children: [
+          // Read as a key_value block's rows on a page, open across
+          // hairlines, not on a white panel (Özlem, 2026-11-23).
+          _RuledRows(children: [
             for (final row in display) ...[
               if (controls[_str(row['param'])] case final control?)
                 _EditRow(control: control, edits: edits!)
@@ -2187,7 +2189,7 @@ Widget _confirmCard(
                   part: 'details',
                 )
               else
-                _KeyValueRow(
+                _Fact(
                   label: _str(row['label']) ?? '',
                   value: _str(row['value']) ?? '',
                   part: 'details',
@@ -8042,16 +8044,12 @@ class _KeyValueRow extends StatelessWidget {
     required this.label,
     required this.value,
     this.strong = false,
-    this.part,
     this.tone,
     this.range,
     this.masked = false,
     this.copy = false,
     this.dispatch,
   });
-
-  /// The card part these rows are, if they are one; see [RendelTheme.part].
-  final String? part;
 
   final String label;
   final String value;
@@ -8069,11 +8067,7 @@ class _KeyValueRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
-    final style = _asPart(
-      theme,
-      part,
-      strong ? theme.text.displayTabular : theme.text.captionSoftTabular,
-    );
+    final style = strong ? theme.text.displayTabular : theme.text.captionSoftTabular;
     final row = MergeSemantics(
         child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -8090,7 +8084,7 @@ class _KeyValueRow extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              style: _asPart(theme, part, strong ? theme.text.heading : theme.text.caption),
+              style: strong ? theme.text.heading : theme.text.caption,
 
             ),
           ),
@@ -8754,6 +8748,36 @@ class _KvPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: children,
       ),
+    );
+  }
+}
+
+/// A confirmation's rows as a `key_value` block's on a page: open, one
+/// hairline above each, no panel. Özlem, 2026-11-23: inSepo's quote card
+/// drew its rows on a grey panel inside the card, and the Halden phone's
+/// "Court Low" rows were the look she asked for. A [_Fact] rules itself; a
+/// control, a stacked value or the photos get the same rule here, and the
+/// "remembered" note stays under the row it belongs to.
+class _RuledRows extends StatelessWidget {
+  const _RuledRows({required this.children});
+
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = RendelThemeScope.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final child in children)
+          if (child is _Fact || child is _Remembered)
+            child
+          else
+            DecoratedBox(
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: theme.hairline))),
+              child: Padding(padding: const EdgeInsets.symmetric(vertical: 12), child: child),
+            ),
+      ],
     );
   }
 }
@@ -11827,6 +11851,7 @@ class _Fact extends StatelessWidget {
   const _Fact({
     required this.label,
     required this.value,
+    this.part,
     this.strong = false,
     this.tone,
     this.range,
@@ -11839,6 +11864,9 @@ class _Fact extends StatelessWidget {
   final String value;
   final bool strong;
 
+  /// The card part these rows are, if they are one; see [RendelTheme.part].
+  final String? part;
+
   /// As on [_KeyValueRow].
   final String? tone;
   final String? range;
@@ -11849,9 +11877,13 @@ class _Fact extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = RendelThemeScope.of(context);
-    final style = theme.text.labelTabular.copyWith(
-      fontSize: 14.5,
-      fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
+    final style = _asPart(
+      theme,
+      part,
+      theme.text.labelTabular.copyWith(
+        fontSize: 14.5,
+        fontWeight: strong ? FontWeight.w700 : FontWeight.w500,
+      ),
     );
     final fact = MergeSemantics(
       child: Row(
@@ -11861,7 +11893,7 @@ class _Fact extends StatelessWidget {
           Flexible(
             child: Text(
               label,
-              style: theme.text.body.copyWith(fontSize: 14.5, height: 1.35),
+              style: _asPart(theme, part, theme.text.body.copyWith(fontSize: 14.5, height: 1.35)),
             ),
           ),
           SizedBox(width: theme.space.md),

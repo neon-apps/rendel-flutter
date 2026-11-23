@@ -87,6 +87,26 @@ void main() {
     }
   });
 
+  // Özlem, 2026-11-23: the details read as a key_value block's on a page
+  // (the Halden phone's "Court Low" rows), never on a grey panel.
+  testWidgets('its details are open rows across hairlines, with no panel', (tester) async {
+    await pump(
+      tester,
+      card()
+        ..['params_display'] = [
+          {'label': 'Otel', 'value': 'Citymax Hotel Business Bay', 'param': 'hotel'},
+          {'label': 'Oda', 'value': 'Deluxe King Oda', 'param': 'rate_key'},
+          {'label': 'Toplam', 'value': '28.063,61 ₺', 'param': 'total'},
+        ],
+    );
+    expect(tester.takeException(), isNull);
+    bool named(Widget w, String type) => w.runtimeType.toString() == type;
+    expect(find.byWidgetPredicate((w) => named(w, '_KvPanel')), findsNothing);
+    expect(find.byWidgetPredicate((w) => named(w, '_RuledRows')), findsOneWidget);
+    expect(find.byWidgetPredicate((w) => named(w, '_Fact')), findsNWidgets(3));
+    expect(find.text('Deluxe King Oda'), findsOneWidget);
+  });
+
   // Grove report P0-2: a paying card said "Confirm" over raw ids, and every
   // destructive one claimed it could not be undone.
   group('the card in the user\'s terms', () {
