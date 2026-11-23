@@ -7,6 +7,17 @@ asks of you.
 
 ## Unreleased
 
+## 0.111.0
+
+### Changed
+
+- Send on a form with a field still empty or wrong gives the keyboard to the first such field, so it comes into view, and the line over the button that counts them is in the conversation's language (it was English in every language).
+- A form's dates are in the language the assistant is speaking. The host's Material words are used only when they are in that language: an app that loaded no Material translations showed "Dec 15" in a Turkish form.
+
+### Added
+
+- `RendelStrings.formToFix` and `formToFixMany`, in every language the SDK ships.
+
 ## 0.110.0
 
 ### Changed

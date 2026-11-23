@@ -88,6 +88,8 @@ class RendelStrings {
     this.fieldRequired = 'Fill this in to continue.',
     this.fieldNumber = 'Enter a number.',
     this.fieldSwitchRequired = 'Turn this on to continue.',
+    this.formToFix = '1 field above needs fixing.',
+    this.formToFixMany = '{count} fields above need fixing.',
     this.formBusy = 'Still working on the last answer. Try again in a moment.',
     this.formFailed =
         'That did not send. Your answers are still here, so press {submit} to try again.',
@@ -477,6 +479,13 @@ class RendelStrings {
 
   /// A form that could not be sent: the thread was busy, or the send failed.
   /// `{submit}` in [formFailed] is the submit control's label.
+  /// Over the Send button when one field of a form is wrong. The fields
+  /// that are can be above the fold the button is in.
+  final String formToFix;
+
+  /// [formToFix] for more than one: `{count}` is how many.
+  final String formToFixMany;
+
   final String formBusy;
   final String formFailed;
 
@@ -933,6 +942,8 @@ class RendelStrings {
   String inMinutesCount(int n) => inMinutes.replaceAll('{n}', '$n');
   String inHoursCount(int n) => inHours.replaceAll('{n}', '$n');
   String tomorrowAtTime(String time) => tomorrowAt.replaceAll('{time}', time);
+  String formToFixOf(int count) =>
+      count == 1 ? formToFix : formToFixMany.replaceAll('{count}', '$count');
   String fieldAtLeastOf(String min) => fieldAtLeast.replaceAll('{min}', min);
   String fieldAtMostOf(String max) => fieldAtMost.replaceAll('{max}', max);
   String fieldOnOrAfterOf(String date) => fieldOnOrAfter.replaceAll('{date}', date);
@@ -1045,6 +1056,8 @@ class RendelStrings {
     String? fieldRequired,
     String? fieldNumber,
     String? fieldSwitchRequired,
+    String? formToFix,
+    String? formToFixMany,
     String? formBusy,
     String? formFailed,
     String? expired,
@@ -1314,6 +1327,8 @@ class RendelStrings {
       fieldRequired: fieldRequired ?? this.fieldRequired,
       fieldNumber: fieldNumber ?? this.fieldNumber,
       fieldSwitchRequired: fieldSwitchRequired ?? this.fieldSwitchRequired,
+      formToFix: formToFix ?? this.formToFix,
+      formToFixMany: formToFixMany ?? this.formToFixMany,
       formBusy: formBusy ?? this.formBusy,
       formFailed: formFailed ?? this.formFailed,
       expired: expired ?? this.expired,
@@ -1602,6 +1617,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldRequired: 'Devam etmek için bunu doldurun.',
     fieldNumber: 'Bir sayı girin.',
     fieldSwitchRequired: 'Devam etmek için bunu açın.',
+    formToFix: 'Yukarıda düzeltilmesi gereken 1 alan var.',
+    formToFixMany: 'Yukarıda düzeltilmesi gereken {count} alan var.',
     formBusy: 'Önceki yanıt hâlâ hazırlanıyor. Birazdan tekrar deneyin.',
     formFailed:
         'Gönderilemedi. Yanıtlarınız duruyor; tekrar denemek için {submit} düğmesine basın.',
@@ -1876,6 +1893,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldRequired: 'Füllen Sie dies aus, um fortzufahren.',
     fieldNumber: 'Geben Sie eine Zahl ein.',
     fieldSwitchRequired: 'Schalten Sie dies ein, um fortzufahren.',
+    formToFix: '1 Feld oben muss korrigiert werden.',
+    formToFixMany: '{count} Felder oben müssen korrigiert werden.',
     formBusy:
         'Die letzte Antwort wird noch bearbeitet. Versuchen Sie es gleich erneut.',
     formFailed:
@@ -2151,6 +2170,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldRequired: 'Remplissez ce champ pour continuer.',
     fieldNumber: 'Saisissez un nombre.',
     fieldSwitchRequired: 'Activez ceci pour continuer.',
+    formToFix: '1 champ ci-dessus doit être corrigé.',
+    formToFixMany: '{count} champs ci-dessus doivent être corrigés.',
     formBusy: 'La dernière réponse est encore en cours. Réessayez dans un instant.',
     formFailed:
         'L’envoi a échoué. Vos réponses sont conservées ; appuyez sur {submit} pour réessayer.',
@@ -2424,6 +2445,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldRequired: 'Rellena esto para continuar.',
     fieldNumber: 'Escribe un número.',
     fieldSwitchRequired: 'Activa esto para continuar.',
+    formToFix: 'Hay 1 campo arriba que corregir.',
+    formToFixMany: 'Hay {count} campos arriba que corregir.',
     formBusy: 'La última respuesta aún está en curso. Inténtalo de nuevo en un momento.',
     formFailed:
         'No se envió. Tus respuestas siguen aquí; pulsa {submit} para intentarlo de nuevo.',
@@ -2697,6 +2720,8 @@ const Map<String, RendelStrings> _byLocale = {
     fieldRequired: 'املأ هذا الحقل للمتابعة.',
     fieldNumber: 'أدخل رقمًا.',
     fieldSwitchRequired: 'فعّل هذا للمتابعة.',
+    formToFix: 'يجب تصحيح حقل واحد أعلاه.',
+    formToFixMany: 'يجب تصحيح {count} من الحقول أعلاه.',
     formBusy: 'ما زالت الإجابة الأخيرة قيد الإعداد. حاول مرة أخرى بعد قليل.',
     formFailed: 'لم يتم الإرسال. إجاباتك ما زالت هنا؛ اضغط {submit} للمحاولة مرة أخرى.',
     expired: 'انتهت الصلاحية',

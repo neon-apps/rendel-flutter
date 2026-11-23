@@ -5361,10 +5361,14 @@ class _FormBlockState extends State<_FormBlock> {
         // The per-field messages are correct, but in a six-field form they sit
         // above the fold the Send button is in, so pressing Send appeared to
         // do nothing at all. This slot is directly above the button.
-        _formError = errors.length == 1
-            ? '1 field above needs fixing.'
-            : '${errors.length} fields above need fixing.';
+        _formError = strings.formToFixOf(errors.length);
       });
+      // The count alone still read as "nothing happened" when the wrong field
+      // was a typed one: it takes the keyboard, which scrolls it into view.
+      final first = _fields
+          .map((field) => _str(field['name'])!)
+          .firstWhere(errors.containsKey);
+      _focus[first]?.requestFocus();
       return;
     }
 
@@ -6929,8 +6933,17 @@ class _MonthSheetState extends State<_MonthSheet> {
 
 /// The host's Material words, when it has any: the SDK carries no date
 /// library, so a month's name and a day said in full come from them.
-MaterialLocalizations? _material(BuildContext context) =>
-    Localizations.of<MaterialLocalizations>(context, MaterialLocalizations);
+///
+/// Only when they are in the language the copilot is speaking. An app that
+/// never loaded Turkish Material words still has English ones, and a Turkish
+/// form then showed "Dec 15"; the SDK's own month names say "15 Ara".
+MaterialLocalizations? _material(BuildContext context) {
+  final host = Localizations.maybeLocaleOf(context);
+  if (host == null) return null;
+  final speaking = RendelStringsScope.of(context).shortMonths;
+  if (!listEquals(RendelStrings.forLocale(host.toLanguageTag()).shortMonths, speaking)) return null;
+  return Localizations.of<MaterialLocalizations>(context, MaterialLocalizations);
+}
 
 /// A day as a date field shows it, in the host's language: "Nov 14, 2026".
 String _dayWords(BuildContext context, DateTime day) =>
