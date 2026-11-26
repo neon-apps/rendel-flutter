@@ -57,7 +57,9 @@ void main() async {
       ),
     ),
     config: RendelConfig(
-      apiBaseUrl: String.fromEnvironment(
+      // const, as the key's: a fromEnvironment that is not const reads no
+      // define in a build for a phone, and the app went to localhost.
+      apiBaseUrl: const String.fromEnvironment(
         'RENDEL_API',
         defaultValue: String.fromEnvironment(
           'NC_API',

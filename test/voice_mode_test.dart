@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -50,13 +51,16 @@ void main() {
     });
   });
 
-  ConversationController held() => ConversationController(
+  ConversationController held({List<Map<String, dynamic>>? sent}) => ConversationController(
         // A request that never answers: the question stays over the page.
         api: RendelApiClient(
           appKey: 'nc_pk_test_x',
           deviceId: 'd',
           config: const RendelConfig(),
-          httpClient: MockClient((_) => Completer<http.Response>().future),
+          httpClient: MockClient((request) {
+            if (request.body.isNotEmpty) sent?.add(jsonDecode(request.body) as Map<String, dynamic>);
+            return Completer<http.Response>().future;
+          }),
         ),
         actions: const {},
         sdkVersion: 'flutter/test',
@@ -116,7 +120,8 @@ void main() {
 
   testWidgets('a spoken question is written once, in the place it was heard in',
       (tester) async {
-    final c = held();
+    final sent = <Map<String, dynamic>>[];
+    final c = held(sent: sent);
     addTearDown(c.dispose);
     final (done, say) = await speak(tester, c, RendelTheme.paper());
     const words = 'Find white sneakers under 130 in size 42';
@@ -134,6 +139,9 @@ void main() {
       expect(find.text(words), findsOneWidget);
       expect(find.text('sneakers'), findsNothing);
     }
+    // Marked as spoken, so the server reads a misheard word as what was
+    // meant in this app (Blushy, 2026-11-26).
+    expect(sent.last['message'], {'text': words, 'spoken': true});
     // Past the copilot's own time limit, which ends the turn it is holding.
     await tester.pump(const Duration(minutes: 2));
     await tester.pump(const Duration(seconds: 1));

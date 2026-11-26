@@ -10,6 +10,7 @@ import 'package:http/testing.dart';
 import 'package:rendel/rendel.dart';
 import 'package:rendel/src/core/batteries.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart' show ListenMode;
 
 /// The controls a host gets without writing them.
 ///
@@ -84,6 +85,64 @@ void main() {
 
     expect(await heard.timeout(const Duration(seconds: 1)), isNull);
     expect(calls, isNot(contains('listen')));
+  });
+
+  test('silence reported as minus infinity leaves the level a number, and sentences are listened for', () async {
+    // Blushy, Özlem 2026-11-26: iOS reports silence as 20 * log10(0). Kept as
+    // the quietest, every level after it was NaN, and voice mode's ground
+    // went black for the rest of the press.
+    TestWidgetsFlutterBinding.ensureInitialized();
+    const channel = MethodChannel('plugin.csdcorp.com/speech_to_text');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    Future<void> callback(String method, Object arguments) {
+      final done = Completer<void>();
+      messenger.handlePlatformMessage(
+        channel.name,
+        channel.codec.encodeMethodCall(MethodCall(method, arguments)),
+        (_) => done.complete(),
+      );
+      return done.future;
+    }
+
+    Map<dynamic, dynamic>? listened;
+    var localeLookups = 0;
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      switch (call.method) {
+        case 'listen':
+          listened = call.arguments as Map<dynamic, dynamic>;
+          await callback('notifyStatus', 'listening');
+          return true;
+        case 'locales':
+          localeLookups++;
+          return <dynamic>['tr_TR:Türkçe'];
+        default:
+          return true;
+      }
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(channel, null));
+
+    final speech = RendelSpeech(locale: 'tr-TR');
+    unawaited(speech.dictate((_) {}));
+    await pumpEventQueue();
+    expect(listened, isNotNull);
+    expect(listened!['listenMode'], ListenMode.dictation.index);
+
+    for (final raw in [double.negativeInfinity, -50.0, double.negativeInfinity, -20.0, -35.0]) {
+      await callback('soundLevelChange', raw);
+      expect(speech.level.value.isFinite, isTrue, reason: 'after $raw');
+    }
+    expect(speech.level.value, closeTo(0.5, 0.001));
+
+    // The device's languages are asked for once, not on every press.
+    speech.stop();
+    await callback('notifyStatus', 'done');
+    await pumpEventQueue();
+    unawaited(speech.dictate((_) {}));
+    await pumpEventQueue();
+    expect(localeLookups, 1);
+    speech.stop();
+    await callback('notifyStatus', 'done');
+    await pumpEventQueue();
   });
 
   test('the built-in picker reports a missing platform, not a cancel',

@@ -5,7 +5,18 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
-## Unreleased
+## 0.115.0
+
+### Fixed
+
+- Voice mode no longer turns the screen black a moment after the microphone opens. iOS reports silence as minus infinity, and the loudness worked out from it was no number for the rest of the press, so the ring's ground and ticks painted black or not at all.
+- The microphone listens for whole sentences. The recogniser was tuned for short replies, so a spoken question showed its words late and misheard more of them.
+- The microphone opens sooner on each press after the first: the device's languages are looked up once, not before every press.
+- A spoken question is sent marked as spoken, so the assistant reads a misheard word as what the person most likely meant in your app instead of answering it as written. `ConversationController.send` takes `spoken`.
+- On the team's page, the card that says an email address was saved, or asks for its code, stays where the address was given. It moved under each new line, and read as the team writing again.
+- A later conversation's email box on the same phone comes filled with the address the person gave there last, so one tap on Save gives it again; it asked from scratch each time. The address is kept on the phone for the person who gave it, never on the server, and signing out forgets it.
+- On the team's page, a tap on the conversation or a drag through it puts the keyboard away. It stayed up until the send button was pressed with nothing written, hiding half the conversation and "I'm sorted".
+- The example app goes to the server `--dart-define=RENDEL_API=…` names. Built for a phone, it went to `http://localhost:3200` whatever the define said: the address was read with a `String.fromEnvironment` that was not `const`, which reads no define in such a build.
 
 ## 0.114.0
 

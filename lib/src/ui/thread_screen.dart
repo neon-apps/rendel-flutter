@@ -898,7 +898,12 @@ class _ThreadScreenState extends State<ThreadScreen> with WidgetsBindingObserver
     final spoken = _spoken;
     _overDetail(() {
       _spoken = spoken;
-      final sent = widget.controller.send(text, attachments: ids, image: image);
+      final sent = widget.controller.send(
+        text,
+        attachments: ids,
+        image: image,
+        spoken: spoken,
+      );
       _spoken = false;
       return sent;
     });

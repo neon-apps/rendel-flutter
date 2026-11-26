@@ -534,6 +534,7 @@ class RendelSupport {
 
   RendelSupport(this.api, {required this.user, required this.locale}) {
     unawaited(_loadSkipped());
+    unawaited(_loadContact());
   }
 
   final RendelApiClient api;
@@ -920,10 +921,58 @@ class RendelSupport {
     final error = answer.json?['error'];
     if (answer.status == 409 && error is Map && error['code'] == 'too_many_changes') return 'too_many';
     if (answer.status != 200) return 'failed';
+    unawaited(_keepContact(email));
     await load();
     if (answer.json?['state'] == 'verified') return 'verified';
     return answer.json?['emailed'] == true ? 'stated' : 'unsent';
   }
+
+  /// The address this person gave the team last on this phone: a later conversation's box comes filled with it, so
+  /// one tap gives it again (QA 2026-11-20, B8). Kept here and never on the server, which holds an address for one
+  /// conversation only (human-support §3.2b). Kept with who gave it, for them only; signing out forgets it.
+  String? get lastContact => _lastContact != null && _lastContact!.who == _who() ? _lastContact!.email : null;
+  ({String who, String email})? _lastContact;
+
+  static const _contactKey = 'rendel_support_email';
+
+  Future<void> _loadContact() async {
+    try {
+      // Who gave it, and the address.
+      final saved = (await SharedPreferences.getInstance()).getStringList(_contactKey);
+      if (_lastContact == null && saved != null && saved.length == 2) _lastContact = (who: saved[0], email: saved[1]);
+    } catch (_) {
+      // No storage: the address is kept for as long as the app runs.
+    }
+  }
+
+  Future<void> _keepContact(String email) async {
+    final kept = (who: _who(), email: email);
+    _lastContact = kept;
+    try {
+      await (await SharedPreferences.getInstance()).setStringList(_contactKey, [kept.who, kept.email]);
+    } catch (_) {}
+  }
+
+  Future<void> _forgetContact() async {
+    _lastContact = null;
+    try {
+      await (await SharedPreferences.getInstance()).remove(_contactKey);
+    } catch (_) {}
+  }
+
+  /// Where the card for the address given in [threadId] sits on its page: after the line that was newest when the
+  /// address was first seen given, never under each line since, where it read as the team writing again
+  /// (QA 2026-11-20, B8). Kept for the app's life, so the page opened again draws it there too; forgotten, and null,
+  /// once no address waits in that conversation ([stated] false).
+  int? contactAfter(String threadId, {required bool stated}) {
+    if (!stated) {
+      _contactAfter.remove(threadId);
+      return null;
+    }
+    return _contactAfter.putIfAbsent(threadId, () => _now.cursor);
+  }
+
+  final Map<String, int> _contactAfter = {};
 
   /// Asks for the address's code again: 'sent', 'later' (too soon after the last one, or no email can go now) or 'failed'.
   Future<String> resendCode() async {
@@ -1297,6 +1346,9 @@ class RendelSupport {
     }
     _askTimers.clear();
     _lookupsTaken.clear();
+    _contactAfter.clear();
+    // Nor the address they gave, on the phone either.
+    if (_lastContact != null) unawaited(_forgetContact());
     value.value = const RendelSupportSnapshot();
   }
 }

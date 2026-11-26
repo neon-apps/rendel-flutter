@@ -166,6 +166,10 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
   String? _codeNote;
   bool _resending = false;
 
+  /// The thread whose email box was filled with the address the person gave last on this phone: once a thread, so
+  /// an address they cleared stays cleared (QA 2026-11-20, B8).
+  String? _filledFor;
+
   /// A line landed while the person had scrolled up to read: the pill brings them back.
   bool _newBelow = false;
 
@@ -238,6 +242,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     _openedReads = widget.support.reads;
     _resets = widget.support.resets;
     _threadDrawn = widget.support.value.value.threadId;
+    _fill();
     // The stream follows a thread, so it opens once the thread is read.
     unawaited(widget.support.load().then((_) {
       if (!mounted) return;
@@ -257,6 +262,17 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   void _redraw() {
     if (mounted) setState(() {});
+  }
+
+  /// A conversation with no address yet: its email box comes filled with the one this person gave last on this phone,
+  /// and one tap on Save gives it again (QA 2026-11-20, B8). Never over what they typed.
+  void _fill() {
+    final v = widget.support.value.value;
+    final thread = v.threadId;
+    final last = widget.support.lastContact;
+    if (thread == null || thread == _filledFor || v.state?.contactState != 'none' || last == null) return;
+    _filledFor = thread;
+    if (_email.text.isEmpty) _email.text = last;
   }
 
   /// Shortened to what the API takes, or emptied: "too long" no longer holds (qa2-sdk-02).
@@ -291,6 +307,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       _changing = false;
       _codeNote = null;
     }
+    _fill();
     if (_newAfter == null && state != null && _fresh) _newAfter = (read: state.userReadSeq, last: state.lastSeq);
     setState(() {});
     // Read once the page has what the server has, and only while the app is in front of the person (sdk-22 f).
@@ -489,9 +506,20 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
       _rateThread = state!.threadId;
     }
     final lastMarker = v.entries.where((e) => e.marker).lastOrNull;
+    // The card that says the address went, or asks for its code, stays where the address was given: once a line comes
+    // after it, it stays above that line, its own card in the team's column, and never moves under each new line, where
+    // it read as the team writing again (QA 2026-11-20, B8). Until then it ends the team's column, as it did.
+    final givenAfter = v.threadId == null ? null : widget.support.contactAfter(v.threadId!, stated: state?.contactState == 'stated');
+    final givenInFlow = givenAfter != null && !resolved && v.cursor > givenAfter;
+    var givenPlaced = false;
     RendelSupportEntry? prev;
     DateTime? lastDay;
     for (final entry in v.entries) {
+      if (givenInFlow && !givenPlaced && entry.seq > givenAfter) {
+        givenPlaced = true;
+        run = null;
+        items.add(const _GivenMark());
+      }
       final before = prev;
       prev = entry;
       // The same read of their account said twice in a row is one line (check-08).
@@ -530,13 +558,14 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
     // "Read ✓" under the person's newest run the team has read (design A).
     final readSeq = state?.teamReadSeq ?? 0;
     final readRun = items.whereType<_Run>().where((r) => r.mine && readSeq >= r.entries.last.seq).lastOrNull;
-    final column = _teamColumn(context, theme, strings, need: need, asked: asked);
+    final column = _teamColumn(context, theme, strings, need: need, asked: asked, givenInFlow: givenInFlow);
     final lines = <Widget>[
       for (final item in items)
         switch (item) {
           _Run() => _run(context, theme, strings, item, read: identical(item, readRun)),
           _NewMark() => _newLine(context, theme, strings, item.at),
           _DayMark() => _dayLine(context, theme, item.at),
+          _GivenMark() => _teamSide(theme, strings, [_given(theme, strings)]),
           _ => _event(context, theme, strings, item as RendelSupportEntry),
         },
       if (column != null) column,
@@ -590,14 +619,22 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
                 child: Stack(
                   alignment: Alignment.bottomCenter,
                   children: [
-                    Semantics(
-                      liveRegion: true,
-                      child: ListView.separated(
-                        controller: _scroll,
-                        padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
-                        itemCount: lines.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 8),
-                        itemBuilder: (_, i) => lines[i],
+                    // A tap on the conversation, or a drag through it, puts the keyboard away, and with it what the
+                    // keyboard hid: half the lines and "I'm sorted" (QA 2026-11-20, B9). A tap on a field or a
+                    // button in a card is still theirs.
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                      child: Semantics(
+                        liveRegion: true,
+                        child: ListView.separated(
+                          controller: _scroll,
+                          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(12, 14, 12, 14),
+                          itemCount: lines.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          itemBuilder: (_, i) => lines[i],
+                        ),
                       ),
                     ),
                     if (_newBelow)
@@ -1048,7 +1085,8 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
 
   /// The team's side at the end of the page while it waits: their auto-reply about when they answer, and what they
   /// ask of the person (where to send the reply, the code it got, a read of their account).
-  Widget? _teamColumn(BuildContext context, RendelTheme theme, RendelStrings strings, {required String? need, required bool asked}) {
+  /// [givenInFlow]: the card for the address given is drawn where it was given, not here.
+  Widget? _teamColumn(BuildContext context, RendelTheme theme, RendelStrings strings, {required String? need, required bool asked, required bool givenInFlow}) {
     final v = widget.support.value.value;
     final state = v.state;
     final resolved = state?.resolved ?? false;
@@ -1094,7 +1132,7 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
           auto: true,
         ),
       if (need != null || offersContact) _contactCard(theme, strings, kind: need ?? 'optional'),
-      if (contact == 'stated' && !resolved) _changing ? _contactCard(theme, strings, kind: 'change') : _codeCard(theme, strings),
+      if (contact == 'stated' && !resolved && !givenInFlow) _given(theme, strings),
       // The contact block is a raised plate of its own: drawn as it is, never inside a second card (qa2-k1-01).
       if (reach != null) KeyedSubtree(key: const ValueKey('rd-support-reach'), child: ComponentRegistry.build(context, reach..ready = true, _dispatch)),
       // A read the team asked for that waits for the person's yes, in the server's words: Allow or Not now, never
@@ -1114,6 +1152,14 @@ class _RendelSupportSheetState extends State<RendelSupportSheet> with WidgetsBin
         ]),
     ];
     if (items.isEmpty) return null;
+    return _teamSide(theme, strings, items);
+  }
+
+  /// The card for the address given: its code, or another address in its place.
+  Widget _given(RendelTheme theme, RendelStrings strings) => _changing ? _contactCard(theme, strings, kind: 'change') : _codeCard(theme, strings);
+
+  /// What the team says and asks, under the team's name, on their side of the page.
+  Widget _teamSide(RendelTheme theme, RendelStrings strings, List<Widget> items) {
     final team = strings.supportTeamOf(widget.team);
     return _side(
       theme,
@@ -1821,6 +1867,11 @@ class _NewMark {
 class _DayMark {
   _DayMark(this.at);
   final DateTime at;
+}
+
+/// Where the card for the address given goes, once lines came after it.
+class _GivenMark {
+  const _GivenMark();
 }
 
 class _Run {

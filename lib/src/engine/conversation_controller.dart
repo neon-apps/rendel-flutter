@@ -520,6 +520,7 @@ class ConversationController extends ChangeNotifier {
     List<String> attachments = const [],
     RendelDetail? detail,
     Uint8List? image,
+    bool spoken = false,
   }) async {
     if (busy || text.trim().isEmpty || resting) return false;
     errorText = null;
@@ -538,6 +539,9 @@ class ConversationController extends ChangeNotifier {
       'message': {
         'text': text.trim(),
         if (detail != null) 'detail_of': detail.toWire(),
+        // Written by the recogniser: the server reads a misheard word as
+        // what was meant in this app.
+        if (spoken) 'spoken': true,
       },
       // Ids, uploaded before this turn was sent. Carried unchanged through
       // `retry` with the turn_id below, so the documented one-tap recovery

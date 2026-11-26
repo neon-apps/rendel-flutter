@@ -405,6 +405,34 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
+    testWidgets('puts the keyboard away on a tap on the conversation or a drag through it (QA 2026-11-20, B9)', (tester) async {
+      final server = _Server(
+        entries: [for (var i = 1; i <= 12; i++) _entry(i, text: 'Kargom hâlâ gelmedi, sipariş $i')],
+        state: _state(mode: 'human'),
+      );
+      tester.view.physicalSize = const Size(402, 874) * tester.view.devicePixelRatio;
+      addTearDown(tester.view.resetPhysicalSize);
+      await _open(tester, server.support());
+      final box = find.widgetWithText(TextField, 'Message the Grove team');
+      bool writing() => tester.widget<EditableText>(find.descendant(of: box, matching: find.byType(EditableText))).focusNode.hasFocus;
+      await tester.showKeyboard(box);
+      await tester.pump();
+      expect(writing(), isTrue);
+      // A tap on a line.
+      await tester.tap(find.text('Kargom hâlâ gelmedi, sipariş 12'));
+      await tester.pump();
+      expect(writing(), isFalse);
+      // A drag through the lines.
+      await tester.showKeyboard(box);
+      await tester.pump();
+      expect(writing(), isTrue);
+      await tester.drag(find.text('Kargom hâlâ gelmedi, sipariş 11'), const Offset(0, 200));
+      await tester.pump();
+      expect(writing(), isFalse);
+      await tester.pump(const Duration(milliseconds: 400));
+      await _close(tester);
+    });
+
     testWidgets('asks how it went once the team closed it: a thumb, a comment, then thanks', (tester) async {
       final server = _Server(
         entries: [_entry(1, author: 'agent', name: 'Ayşe', text: 'Çözüldü.')],
@@ -968,6 +996,70 @@ void main() {
       // The page's own ✕, above the card's.
       await tester.tap(find.byIcon(Icons.close_rounded).first);
       await _settle(tester);
+    });
+
+    testWidgets('keeps the card that says the address was saved where it was given, as the person goes on writing (QA 2026-11-20, B8)', (tester) async {
+      const saved = 'Email address saved. This is a test key, so no email is sent and there is no code to enter.';
+      final server = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: _state(contact: {'state': 'none', 'required': true}))..emailed = false;
+      final support = server.support();
+      // Tall enough for every line at once.
+      tester.view.physicalSize = const Size(402, 1400) * tester.view.devicePixelRatio;
+      addTearDown(tester.view.resetPhysicalSize);
+      await _open(tester, support, sandbox: true);
+      await tester.enterText(find.byType(TextField).first, 'zeynep@example.com');
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(find.text(saved), findsOneWidget);
+      await tester.enterText(find.widgetWithText(TextField, 'Message the Grove team'), 'Sipariş numarası 1042');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      await tester.enterText(find.widgetWithText(TextField, 'Message the Grove team'), 'Kutu da ezikti');
+      await tester.testTextInput.receiveAction(TextInputAction.send);
+      await _settle(tester);
+      // Between the line it followed and the lines written since, never under each new one.
+      double top(String text) => tester.getTopLeft(find.text(text)).dy;
+      expect(top('Kargom gelmedi'), lessThan(top(saved)));
+      expect(top(saved), lessThan(top('Sipariş numarası 1042')));
+      expect(top(saved), lessThan(top('Kutu da ezikti')));
+      // The page opened again draws it in the same place.
+      await _close(tester);
+      await _open(tester, support, sandbox: true);
+      expect(top('Kargom gelmedi'), lessThan(top(saved)));
+      expect(top(saved), lessThan(top('Sipariş numarası 1042')));
+      await _close(tester);
+      await tester.pump(const Duration(minutes: 1));
+    });
+
+    testWidgets("fills a later conversation's email box with the address the person gave last on this phone, for them only (QA 2026-11-20, B8)", (tester) async {
+      Map<String, dynamic> asking() => _state(contact: {'state': 'none', 'required': true});
+      final first = _Server(entries: [_entry(1, text: 'Kargom gelmedi')], state: asking());
+      await _open(tester, first.support());
+      await tester.enterText(find.byType(TextField).first, 'zeynep@example.com');
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      await _close(tester);
+      // Another conversation, on a session that reads it from the phone, as on a later launch: one tap gives it again.
+      final next = _Server(entries: [_entry(1, text: 'Bir sorum daha var')], state: asking());
+      final again = next.support();
+      await _open(tester, again);
+      expect(find.widgetWithText(TextField, 'zeynep@example.com'), findsOneWidget);
+      await tester.tap(find.text('Save'));
+      await _settle(tester);
+      expect(next.posts.singleWhere((p) => p.path == 'contact').body, {'email': 'zeynep@example.com'});
+      await _close(tester);
+      // Somebody else signed in on this phone: their box is empty.
+      final other = _Server(entries: [_entry(1, text: 'Merhaba')], state: asking());
+      await _open(tester, other.support(user: {'id': 'u2'}));
+      expect(find.widgetWithText(TextField, 'zeynep@example.com'), findsNothing);
+      await _close(tester);
+      // Signed out: the phone forgets it.
+      again.reset();
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+      final later = _Server(entries: [_entry(1, text: 'Merhaba')], state: asking());
+      await _open(tester, later.support());
+      expect(find.widgetWithText(TextField, 'zeynep@example.com'), findsNothing);
+      await _close(tester);
+      await tester.pump(const Duration(minutes: 1));
     });
 
     testWidgets('says a line did not go, and sends it again under the same id', (tester) async {

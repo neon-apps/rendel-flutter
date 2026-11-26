@@ -205,10 +205,13 @@ class _RingVoiceModeState extends State<RingVoiceMode>
     final dt = ((elapsed - _last).inMicroseconds / 1e6).clamp(0.0, 0.1);
     _last = elapsed;
     now = elapsed.inMicroseconds / 1e3;
-    final raw =
+    var raw =
         widget.listening && _phase == _Phase.listening
             ? (widget.level?.value ?? 0)
             : 0.0;
+    // A host's level that is no number would stay in the easing for good,
+    // and a NaN light paints the whole ground black.
+    if (!raw.isFinite) raw = 0;
     level += (raw - level) * (1 - math.exp(-dt * 14));
     // A quick tap shows no ring: it comes in once the press has lasted a moment.
     if (now > 120 || still) born = still ? 1 : math.min(1, born + dt / 0.3);
@@ -1426,7 +1429,7 @@ class _HaloPainter extends CustomPainter {
     if (!on) return;
     // The pill is drawn 1 inside its target; the band starts 1.5 outside it, 3.5 wide.
     final pill = (Offset.zero & size).deflate(1);
-    final scale = 1 + level.clamp(0.0, 1.0) * 0.12;
+    final scale = 1 + (level.isFinite ? level.clamp(0.0, 1.0) : 0.0) * 0.12;
     final c = pill.center;
     canvas.save();
     canvas.translate(c.dx, c.dy);

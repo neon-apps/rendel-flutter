@@ -168,6 +168,11 @@ class RendelSpeech {
         listenOptions: SpeechListenOptions(
           localeId: await _availableLocale(locale),
           partialResults: true,
+          /* Whole sentences, not a yes or a no. The plugin's default is
+             `confirmation`, iOS's hint for short replies: a question spoken
+             as a sentence came back late and with its own words misheard
+             ("look'umu" as "uykumu", Blushy, Özlem 2026-11-26). */
+          listenMode: ListenMode.dictation,
           listenFor: const Duration(seconds: 60),
           // The microphone is held while it listens, and letting go is what
           // ends it: a pause to think must not send half a question.
@@ -199,6 +204,11 @@ class RendelSpeech {
   }
 
   void _heardLevel(double raw) {
+    /* Silence, on iOS, is `20 * log10(0)`: minus infinity. Kept as the
+       quietest, every level after it was infinity over infinity, NaN, and
+       voice mode painted its ground black for the rest of the press (Blushy,
+       Özlem 2026-11-26). A level that is no number is no level. */
+    if (!raw.isFinite) return;
     final quietest = _quietest = math.min(_quietest ?? raw, raw);
     final loudest = _loudest = math.max(_loudest ?? raw, raw);
     level.value = loudest - quietest < 1 ? 0 : (raw - quietest) / (loudest - quietest);
@@ -240,6 +250,20 @@ class RendelSpeech {
   /// it fails the session with a permanent error the instant it starts.
   Future<String?> _availableLocale(String? wanted) async {
     if (wanted == null) return null;
+    // Asked once: the device's list does not change while the app runs, and
+    // each press waited on it before the microphone opened.
+    final found = _locale ??= _findLocale(wanted);
+    try {
+      return await found;
+    } catch (_) {
+      _locale = null;
+      rethrow;
+    }
+  }
+
+  Future<String?>? _locale;
+
+  Future<String?> _findLocale(String wanted) async {
     final target = wanted.toLowerCase().replaceAll('-', '_');
     final language = target.split('_').first;
     final locales = await _speech.locales();
