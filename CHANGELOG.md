@@ -5,6 +5,9 @@ semantic versioning: while the version is below 1.0.0 a minor bump may carry a
 breaking change, and each one is listed under **Breaking** with the edit it
 asks of you.
 
+## 0.116.0
+- `RendelSchema.file()` declares a parameter that takes a file the person attached in the conversation. The handler is given the attachment's id, and `Rendel.attachment(id)` returns the file (`RendelAttachment`), from this run's own uploads or, after a restart, from the server, which returns it only to the device that attached it. An action that took a photo used to open the gallery for one already in the chat.
+
 ## 0.115.0
 
 ### Fixed

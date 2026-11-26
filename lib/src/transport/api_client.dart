@@ -279,7 +279,9 @@ class RendelApiClient {
         .timeout(config.requestTimeout);
 
     if (response.statusCode == 201) {
-      return (jsonDecode(response.body) as Map<String, dynamic>)['id'] as String;
+      final id = (jsonDecode(response.body) as Map<String, dynamic>)['id'] as String;
+      _keepUploaded(id, RendelAttachment(bytes: bytes, name: fileName ?? 'file', mediaType: mediaType));
+      return id;
     }
 
     // The server's own words, not ours. It is the end that knows the ceiling
@@ -297,6 +299,49 @@ class RendelApiClient {
       // Not the JSON envelope.
     }
     throw RendelUploadFailure(message);
+  }
+
+  /// The files this run uploaded, newest last, for an action handed one of
+  /// their ids ([Rendel.attachment]): the bytes are already here, so the
+  /// common case (attach, ask, confirm) asks the server for nothing.
+  static final Map<String, RendelAttachment> _uploaded = {};
+  static const int _uploadedKept = 8;
+
+  static void _keepUploaded(String id, RendelAttachment file) {
+    _uploaded.remove(id);
+    _uploaded[id] = file;
+    while (_uploaded.length > _uploadedKept) {
+      _uploaded.remove(_uploaded.keys.first);
+    }
+  }
+
+  /// GET /v1/uploads/:id → a file this device attached, by the id an action
+  /// was handed. From this run's own uploads when it has them; else the
+  /// server's copy, which it returns only to the device that attached it.
+  /// Null when there is no such file for this device or it cannot be read now.
+  Future<RendelAttachment?> attachment(String id) async {
+    final kept = _uploaded[id];
+    if (kept != null) return kept;
+    try {
+      final response = await _http
+          .get(
+            Uri.parse('${config.apiBaseUrl}/v1/uploads/${Uri.encodeComponent(id)}'),
+            headers: {'X-Rendel-Key': appKey, 'X-Rendel-Device': deviceId},
+          )
+          .timeout(config.requestTimeout);
+      if (response.statusCode != 200) return null;
+      final type = (response.headers['content-type'] ?? 'application/octet-stream').split(';').first.trim();
+      final header = response.headers['x-rendel-filename'];
+      final file = RendelAttachment(
+        bytes: response.bodyBytes,
+        name: header != null && header.isNotEmpty ? Uri.decodeComponent(header) : 'file',
+        mediaType: type,
+      );
+      _keepUploaded(id, file);
+      return file;
+    } catch (_) {
+      return null;
+    }
   }
 
   /// POST /v1/apps/launcher-snapshot → a picture of the launcher the app

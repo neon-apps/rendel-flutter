@@ -40,6 +40,27 @@ class RendelSchema {
         if (titles != null && titles.isNotEmpty) 'titles': titles,
       };
 
+  /// A file the person attached in the conversation: a photo, a PDF.
+  ///
+  /// The handler is given the attachment's id; [Rendel.attachment] turns it
+  /// into the bytes. Make it [optional] when the action can also ask for the
+  /// file itself (open the gallery) where nobody attached one. The card shows
+  /// an attached picture as the picture.
+  ///
+  /// ```dart
+  /// params: {'photo': RendelSchema.file(description: 'The outfit photo.').optional},
+  /// handler: (p) async {
+  ///   final photo = await Rendel.attachment(p['photo'] as String?);
+  ///   ...
+  /// },
+  /// ```
+  static RendelSchema file({String? description, String? title, Map<String, String>? titles}) => RendelSchema._({
+        'type': 'string',
+        'format': 'attachment',
+        if (description != null) 'description': description,
+        ..._titled(title, titles),
+      });
+
   /// A list of [items], e.g. `RendelSchema.list(RendelSchema.string())`.
   ///
   /// Absent until now, which made "the ids the user picked" impossible to

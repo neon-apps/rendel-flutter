@@ -569,6 +569,17 @@ class Rendel {
     }
   }
 
+  /// The file the person attached in the conversation, for an action's
+  /// [RendelSchema.file] parameter: its bytes, name and type. Null for a null
+  /// or empty [id] (nobody attached one), and where the file cannot be had
+  /// (another device's, or the network is down), so the action can ask for
+  /// the file itself instead.
+  static Future<RendelAttachment?> attachment(String? id) async {
+    if (id == null || id.trim().isEmpty) return null;
+    final api = await _whenClient();
+    return api?.attachment(id.trim());
+  }
+
   static void registerAction(RendelAction action) {
     _actions[action.name] = action;
     _manifestSynced = false;
